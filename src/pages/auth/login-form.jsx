@@ -21,6 +21,7 @@ import { useDispatch } from "react-redux";
 import { login } from "@/redux/slices/authSlice";
 import { useNavigate } from "react-router";
 import { loginUser } from "@/services/authApi";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   username: z
@@ -107,8 +108,15 @@ const LoginForm = ({ className, ...props }) => {
                 )}
               </Field>
               <Field>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Logging in..." : "Login"}
+                <Button type="submit" variant="green" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Logging in
+                    </>
+                  ) : (
+                    "Login"
+                  )}
                 </Button>
               </Field>
             </FieldGroup>

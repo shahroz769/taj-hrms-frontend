@@ -1,0 +1,187 @@
+.sidebarParent {
+  background-color: #fff;
+  width: 290px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 35px;
+  position: relative;
+  border-right: 1px solid #e4e7ec;
+}
+
+.sidebarTop {
+  display: flex;
+  flex-direction: column;
+  gap: 35px;
+  position: relative;
+  overflow-y: auto;
+  padding: 20px 20px 64px 20px;
+  /* margin-bottom: 64px; */
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+/* Menu Section */
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  user-select: none;
+}
+
+.menuItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menuItemTitle {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #345435;
+  justify-content: space-between;
+  font-size: 14px;
+  user-select: none;
+}
+
+.menuItemTitle:hover {
+  background-color: #e6eeea;
+}
+
+.menuItemTitleActive {
+  background-color: #e6eeea;
+  font-weight: 500;
+}
+
+.menuItemTitleLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuItemTitleRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subMenu {
+  display: flex;
+  flex-direction: column;
+  color: #345435;
+  font-size: 14px;
+  gap: 2px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.subMenuOpen {
+  max-height: 500px;
+}
+
+.subMenuClosed {
+  max-height: 0;
+}
+
+.subMenuItem {
+  padding: 8px 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 400;
+  user-select: none;
+}
+
+.subMenuItem:hover {
+  background-color: #e6eeea;
+}
+
+.subMenuItemActive {
+  background-color: #e6eeea;
+  font-weight: 500;
+}
+
+.subMenuItemActive:hover {
+  background-color: #e6eeea;
+}
+
+/* Footer */
+
+.footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #ffffff;
+  width: 90%;
+  padding: 12px 20px;
+  color: #344054;
+  font-size: 16px;
+}
+
+.profileInitials {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #eff4fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.profileName {
+  font-weight: 600;
+}
+
+/* Scrollbar */
+
+/* === CHROME / EDGE / SAFARI / OPERA === */
+
+/* Width of scrollbar */
+.sidebarTop::-webkit-scrollbar {
+  width: 6px; /* adjust thickness */
+}
+
+/* Scrollbar track (background behind thumb) */
+.sidebarTop::-webkit-scrollbar-track {
+  background: #ffffff; /* <-- match to your sidebarTop background */
+  border-radius: 0;
+}
+
+/* Scrollbar thumb (moving part) */
+.sidebarTop::-webkit-scrollbar-thumb {
+  background: #ffffff; /* scrollbar color */
+  border-radius: 4px;
+}
+
+/* Hover effect (optional) */
+.sidebarTop::-webkit-scrollbar-thumb:hover {
+  background: #ffffff;
+}
+
+/* Remove arrows (top/bottom buttons) */
+.sidebarTop::-webkit-scrollbar-button {
+  height: 0;
+  display: none;
+}
+
+/* Remove corner (bottom-right for both-axis scroll) */
+.sidebarTop::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* === FIREFOX === */
+.sidebarTop {
+  scrollbar-width: thin; /* auto | thin | none */
+  scrollbar-color: #999 #ffffff; /* thumb | track */
+}

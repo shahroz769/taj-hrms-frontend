@@ -1,14 +1,28 @@
 import { ROLES } from "../../utils/roles";
+import {
+  LayoutGridIcon,
+  FileSlidersIcon,
+  IdCardLanyardIcon,
+  ClipboardClockIcon,
+  CalendarCheckIcon,
+  MessageSquareWarningIcon,
+  ChevronDownIcon,
+} from "lucide-react";
 
 export const sidebarItems = [
   {
-    name: "Dashboard",
+    label: "Dashboard",
     path: "/dashboard",
+    icon: LayoutGridIcon,
     roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: false,
   },
   {
     label: "Setups",
+    icon: FileSlidersIcon,
     roles: [ROLES.admin],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
     children: [
       { label: "Departments Setup", path: "/setups/departments" },
       { label: "Positions Setup", path: "/setups/positions" },
@@ -17,7 +31,10 @@ export const sidebarItems = [
   },
   {
     label: "Workforce",
+    icon: IdCardLanyardIcon,
     roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
     children: [
       { label: "All Employees", path: "/workforce/all-employees" },
       { label: "Shift Requests", path: "/workforce/shift-requests" },
@@ -27,12 +44,18 @@ export const sidebarItems = [
   },
   {
     label: "Attendance",
+    icon: ClipboardClockIcon,
     roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
     children: [{ label: "Attendance Records", path: "/attendance/records" }],
   },
   {
     label: "Leaves",
+    icon: CalendarCheckIcon,
     roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
     children: [
       { label: "Leaves Types", path: "/leaves/types" },
       { label: "Leaves Applications", path: "/leaves/applications" },
@@ -40,7 +63,10 @@ export const sidebarItems = [
   },
   {
     label: "Compliance",
+    icon: MessageSquareWarningIcon,
     roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
     children: [
       {
         label: "Work Progress Reports",
