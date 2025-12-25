@@ -1,0 +1,98 @@
+/* Table Styles */
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tableHead {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tableHeadRow {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tableHeader {
+  padding: 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #02542d;
+}
+
+.tableHeaderRight {
+  padding: 16px 16px 16px 0;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: #02542d;
+}
+
+/* .tableBody {
+} */
+
+.tableRow {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s ease;
+}
+
+.tableRow:hover {
+  background-color: #f9fafb;
+}
+
+.tableCell {
+  padding: 16px 0;
+  color: #667085;
+}
+
+.tableCellMedium {
+  padding: 16px 0;
+  /* font-weight: 500; */
+  color: #667085;
+  font-size: 16px;
+}
+
+.tableCellRight {
+  padding: 16px 16px 16px 0;
+  text-align: right;
+  font-size: 16px;
+}
+
+/* Actions */
+.actionsContainer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.actionButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: #9ca3af;
+  transition: color 0.2s ease;
+}
+
+.actionButton:hover {
+  color: #2563eb;
+}
+
+.actionButtonDelete {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: #f87171;
+  transition: color 0.2s ease;
+}
+
+.actionButtonDelete:hover {
+  color: #dc2626;
+}
