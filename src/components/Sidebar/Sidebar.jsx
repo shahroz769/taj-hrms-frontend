@@ -2,15 +2,37 @@ import { sidebarItems } from "./sidebarConfig";
 import { useSelector } from "react-redux";
 import styles from "./Sidebar.module.css";
 import logo from "../../assets/taj-logo.png";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useMemo } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UserIcon } from "lucide-react";
+import { logout } from "@/redux/slices/authSlice";
+import { useDispatch } from "react-redux";
+import { logoutUser } from "@/services/authApi";
 
 const Sidebar = () => {
   const role = useSelector((state) => state.auth.user?.role);
   const location = useLocation();
-  
-  const filteredSidebarItems = useMemo(() => 
-    sidebarItems.filter((item) => item.roles.includes(role)),
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.user);
+  const firstInitial = user?.name?.charAt(0).toUpperCase() ?? "U";
+
+  const logOut = async () => {
+    await logoutUser();
+    dispatch(logout());
+    navigate("/login");
+  };
+
+  const filteredSidebarItems = useMemo(
+    () => sidebarItems.filter((item) => item.roles.includes(role)),
     [role]
   );
 
@@ -56,7 +78,8 @@ const Sidebar = () => {
                   <Link
                     to={item.path}
                     className={`${styles.menuItemTitle} ${
-                      location.pathname === item.path || (item.path === "/dashboard" && location.pathname === "/")
+                      location.pathname === item.path ||
+                      (item.path === "/dashboard" && location.pathname === "/")
                         ? styles.menuItemTitleActive
                         : ""
                     }`}
@@ -67,10 +90,10 @@ const Sidebar = () => {
                     </div>
                   </Link>
                 ) : (
-                  <div 
+                  <div
                     className={styles.menuItemTitle}
                     onClick={() => item.collapsible && toggleItem(index)}
-                    style={{ cursor: item.collapsible ? 'pointer' : 'default' }}
+                    style={{ cursor: item.collapsible ? "pointer" : "default" }}
                   >
                     <div className={styles.menuItemTitleLeft}>
                       {item.icon && <item.icon size={20} color="#344054" />}
@@ -78,12 +101,14 @@ const Sidebar = () => {
                     </div>
                     <div className={styles.menuItemTitleRight}>
                       {item.collapsible && (
-                        <item.collapseIcon 
-                          size={20} 
+                        <item.collapseIcon
+                          size={20}
                           color="#344054"
-                          style={{ 
-                            transform: openItems[index] ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.3s ease-in-out'
+                          style={{
+                            transform: openItems[index]
+                              ? "rotate(180deg)"
+                              : "rotate(0deg)",
+                            transition: "transform 0.3s ease-in-out",
                           }}
                         />
                       )}
@@ -91,12 +116,22 @@ const Sidebar = () => {
                   </div>
                 )}
                 {item.children && (
-                  <div className={`${styles.subMenu} ${openItems[index] ? styles.subMenuOpen : styles.subMenuClosed}`}>
+                  <div
+                    className={`${styles.subMenu} ${
+                      openItems[index]
+                        ? styles.subMenuOpen
+                        : styles.subMenuClosed
+                    }`}
+                  >
                     {item.children.map((subItem, subIndex) => (
-                      <Link 
-                        key={subIndex} 
-                        to={subItem.path} 
-                        className={`${styles.subMenuItem} ${location.pathname === subItem.path ? styles.subMenuItemActive : ''}`}
+                      <Link
+                        key={subIndex}
+                        to={subItem.path}
+                        className={`${styles.subMenuItem} ${
+                          location.pathname === subItem.path
+                            ? styles.subMenuItemActive
+                            : ""
+                        }`}
                       >
                         {subItem.label}
                       </Link>
@@ -107,12 +142,37 @@ const Sidebar = () => {
             ))}
           </div>
         </div>
+
         {/* Footer Section */}
         <div className={styles.footer}>
           <div className={styles.profileInitials}>
-            <p>HM</p>
+            <div className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      className="relative flex items-center justify-center w-8 h-8 bg-gray-200 rounded-full"
+                    >
+                      {firstInitial}
+                    </Button>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuItem className="p-0">
+                    <Button
+                      className="justify-start w-full h-4 px-2 py-4"
+                      variant="ghost"
+                      onClick={logOut}
+                    >
+                      Log Out
+                    </Button>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-          <p className={styles.profileName}>Hady Malik</p>
+          <p className={styles.profileName}>{user?.name ?? "User"}</p>
         </div>
       </aside>
     </>

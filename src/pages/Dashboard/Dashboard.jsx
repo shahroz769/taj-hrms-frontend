@@ -2,9 +2,11 @@ import styles from "./Dashboard.module.css";
 
 const Dashboard = () => {
   return (
-    <>
-      <h1 className={styles.title}>Dashboard</h1>
-    </>
+    <div className={styles.container}>
+      <div>
+        <h1 className={styles.title}>Dashboard</h1>
+      </div>
+    </div>
   );
 };
 

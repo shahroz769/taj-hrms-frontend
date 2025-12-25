@@ -22,6 +22,7 @@ import { login } from "@/redux/slices/authSlice";
 import { useNavigate } from "react-router";
 import { loginUser } from "@/services/authApi";
 import { Loader2 } from "lucide-react";
+import logo from "@/assets/taj-logo.png";
 
 const formSchema = z.object({
   username: z
@@ -66,9 +67,12 @@ const LoginForm = ({ className, ...props }) => {
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-4", className)} {...props}>
       <Card>
         <CardHeader>
+          <div className="flex justify-center mb-4">
+            <img src={logo} alt="Logo" />
+          </div>
           <CardTitle>Login to your account</CardTitle>
           <CardDescription>
             Enter your username below to login to your account

@@ -11,7 +11,6 @@ import {
 const Header = () => {
   const { pathname } = useLocation();
   const breadcrumbs = getBreadcrumbs(pathname);
-  console.log("Breadcrumbs:", breadcrumbs);
 
   return (
     <div className={styles.header}>
