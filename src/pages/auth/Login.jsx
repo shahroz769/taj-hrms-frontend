@@ -1,4 +1,4 @@
-import LoginForm from "@/pages/Auth/login-form";
+import LoginForm from "@/pages/auth/login-form";
 
 function LoginPage() {
   return (
