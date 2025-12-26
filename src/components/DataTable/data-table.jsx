@@ -22,7 +22,7 @@ const DataTable = ({ columns, data, onEdit, onDelete }) => {
         </thead>
         <tbody className={styles.tableBody}>
           {data.map((row) => (
-            <tr key={row.id} className={styles.tableRow}>
+            <tr key={row._id || row.id} className={styles.tableRow}>
               {columns.map((column, index) => {
                 if (column.key === "actions") {
                   return (

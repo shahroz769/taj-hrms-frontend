@@ -4,11 +4,13 @@ import Header from "@/components/Header/Header";
 
 const DashboardLayout = () => {
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex-1">
-        <Header />
-        <Outlet />
+      <div className="flex-1 flex flex-col min-h-0">
+        <Header className="shrink-0" />
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </div>
     </div>
   );
