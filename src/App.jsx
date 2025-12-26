@@ -1,6 +1,6 @@
 import "./App.css";
 import { BrowserRouter, Route, Routes } from "react-router";
-import LoginPage from "./pages/auth/Login";
+import LoginPage from "./pages/Auth/Login";
 import { useDispatch } from "react-redux";
 import { login, setAuthChecking } from "./redux/slices/authSlice";
 import { refreshToken } from "./services/authApi";
@@ -33,7 +33,6 @@ function App() {
       try {
         // await new Promise(resolve => setTimeout(resolve, 2000));
         const response = await refreshToken();
-        console.log("Token refreshed:", response.data);
         dispatch(login(response.data));
         return response.data;
       } catch (error) {

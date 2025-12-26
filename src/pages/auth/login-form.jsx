@@ -58,7 +58,6 @@ const LoginForm = ({ className, ...props }) => {
   const onSubmit = async (data) => {
     try {
       const response = await loginUser(data);
-      console.log(response.data);
       dispatch(login(response.data));
       navigate("/", { replace: true });
     } catch (error) {

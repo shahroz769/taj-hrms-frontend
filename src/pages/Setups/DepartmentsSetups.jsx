@@ -22,7 +22,11 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import DataTable from "@/components/DataTable/data-table";
-import { createDepartment, fetchDepartments } from "@/services/departmentsApi";
+import {
+  createDepartment,
+  fetchDepartments,
+  updateDepartment,
+} from "@/services/departmentsApi";
 import styles from "./DepartmentsSetups.module.css";
 
 const DepartmentsSetups = () => {
@@ -30,6 +34,7 @@ const DepartmentsSetups = () => {
   const [unlimitedChecked, setUnlimitedChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
+  const [editingDepartment, setEditingDepartment] = useState(null);
 
   // React Query
   const queryClient = useQueryClient();
@@ -46,11 +51,29 @@ const DepartmentsSetups = () => {
       setUnlimitedChecked(false);
       setDialogOpen(false);
       setErrors({});
+      setEditingDepartment(null);
     },
     onError: (error) => {
       console.error("Error creating department:", error);
       const errorMessage =
         error.response?.data?.message || "Failed to create department";
+      setErrors({ server: errorMessage });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }) => updateDepartment(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      setUnlimitedChecked(false);
+      setDialogOpen(false);
+      setErrors({});
+      setEditingDepartment(null);
+    },
+    onError: (error) => {
+      console.error("Error updating department:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to update department";
       setErrors({ server: errorMessage });
     },
   });
@@ -86,6 +109,9 @@ const DepartmentsSetups = () => {
 
   // Event handlers
   const handleEdit = (row) => {
+    setEditingDepartment(row);
+    setUnlimitedChecked(row.positionCount === "Unlimited");
+    setDialogOpen(true);
     console.log("Edit:", row);
   };
 
@@ -121,36 +147,25 @@ const DepartmentsSetups = () => {
       return;
     }
 
-    mutation.mutate(payload, {
-      onSuccess: () => {
-        e.target.reset();
-      },
-    });
+    if (editingDepartment) {
+      // Update existing department
+      updateMutation.mutate(
+        { id: editingDepartment._id, payload },
+        {
+          onSuccess: () => {
+            e.target.reset();
+          },
+        }
+      );
+    } else {
+      // Create new department
+      mutation.mutate(payload, {
+        onSuccess: () => {
+          e.target.reset();
+        },
+      });
+    }
   };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>Dashboard</h1>
-        </div>
-        <p>Loading departments...</p>
-      </div>
-    );
-  }
-
-  // Error state
-  if (isError) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>Dashboard</h1>
-        </div>
-        <p>Error loading departments. Please try again.</p>
-      </div>
-    );
-  }
 
   return (
     <div className={styles.container}>
@@ -162,16 +177,20 @@ const DepartmentsSetups = () => {
             setDialogOpen(open);
             if (!open) {
               setErrors({});
+              setEditingDepartment(null);
+              setUnlimitedChecked(false);
             }
           }}
         >
           <DialogTrigger asChild>
-            <Button variant="green">Add Department</Button>
+            <Button variant="green" className="cursor-pointer">
+              Add Department
+            </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                Add Department
+                {editingDepartment ? "Edit Department" : "Add Department"}
               </DialogTitle>
               <DialogDescription className="sr-only">
                 Create a new department by entering the name and position
@@ -193,6 +212,7 @@ const DepartmentsSetups = () => {
                     id="department-name"
                     name="department-name"
                     placeholder="Enter department name"
+                    defaultValue={editingDepartment?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
@@ -208,6 +228,11 @@ const DepartmentsSetups = () => {
                       name="position-limits"
                       placeholder="Enter position limits"
                       disabled={unlimitedChecked}
+                      defaultValue={
+                        editingDepartment?.positionCount !== "Unlimited"
+                          ? editingDepartment?.positionCount || ""
+                          : ""
+                      }
                     />
                     <InputGroupAddon align="inline-end">
                       <Checkbox
@@ -232,20 +257,27 @@ const DepartmentsSetups = () => {
               </div>
               <DialogFooter className="mt-4">
                 <DialogClose asChild>
-                  <Button type="button" variant="outline">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                  >
                     Cancel
                   </Button>
                 </DialogClose>
                 <Button
                   type="submit"
                   variant="green"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || updateMutation.isPending}
+                  className="cursor-pointer"
                 >
-                  {mutation.isPending ? (
+                  {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating
+                      {editingDepartment ? "Updating" : "Creating"}
                     </>
+                  ) : editingDepartment ? (
+                    "Update"
                   ) : (
                     "Create"
                   )}
@@ -261,6 +293,8 @@ const DepartmentsSetups = () => {
         data={data || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        isLoading={isLoading}
+        isError={isError}
       />
     </div>
   );

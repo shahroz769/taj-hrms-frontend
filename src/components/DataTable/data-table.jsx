@@ -1,6 +1,32 @@
+import { Loader2 } from "lucide-react";
 import styles from "./data-table.module.css";
 
-const DataTable = ({ columns, data, onEdit, onDelete }) => {
+const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
+  if (isLoading) {
+    return (
+      <div className={styles.stateContainer}>
+        <Loader2 className={styles.loader} />
+        <p className={styles.stateText}>Loading departments...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className={styles.errorContainer}>
+        <p className={styles.errorText}>Error loading departments. Please try again.</p>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className={styles.stateContainer}>
+        <p className={styles.stateText}>No departments found.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>

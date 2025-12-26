@@ -1,13 +1,7 @@
 import styles from "./Dashboard.module.css";
 
 const Dashboard = () => {
-  return (
-    <div className={styles.container}>
-      <div>
-        <h1 className={styles.title}>Dashboard</h1>
-      </div>
-    </div>
-  );
+  return <h1 className={styles.title}>Dashboard</h1>;
 };
 
 export default Dashboard;
