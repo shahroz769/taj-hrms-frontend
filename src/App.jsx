@@ -1,6 +1,6 @@
 import "./App.css";
 import { BrowserRouter, Route, Routes } from "react-router";
-import LoginPage from "./pages/Auth/Login";
+import LoginPage from "./pages/auth/Login";
 import { useDispatch } from "react-redux";
 import { login, setAuthChecking } from "./redux/slices/authSlice";
 import { refreshToken } from "./services/authApi";
