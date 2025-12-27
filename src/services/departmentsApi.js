@@ -19,4 +19,9 @@ export const updateDepartment = async (id, payload) => {
   console.log("Updating department with ID:", id, "and payload:", payload);
   const res = await API.put(`/api/departments/${id}`, payload);
   return res.data;
-}
+};
+
+export const deleteDepartment = async (id) => {
+  const res = await API.delete(`/api/departments/${id}`);
+  return res.data;
+};

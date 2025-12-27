@@ -10,3 +10,14 @@ html {
 #root {
   background-color: #E6EEEA;
 }
+
+/* Global text selection color */
+::selection {
+  background-color: #02542d;
+  color: white;
+}
+
+::-moz-selection {
+  background-color: #02542d;
+  color: white;
+}

@@ -10,6 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import {
   InputGroup,
@@ -24,6 +35,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTable from "@/components/DataTable/data-table";
 import {
   createDepartment,
+  deleteDepartment,
   fetchDepartments,
   updateDepartment,
 } from "@/services/departmentsApi";
@@ -35,6 +47,8 @@ const DepartmentsSetups = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editingDepartment, setEditingDepartment] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingDepartment, setDeletingDepartment] = useState(null);
 
   // React Query
   const queryClient = useQueryClient();
@@ -78,6 +92,18 @@ const DepartmentsSetups = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteDepartment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      setDeleteDialogOpen(false);
+      setDeletingDepartment(null);
+    },
+    onError: (error) => {
+      console.error("Error deleting department:", error);
+    },
+  });
+
   // Table columns configuration
   const columns = [
     {
@@ -112,11 +138,17 @@ const DepartmentsSetups = () => {
     setEditingDepartment(row);
     setUnlimitedChecked(row.positionCount === "Unlimited");
     setDialogOpen(true);
-    console.log("Edit:", row);
   };
 
   const handleDelete = (row) => {
-    console.log("Delete:", row);
+    setDeletingDepartment(row);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingDepartment) {
+      deleteMutation.mutate(deletingDepartment._id);
+    }
   };
 
   const handleCreateDepartment = (e) => {
@@ -171,6 +203,7 @@ const DepartmentsSetups = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Departments Setup</h1>
+
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -296,6 +329,53 @@ const DepartmentsSetups = () => {
         isLoading={isLoading}
         isError={isError}
       />
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            // Delay clearing state to allow dialog animation to complete
+            setTimeout(() => {
+              setDeletingDepartment(null);
+            }, 200);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#02542D]">
+              Delete Department
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the department{" "}
+              <span className="font-semibold text-[#02542D]">
+                "{deletingDepartment?.name}"
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
