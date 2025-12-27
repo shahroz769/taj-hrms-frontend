@@ -145,32 +145,30 @@ const Sidebar = () => {
 
         {/* Footer Section */}
         <div className={styles.footer}>
-          <div className={styles.profileInitials}>
-            <div className="flex items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center">
-                    <Button
-                      variant="ghost"
-                      className="relative flex items-center justify-center w-8 h-8 bg-gray-200 rounded-full"
-                    >
-                      {firstInitial}
-                    </Button>
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuItem className="p-0">
-                    <Button
-                      className="justify-start w-full h-4 px-2 py-4"
-                      variant="ghost"
-                      onClick={logOut}
-                    >
-                      Log Out
-                    </Button>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          <div className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    className="relative flex items-center justify-center w-9 h-9 bg-[#e6eeea] rounded-full"
+                  >
+                    {firstInitial}
+                  </Button>
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem className="p-0">
+                  <Button
+                    className="justify-start w-full h-4 px-2 py-4"
+                    variant="ghost"
+                    onClick={logOut}
+                  >
+                    Log Out
+                  </Button>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <p className={styles.profileName}>{user?.name ?? "User"}</p>
         </div>
