@@ -23,6 +23,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import { ROLES } from "./utils/roles";
 import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   const dispatch = useDispatch();
@@ -133,6 +134,7 @@ function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster richColors position="bottom-right" />
     </>
   );
 }

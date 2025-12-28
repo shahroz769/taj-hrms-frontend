@@ -1,7 +1,7 @@
 import styles from "./Header.module.css";
 import { useLocation } from "react-router";
 import { getBreadcrumbs } from "@/utils/breadcrumbUtils";
-import { ChevronRightIcon, SearchIcon } from "lucide-react";
+import { ChevronRightIcon, SearchIcon, CircleXIcon } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -34,12 +34,18 @@ const Header = () => {
       </div>
 
       {/* Search */}
-      <InputGroup className={styles.searchInput}>
+      {/* <InputGroup className={styles.searchInput}>
         <InputGroupInput placeholder="Search..." />
         <InputGroupAddon>
           <SearchIcon />
         </InputGroupAddon>
-      </InputGroup>
+        <InputGroupAddon
+          align="inline-end"
+          className="cursor-pointer hover:text-[#02542D]"
+        >
+          <CircleXIcon />
+        </InputGroupAddon>
+      </InputGroup> */}
     </div>
   );
 };

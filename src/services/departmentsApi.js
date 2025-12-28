@@ -1,7 +1,13 @@
 import API from "./api";
 
-export const fetchDepartments = async () => {
-  const res = await API.get(`/api/departments`);
+export const fetchDepartments = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+}) => {
+  const res = await API.get(`/api/departments`, {
+    params: { page, limit, search },
+  });
   return res.data;
 };
 

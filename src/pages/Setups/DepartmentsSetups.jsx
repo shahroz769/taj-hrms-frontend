@@ -21,6 +21,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import {
   InputGroup,
@@ -28,10 +46,11 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
-import { Loader2, PencilIcon, TrashIcon } from "lucide-react";
-import { useState } from "react";
+import { Loader2, PencilIcon, PlusIcon, TrashIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
+import { SearchIcon, CircleXIcon } from "lucide-react";
 import DataTable from "@/components/DataTable/data-table";
 import {
   createDepartment,
@@ -39,9 +58,30 @@ import {
   fetchDepartments,
   updateDepartment,
 } from "@/services/departmentsApi";
+import { formatDate } from "@/utils/dateUtils";
 import styles from "./DepartmentsSetups.module.css";
+import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
 const DepartmentsSetups = () => {
+  // URL Search Params
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Get initial values from URL or use defaults
+  const getInitialLimit = () => {
+    const urlLimit = searchParams.get("limit");
+    return urlLimit ? Number(urlLimit) : 10;
+  };
+
+  const getInitialPage = () => {
+    const urlPage = searchParams.get("page");
+    return urlPage ? Number(urlPage) : 1;
+  };
+
+  const getInitialSearch = () => {
+    return searchParams.get("search") || "";
+  };
+
   // State
   const [unlimitedChecked, setUnlimitedChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,13 +89,52 @@ const DepartmentsSetups = () => {
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingDepartment, setDeletingDepartment] = useState(null);
+  const [searchValue, setSearchValue] = useState(getInitialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
+  const [limit, setLimit] = useState(getInitialLimit);
+  const [page, setPage] = useState(getInitialPage);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchValue);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  // Reset to page 1 when debounced search changes (after user stops typing)
+  useEffect(() => {
+    if (searchValue !== "") {
+      setPage(1);
+    }
+  }, [debouncedSearch]);
+
+  // Update URL when limit, page, or debouncedSearch changes
+  useEffect(() => {
+    const params = {};
+
+    if (limit !== 10) {
+      params.limit = limit.toString();
+    }
+
+    if (page !== 1) {
+      params.page = page.toString();
+    }
+
+    if (debouncedSearch) {
+      params.search = debouncedSearch;
+    }
+
+    setSearchParams(params, { replace: true });
+  }, [limit, page, debouncedSearch, setSearchParams]);
 
   // React Query
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["departments"],
-    queryFn: fetchDepartments,
+  const { data, isLoading, isError, isFetching } = useQuery({
+    queryKey: ["departments", { limit, page, search: debouncedSearch }],
+    queryFn: () => fetchDepartments({ limit, page, search: debouncedSearch }),
   });
 
   const mutation = useMutation({
@@ -66,12 +145,14 @@ const DepartmentsSetups = () => {
       setDialogOpen(false);
       setErrors({});
       setEditingDepartment(null);
+      toast.success("Department created successfully");
     },
     onError: (error) => {
       console.error("Error creating department:", error);
       const errorMessage =
         error.response?.data?.message || "Failed to create department";
       setErrors({ server: errorMessage });
+      toast.error(errorMessage);
     },
   });
 
@@ -83,12 +164,14 @@ const DepartmentsSetups = () => {
       setDialogOpen(false);
       setErrors({});
       setEditingDepartment(null);
+      toast.success("Department updated successfully");
     },
     onError: (error) => {
       console.error("Error updating department:", error);
       const errorMessage =
         error.response?.data?.message || "Failed to update department";
       setErrors({ server: errorMessage });
+      toast.error(errorMessage);
     },
   });
 
@@ -98,9 +181,13 @@ const DepartmentsSetups = () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       setDeleteDialogOpen(false);
       setDeletingDepartment(null);
+      toast.success("Department deleted successfully");
     },
     onError: (error) => {
       console.error("Error deleting department:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to delete department";
+      toast.error(errorMessage);
     },
   });
 
@@ -121,8 +208,7 @@ const DepartmentsSetups = () => {
     {
       key: "createdAt",
       label: "Creation Date",
-      render: (row) =>
-        row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "N/A",
+      render: (row) => formatDate(row.createdAt),
     },
     {
       key: "actions",
@@ -143,6 +229,37 @@ const DepartmentsSetups = () => {
   const handleDelete = (row) => {
     setDeletingDepartment(row);
     setDeleteDialogOpen(true);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchValue(e.target.value);
+  };
+
+  const handleClearSearch = () => {
+    setSearchValue("");
+    setDebouncedSearch("");
+    setPage(1);
+  };
+
+  const handleLimitChange = (value) => {
+    setLimit(Number(value));
+    setPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+  };
+
+  const handlePreviousPage = () => {
+    if (page > 1) {
+      setPage(page - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (data?.pagination && page < data.pagination.totalPages) {
+      setPage(page + 1);
+    }
   };
 
   const confirmDelete = () => {
@@ -174,6 +291,21 @@ const DepartmentsSetups = () => {
       newErrors.positionCount = "Position count is required";
     }
 
+    // Validate position count is a positive integer when not unlimited
+    if (!unlimitedChecked && payload.positionCount?.trim()) {
+      const positionCountValue = payload.positionCount.trim();
+      const isValidNumber = /^\d+$/.test(positionCountValue); // Only positive integers
+      const numericValue = Number(positionCountValue);
+
+      if (
+        !isValidNumber ||
+        numericValue <= 0 ||
+        !Number.isInteger(numericValue)
+      ) {
+        newErrors.positionCount = "Position limit must be a proper number";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -203,14 +335,12 @@ const DepartmentsSetups = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Departments Setup</h1>
-
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) {
               setErrors({});
-              // Delay clearing state to allow dialog animation to complete
               setTimeout(() => {
                 setEditingDepartment(null);
                 setUnlimitedChecked(false);
@@ -220,6 +350,7 @@ const DepartmentsSetups = () => {
         >
           <DialogTrigger asChild>
             <Button variant="green" className="cursor-pointer">
+              <PlusIcon size={16} />
               Add Department
             </Button>
           </DialogTrigger>
@@ -324,21 +455,177 @@ const DepartmentsSetups = () => {
         </Dialog>
       </div>
 
+      <div className={styles.controls}>
+        {/* Search */}
+        <InputGroup className={styles.tableSearchInput}>
+          <InputGroupInput
+            placeholder="Search Departments..."
+            value={searchValue}
+            onChange={handleSearchChange}
+          />
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupAddon
+            align="inline-end"
+            className="cursor-pointer hover:text-[#02542D]"
+            onClick={handleClearSearch}
+          >
+            {isFetching ? <Spinner /> : <CircleXIcon />}
+          </InputGroupAddon>
+        </InputGroup>
+
+        {/* Page Limit */}
+        <Select
+          value={limit.toString()}
+          onValueChange={handleLimitChange}
+          className={styles.pageLimitSelect}
+        >
+          <SelectTrigger className="w-45">
+            <SelectValue placeholder="Select page limit" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="5">5 items</SelectItem>
+              <SelectItem value="10">10 items</SelectItem>
+              <SelectItem value="25">25 items</SelectItem>
+              <SelectItem value="50">50 items</SelectItem>
+              <SelectItem value="100">100 items</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+
       <DataTable
         columns={columns}
-        data={data || []}
+        data={data?.departments || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         isLoading={isLoading}
         isError={isError}
       />
 
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <Pagination className="pt-5">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePreviousPage();
+                }}
+                className={
+                  page === 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+
+            {/* Render page numbers */}
+            {(() => {
+              const { currentPage, totalPages } = data.pagination;
+              const pages = [];
+
+              // Always show first page
+              pages.push(
+                <PaginationItem key={1}>
+                  <PaginationLink
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePageChange(1);
+                    }}
+                    isActive={currentPage === 1}
+                    className="cursor-pointer"
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              );
+
+              // Show ellipsis if needed
+              if (currentPage > 3) {
+                pages.push(
+                  <PaginationItem key="ellipsis-start">
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+
+              // Show pages around current page
+              for (
+                let i = Math.max(2, currentPage - 1);
+                i <= Math.min(totalPages - 1, currentPage + 1);
+                i++
+              ) {
+                pages.push(
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(i);
+                      }}
+                      isActive={currentPage === i}
+                      className="cursor-pointer"
+                    >
+                      {i}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              // Show ellipsis if needed
+              if (currentPage < totalPages - 2) {
+                pages.push(
+                  <PaginationItem key="ellipsis-end">
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+
+              // Always show last page if there's more than one page
+              if (totalPages > 1) {
+                pages.push(
+                  <PaginationItem key={totalPages}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(totalPages);
+                      }}
+                      isActive={currentPage === totalPages}
+                      className="cursor-pointer"
+                    >
+                      {totalPages}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              return pages;
+            })()}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNextPage();
+                }}
+                className={
+                  page === data.pagination.totalPages
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
       <AlertDialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
           setDeleteDialogOpen(open);
           if (!open) {
-            // Delay clearing state to allow dialog animation to complete
             setTimeout(() => {
               setDeletingDepartment(null);
             }, 200);
@@ -359,7 +646,10 @@ const DepartmentsSetups = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending} className="cursor-pointer">
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="cursor-pointer"
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction

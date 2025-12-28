@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router";
 import { useSelector } from "react-redux";
-import { BounceLoader } from "react-spinners";
+import { Loader2 } from "lucide-react";
 
 const AuthLayout = () => {
   const isLogin = useSelector((state) => state.auth.isLogin);
@@ -9,7 +9,7 @@ const AuthLayout = () => {
   if (isAuthChecking) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100vw", height: "100vh" }}>
-        <BounceLoader color="#36d7b7" size={60} />
+        <Loader2 className="h-15 w-15 animate-spin" style={{ color: "#02542D" }} />
       </div>
     );
   }
