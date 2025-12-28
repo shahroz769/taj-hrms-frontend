@@ -1,3 +1,33 @@
+// React
+import { useEffect, useState } from "react";
+
+// React Router
+import { useSearchParams } from "react-router";
+
+// External Libraries
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CircleXIcon,
+  Loader2,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+
+// Components
+import DataTable from "@/components/DataTable/data-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -10,17 +40,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -35,39 +61,38 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { Label } from "@/components/ui/label";
-import { Loader2, PencilIcon, PlusIcon, TrashIcon } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SearchIcon, CircleXIcon } from "lucide-react";
-import DataTable from "@/components/DataTable/data-table";
+import { Spinner } from "@/components/ui/spinner";
+
+// Services
 import {
   createDepartment,
   deleteDepartment,
   fetchDepartments,
   updateDepartment,
 } from "@/services/departmentsApi";
+
+// Utils
 import { formatDate } from "@/utils/dateUtils";
+
+// Styles
 import styles from "./DepartmentsSetups.module.css";
-import { Spinner } from "@/components/ui/spinner";
-import { toast } from "sonner";
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 
 const DepartmentsSetups = () => {
-  // URL Search Params
+  // ===========================================================================
+  // URL SEARCH PARAMS
+  // ===========================================================================
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get initial values from URL or use defaults
+  // ---------------------------------------------------------------------------
+  // Initial Values from URL
+  // ---------------------------------------------------------------------------
   const getInitialLimit = () => {
     const urlLimit = searchParams.get("limit");
     return urlLimit ? Number(urlLimit) : 10;
@@ -82,7 +107,9 @@ const DepartmentsSetups = () => {
     return searchParams.get("search") || "";
   };
 
-  // State
+  // ===========================================================================
+  // STATE
+  // ===========================================================================
   const [unlimitedChecked, setUnlimitedChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
@@ -94,7 +121,13 @@ const DepartmentsSetups = () => {
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
 
+  // ===========================================================================
+  // EFFECTS
+  // ===========================================================================
+
+  // ---------------------------------------------------------------------------
   // Debounce search input
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchValue);
@@ -103,14 +136,18 @@ const DepartmentsSetups = () => {
     return () => clearTimeout(timer);
   }, [searchValue]);
 
+  // ---------------------------------------------------------------------------
   // Reset to page 1 when debounced search changes (after user stops typing)
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (searchValue !== "") {
       setPage(1);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, searchValue]);
 
+  // ---------------------------------------------------------------------------
   // Update URL when limit, page, or debouncedSearch changes
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const params = {};
 
@@ -129,14 +166,22 @@ const DepartmentsSetups = () => {
     setSearchParams(params, { replace: true });
   }, [limit, page, debouncedSearch, setSearchParams]);
 
-  // React Query
+  // ===========================================================================
+  // REACT QUERY
+  // ===========================================================================
   const queryClient = useQueryClient();
 
+  // ---------------------------------------------------------------------------
+  // Fetch Departments Query
+  // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["departments", { limit, page, search: debouncedSearch }],
     queryFn: () => fetchDepartments({ limit, page, search: debouncedSearch }),
   });
 
+  // ---------------------------------------------------------------------------
+  // Create Department Mutation
+  // ---------------------------------------------------------------------------
   const mutation = useMutation({
     mutationFn: createDepartment,
     onSuccess: () => {
@@ -156,6 +201,9 @@ const DepartmentsSetups = () => {
     },
   });
 
+  // ---------------------------------------------------------------------------
+  // Update Department Mutation
+  // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => updateDepartment(id, payload),
     onSuccess: () => {
@@ -175,6 +223,9 @@ const DepartmentsSetups = () => {
     },
   });
 
+  // ---------------------------------------------------------------------------
+  // Delete Department Mutation
+  // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
     mutationFn: deleteDepartment,
     onSuccess: () => {
@@ -191,7 +242,9 @@ const DepartmentsSetups = () => {
     },
   });
 
-  // Table columns configuration
+  // ===========================================================================
+  // TABLE CONFIGURATION
+  // ===========================================================================
   const columns = [
     {
       key: "name",
@@ -219,7 +272,13 @@ const DepartmentsSetups = () => {
     },
   ];
 
-  // Event handlers
+  // ===========================================================================
+  // EVENT HANDLERS
+  // ===========================================================================
+
+  // ---------------------------------------------------------------------------
+  // Edit & Delete Handlers
+  // ---------------------------------------------------------------------------
   const handleEdit = (row) => {
     setEditingDepartment(row);
     setUnlimitedChecked(row.positionCount === "Unlimited");
@@ -231,6 +290,15 @@ const DepartmentsSetups = () => {
     setDeleteDialogOpen(true);
   };
 
+  const confirmDelete = () => {
+    if (deletingDepartment) {
+      deleteMutation.mutate(deletingDepartment._id);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Search Handlers
+  // ---------------------------------------------------------------------------
   const handleSearchChange = (e) => {
     setSearchValue(e.target.value);
   };
@@ -241,6 +309,9 @@ const DepartmentsSetups = () => {
     setPage(1);
   };
 
+  // ---------------------------------------------------------------------------
+  // Pagination Handlers
+  // ---------------------------------------------------------------------------
   const handleLimitChange = (value) => {
     setLimit(Number(value));
     setPage(1);
@@ -262,12 +333,9 @@ const DepartmentsSetups = () => {
     }
   };
 
-  const confirmDelete = () => {
-    if (deletingDepartment) {
-      deleteMutation.mutate(deletingDepartment._id);
-    }
-  };
-
+  // ---------------------------------------------------------------------------
+  // Form Submit Handler
+  // ---------------------------------------------------------------------------
   const handleCreateDepartment = (e) => {
     e.preventDefault();
     setErrors({});
@@ -330,6 +398,10 @@ const DepartmentsSetups = () => {
       });
     }
   };
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
 
   return (
     <div className={styles.container}>
@@ -471,7 +543,7 @@ const DepartmentsSetups = () => {
             className="cursor-pointer hover:text-[#02542D]"
             onClick={handleClearSearch}
           >
-            {isFetching ? <Spinner /> : <CircleXIcon />}
+            {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
           </InputGroupAddon>
         </InputGroup>
 

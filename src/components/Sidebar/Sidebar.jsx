@@ -2,34 +2,34 @@ import { sidebarItems } from "./sidebarConfig";
 import { useSelector } from "react-redux";
 import styles from "./Sidebar.module.css";
 import logo from "../../assets/taj-logo.png";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useState, useMemo } from "react";
 
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserIcon } from "lucide-react";
-import { logout } from "@/redux/slices/authSlice";
-import { useDispatch } from "react-redux";
-import { logoutUser } from "@/services/authApi";
+// import { Button } from "@/components/ui/button";
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu";
+// import { UserIcon } from "lucide-react";
+// import { logout } from "@/redux/slices/authSlice";
+// import { useDispatch } from "react-redux";
+// import { logoutUser } from "@/services/authApi";
 
 const Sidebar = () => {
   const role = useSelector((state) => state.auth.user?.role);
   const location = useLocation();
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const user = useSelector((state) => state.auth.user);
-  const firstInitial = user?.name?.charAt(0).toUpperCase() ?? "U";
+  // const dispatch = useDispatch();
+  // const navigate = useNavigate();
+  // const user = useSelector((state) => state.auth.user);
+  // const firstInitial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
-  const logOut = async () => {
-    await logoutUser();
-    dispatch(logout());
-    navigate("/login");
-  };
+  // const logOut = async () => {
+  //   await logoutUser();
+  //   dispatch(logout());
+  //   navigate("/login");
+  // };
 
   const filteredSidebarItems = useMemo(
     () => sidebarItems.filter((item) => item.roles.includes(role)),
@@ -144,7 +144,7 @@ const Sidebar = () => {
         </div>
 
         {/* Footer Section */}
-        <div className={styles.footer}>
+        {/* <div className={styles.footer}>
           <div className="flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -171,7 +171,7 @@ const Sidebar = () => {
             </DropdownMenu>
           </div>
           <p className={styles.profileName}>{user?.name ?? "User"}</p>
-        </div>
+        </div> */}
       </aside>
     </>
   );
