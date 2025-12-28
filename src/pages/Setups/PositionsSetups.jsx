@@ -68,18 +68,14 @@ import { Spinner } from "@/components/ui/spinner";
 
 // Services
 import {
-  // createPosition,
+  createPosition,
   // deletePosition,
   fetchPositions,
   // updatePosition,
 } from "@/services/positionsApi";
 
 // Services
-import {
-  createDepartment,
-  deleteDepartment,
-  updateDepartment,
-} from "@/services/departmentsApi";
+import { deleteDepartment, updateDepartment } from "@/services/departmentsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -192,19 +188,19 @@ const PositionsSetups = () => {
   // Create Department Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createDepartment,
+    mutationFn: createPosition,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
       setUnlimitedChecked(false);
       setDialogOpen(false);
       setErrors({});
       setEditingDepartment(null);
-      toast.success("Department created successfully");
+      toast.success("Position created successfully");
     },
     onError: (error) => {
-      console.error("Error creating department:", error);
+      console.error("Error creating position:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create department";
+        error.response?.data?.message || "Failed to create position";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
@@ -355,7 +351,7 @@ const PositionsSetups = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateDepartment = (e) => {
+  const handleCreatePosition = (e) => {
     e.preventDefault();
     setErrors({});
 
@@ -450,11 +446,12 @@ const PositionsSetups = () => {
               <DialogTitle className="flex justify-center text-[#02542D]">
                 {editingDepartment ? "Edit Position" : "Add Position"}
               </DialogTitle>
-              <DialogDescription className="sr-only">
-                Create a new position by entering the name and position limits.
-              </DialogDescription>
+              {/* <DialogDescription className="sr-only">
+                Create a new position by entering the name and position employee
+                limits.
+              </DialogDescription> */}
             </DialogHeader>
-            <form onSubmit={handleCreateDepartment}>
+            <form onSubmit={handleCreatePosition}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
@@ -462,13 +459,13 @@ const PositionsSetups = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="department-name" className="text-[#344054]">
-                    Department Name
+                  <Label htmlFor="position-name" className="text-[#344054]">
+                    Position Name
                   </Label>
                   <Input
-                    id="department-name"
-                    name="department-name"
-                    placeholder="Enter department name"
+                    id="position-name"
+                    name="position-name"
+                    placeholder="Enter position name"
                     defaultValue={editingDepartment?.name || ""}
                   />
                   {errors.name && (
@@ -476,14 +473,14 @@ const PositionsSetups = () => {
                   )}
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="position-limits" className="text-[#344054]">
-                    Position Limits
+                  <Label htmlFor="employee-limit" className="text-[#344054]">
+                    Employee Limit
                   </Label>
                   <InputGroup className={styles.searchInput}>
                     <InputGroupInput
-                      id="position-limits"
-                      name="position-limits"
-                      placeholder="Enter position limits"
+                      id="employee-limit"
+                      name="employee-limit"
+                      placeholder="Enter employee limit"
                       disabled={unlimitedChecked}
                       defaultValue={
                         editingDepartment?.positionCount !== "Unlimited"
