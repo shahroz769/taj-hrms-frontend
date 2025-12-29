@@ -70,15 +70,13 @@ import { Spinner } from "@/components/ui/spinner";
 // Services
 import {
   createPosition,
-  // deletePosition,
+  deletePosition,
   fetchPositions,
-  // updatePosition,
+  updatePosition,
 } from "@/services/positionsApi";
 
 // Services
 import {
-  deleteDepartment,
-  updateDepartment,
   fetchDepartmentsList
 } from "@/services/departmentsApi";
 
@@ -122,9 +120,9 @@ const PositionsSetups = () => {
   const [noneChecked, setNoneChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [editingPosition, setEditingPosition] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingDepartment, setDeletingDepartment] = useState(null);
+  const [deletingPosition, setDeletingPosition] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
@@ -197,20 +195,21 @@ const PositionsSetups = () => {
     queryFn: fetchDepartmentsList,
     enabled: false, // Don't fetch on mount, only when manually triggered
   });
-  console.log("Departments List:", departmentsList);
-  // console.log("Positions Data:", data);
+  console.log("Positions Data:", data);
 
   // ---------------------------------------------------------------------------
-  // Create Department Mutation
+  // Create Position Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
     mutationFn: createPosition,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["positions"] });
       setUnlimitedChecked(false);
+      setNoneChecked(false);
+      setSelectedDepartment("");
       setDialogOpen(false);
       setErrors({});
-      setEditingDepartment(null);
+      setEditingPosition(null);
       toast.success("Position created successfully");
     },
     onError: (error) => {
@@ -223,42 +222,44 @@ const PositionsSetups = () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Update Department Mutation
+  // Update Position Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateDepartment(id, payload),
+    mutationFn: ({ id, payload }) => updatePosition(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
       setUnlimitedChecked(false);
+      setNoneChecked(false);
+      setSelectedDepartment("");
       setDialogOpen(false);
       setErrors({});
-      setEditingDepartment(null);
-      toast.success("Department updated successfully");
+      setEditingPosition(null);
+      toast.success("Position updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating department:", error);
+      console.error("Error updating position:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update department";
+        error.response?.data?.message || "Failed to update position";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Department Mutation
+  // Delete Position Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteDepartment,
+    mutationFn: deletePosition,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
       setDeleteDialogOpen(false);
-      setDeletingDepartment(null);
-      toast.success("Department deleted successfully");
+      setDeletingPosition(null);
+      toast.success("Position deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting department:", error);
+      console.error("Error deleting position:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete department";
+        error.response?.data?.message || "Failed to delete position";
       toast.error(errorMessage);
     },
   });
@@ -290,9 +291,9 @@ const PositionsSetups = () => {
       label: "Hired Employees",
     },
     {
-      key: "creationDate",
+      key: "createdAt",
       label: "Creation Date",
-      render: (row) => formatDate(row.creationDate),
+      render: (row) => formatDate(row.createdAt),
     },
     {
       key: "actions",
@@ -310,20 +311,38 @@ const PositionsSetups = () => {
   // ---------------------------------------------------------------------------
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
-  const handleEdit = (row) => {
-    setEditingDepartment(row);
-    setUnlimitedChecked(row.positionCount === "Unlimited");
+  const handleEdit = async (row) => {
+    // Fetch departments first
+    const result = await fetchDepartments();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message || "Failed to fetch departments";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add department first");
+      return;
+    }
+
+    // Set all the editing states
+    setEditingPosition(row);
+    setSelectedDepartment(row.department?._id || "");
+    setUnlimitedChecked(row.employeeLimit === "Unlimited");
+    setNoneChecked(row.reportsTo === "None" || !row.reportsTo);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingDepartment(row);
+    setDeletingPosition(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingDepartment) {
-      deleteMutation.mutate(deletingDepartment._id);
+    if (deletingPosition) {
+      deleteMutation.mutate(deletingPosition._id);
     }
   };
 
@@ -446,10 +465,10 @@ const PositionsSetups = () => {
 
     console.log("Payload:", payload);
 
-    if (editingDepartment) {
-      // Update existing department
+    if (editingPosition) {
+      // Update existing position
       updateMutation.mutate(
-        { id: editingDepartment._id, payload },
+        { id: editingPosition._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -457,7 +476,7 @@ const PositionsSetups = () => {
         }
       );
     } else {
-      // Create new department
+      // Create new position
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -481,7 +500,7 @@ const PositionsSetups = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingDepartment(null);
+                setEditingPosition(null);
                 setUnlimitedChecked(false);
                 setSelectedDepartment("");
                 setNoneChecked(false);
@@ -505,10 +524,10 @@ const PositionsSetups = () => {
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingDepartment ? "Edit Position" : "Add Position"}
+                {editingPosition ? "Edit Position" : "Add Position"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingDepartment
+                {editingPosition
                   ? "Edit the position information below"
                   : "Create a new position by entering the name and employee limits"}
               </DialogDescription>
@@ -528,7 +547,7 @@ const PositionsSetups = () => {
                     id="position-name"
                     name="position-name"
                     placeholder="Enter position name"
-                    defaultValue={editingDepartment?.name || ""}
+                    defaultValue={editingPosition?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
@@ -578,8 +597,8 @@ const PositionsSetups = () => {
                       placeholder="Enter employee ID"
                       disabled={noneChecked}
                       defaultValue={
-                        editingDepartment?.reportsTo !== "None"
-                          ? editingDepartment?.reportsTo || ""
+                        editingPosition?.reportsTo !== "None"
+                          ? editingPosition?.reportsTo || ""
                           : ""
                       }
                     />
@@ -614,8 +633,8 @@ const PositionsSetups = () => {
                       placeholder="Enter employee limit"
                       disabled={unlimitedChecked}
                       defaultValue={
-                        editingDepartment?.positionCount !== "Unlimited"
-                          ? editingDepartment?.positionCount || ""
+                        editingPosition?.employeeLimit !== "Unlimited"
+                          ? editingPosition?.employeeLimit || ""
                           : ""
                       }
                     />
@@ -659,9 +678,9 @@ const PositionsSetups = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      {editingDepartment ? "Updating" : "Creating"}
+                      {editingPosition ? "Updating" : "Creating"}
                     </>
-                  ) : editingDepartment ? (
+                  ) : editingPosition ? (
                     "Update"
                   ) : (
                     "Create"
@@ -845,7 +864,7 @@ const PositionsSetups = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingDepartment(null);
+              setDeletingPosition(null);
             }, 200);
           }
         }}
@@ -858,7 +877,7 @@ const PositionsSetups = () => {
             <AlertDialogDescription>
               Are you sure you want to delete the position{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingDepartment?.name}"
+                "{deletingPosition?.name}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>
