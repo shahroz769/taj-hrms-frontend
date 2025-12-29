@@ -431,10 +431,11 @@ const DepartmentsSetups = () => {
               <DialogTitle className="flex justify-center text-[#02542D]">
                 {editingDepartment ? "Edit Department" : "Add Department"}
               </DialogTitle>
-              {/* <DialogDescription className="sr-only">
-                Create a new department by entering the name and position
-                limits.
-              </DialogDescription> */}
+              <DialogDescription className="sr-only">
+                {editingDepartment
+                  ? "Edit the department information below"
+                  : "Create a new department by entering the name and position limits"}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateDepartment}>
               {errors.server && (

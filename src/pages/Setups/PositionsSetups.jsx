@@ -75,7 +75,11 @@ import {
 } from "@/services/positionsApi";
 
 // Services
-import { deleteDepartment, updateDepartment } from "@/services/departmentsApi";
+import {
+  deleteDepartment,
+  updateDepartment,
+  fetchDepartmentsList
+} from "@/services/departmentsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -114,6 +118,7 @@ const PositionsSetups = () => {
   // STATE
   // ===========================================================================
   const [unlimitedChecked, setUnlimitedChecked] = useState(false);
+  const [noneChecked, setNoneChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editingDepartment, setEditingDepartment] = useState(null);
@@ -175,14 +180,23 @@ const PositionsSetups = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Departments Query
+  // Fetch Positions Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["positions", { limit, page, search: debouncedSearch }],
     queryFn: () => fetchPositions({ limit, page, search: debouncedSearch }),
   });
 
-  console.log("Positions Data:", data);
+  // ---------------------------------------------------------------------------
+  // Fetch Departments List Query (lazy loading)
+  // ---------------------------------------------------------------------------
+  const { data: departmentsList, isLoading: isCheckingDepartments, refetch: fetchDepartments } = useQuery({
+    queryKey: ["departmentsList"],
+    queryFn: fetchDepartmentsList,
+    enabled: false, // Don't fetch on mount, only when manually triggered
+  });
+  console.log("Departments List:", departmentsList);
+  // console.log("Positions Data:", data);
 
   // ---------------------------------------------------------------------------
   // Create Department Mutation
@@ -312,6 +326,28 @@ const PositionsSetups = () => {
   };
 
   // ---------------------------------------------------------------------------
+  // Add Position Handler
+  // ---------------------------------------------------------------------------
+  const handleAddPositionClick = async () => {
+    const result = await fetchDepartments();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message || "Failed to fetch departments";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add department first");
+      return;
+    }
+
+    // If departments exist, open the dialog
+    setDialogOpen(true);
+  };
+
+  // ---------------------------------------------------------------------------
   // Search Handlers
   // ---------------------------------------------------------------------------
   const handleSearchChange = (e) => {
@@ -357,10 +393,13 @@ const PositionsSetups = () => {
 
     const formData = new FormData(e.target);
     const payload = {
-      name: formData.get("department-name"),
-      positionCount: unlimitedChecked
+      name: formData.get("position-name"),
+      reportsTo: noneChecked
+        ? "None"
+        : formData.get("reports-to"),
+      employeeLimit: unlimitedChecked
         ? "Unlimited"
-        : formData.get("position-limits"),
+        : formData.get("employee-limit"),
     };
 
     // Validate
@@ -370,22 +409,26 @@ const PositionsSetups = () => {
       newErrors.name = "Department name is required";
     }
 
-    if (!unlimitedChecked && !payload.positionCount?.trim()) {
-      newErrors.positionCount = "Position count is required";
+    if (!noneChecked && !payload.reportsTo?.trim()) {
+      newErrors.reportsTo = "Reports to is required";
+    }
+
+    if (!unlimitedChecked && !payload.employeeLimit?.trim()) {
+      newErrors.employeeLimit = "Employee limit is required";
     }
 
     // Validate position count is a positive integer when not unlimited
-    if (!unlimitedChecked && payload.positionCount?.trim()) {
-      const positionCountValue = payload.positionCount.trim();
-      const isValidNumber = /^\d+$/.test(positionCountValue); // Only positive integers
-      const numericValue = Number(positionCountValue);
+    if (!unlimitedChecked && payload.employeeLimit?.trim()) {
+      const employeeLimitValue = payload.employeeLimit.trim();
+      const isValidNumber = /^\d+$/.test(employeeLimitValue); // Only positive integers
+      const numericValue = Number(employeeLimitValue);
 
       if (
         !isValidNumber ||
         numericValue <= 0 ||
         !Number.isInteger(numericValue)
       ) {
-        newErrors.positionCount = "Position limit must be a proper number";
+        newErrors.employeeLimit = "Employee limit must be a proper number";
       }
     }
 
@@ -393,6 +436,8 @@ const PositionsSetups = () => {
       setErrors(newErrors);
       return;
     }
+
+    console.log("Payload:", payload);
 
     if (editingDepartment) {
       // Update existing department
@@ -435,21 +480,29 @@ const PositionsSetups = () => {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button variant="green" className="cursor-pointer">
+          <Button
+            variant="green"
+            className="cursor-pointer"
+            onClick={handleAddPositionClick}
+            disabled={isCheckingDepartments}
+          >
+            {isCheckingDepartments ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
               <PlusIcon size={16} />
-              Add Position
-            </Button>
-          </DialogTrigger>
+            )}
+            Add Position
+          </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
                 {editingDepartment ? "Edit Position" : "Add Position"}
               </DialogTitle>
-              {/* <DialogDescription className="sr-only">
-                Create a new position by entering the name and position employee
-                limits.
-              </DialogDescription> */}
+              <DialogDescription className="sr-only">
+                {editingDepartment
+                  ? "Edit the position information below"
+                  : "Create a new position by entering the name and employee limits"}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreatePosition}>
               {errors.server && (
@@ -473,6 +526,42 @@ const PositionsSetups = () => {
                   )}
                 </div>
                 <div className="grid gap-3">
+                  <Label htmlFor="reports-to" className="text-[#344054]">
+                    Reports To
+                  </Label>
+                  <InputGroup className={styles.searchInput}>
+                    <InputGroupInput
+                      id="reports-to"
+                      name="reports-to"
+                      placeholder="Enter employee ID"
+                      disabled={noneChecked}
+                      defaultValue={
+                        editingDepartment?.reportsTo !== "None"
+                          ? editingDepartment?.reportsTo || ""
+                          : ""
+                      }
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <Checkbox
+                        checked={noneChecked}
+                        onCheckedChange={(checked) => {
+                          setNoneChecked(checked);
+                          if (checked && errors.reportsTo) {
+                            setErrors({ ...errors, reportsTo: undefined });
+                          }
+                        }}
+                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                      />
+                      <p>None</p>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  {errors.reportsTo && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.reportsTo}
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-3">
                   <Label htmlFor="employee-limit" className="text-[#344054]">
                     Employee Limit
                   </Label>
@@ -493,8 +582,8 @@ const PositionsSetups = () => {
                         checked={unlimitedChecked}
                         onCheckedChange={(checked) => {
                           setUnlimitedChecked(checked);
-                          if (checked && errors.positionCount) {
-                            setErrors({ ...errors, positionCount: undefined });
+                          if (checked && errors.employeeLimit) {
+                            setErrors({ ...errors, employeeLimit: undefined });
                           }
                         }}
                         className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
@@ -502,9 +591,9 @@ const PositionsSetups = () => {
                       <p>Unlimited</p>
                     </InputGroupAddon>
                   </InputGroup>
-                  {errors.positionCount && (
+                  {errors.employeeLimit && (
                     <p className="text-sm text-red-500 mt-1">
-                      {errors.positionCount}
+                      {errors.employeeLimit}
                     </p>
                   )}
                 </div>

@@ -11,6 +11,11 @@ export const fetchDepartments = async ({
   return res.data;
 };
 
+export const fetchDepartmentsList = async () => {
+  const res = await API.get(`/api/departments/list`);
+  return res.data;
+};
+
 export const createDepartment = async (payload) => {
   const res = await API.post(`/api/departments`, payload);
   return res.data;
