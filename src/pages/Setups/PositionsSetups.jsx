@@ -63,6 +63,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectLabel,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -128,6 +129,7 @@ const PositionsSetups = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
 
   // ===========================================================================
   // EFFECTS
@@ -394,6 +396,7 @@ const PositionsSetups = () => {
     const formData = new FormData(e.target);
     const payload = {
       name: formData.get("position-name"),
+      department: selectedDepartment,
       reportsTo: noneChecked
         ? "None"
         : formData.get("reports-to"),
@@ -406,7 +409,11 @@ const PositionsSetups = () => {
     const newErrors = {};
 
     if (!payload.name?.trim()) {
-      newErrors.name = "Department name is required";
+      newErrors.name = "Position name is required";
+    }
+
+    if (!payload.department) {
+      newErrors.department = "Department is required";
     }
 
     if (!noneChecked && !payload.reportsTo?.trim()) {
@@ -476,6 +483,8 @@ const PositionsSetups = () => {
               setTimeout(() => {
                 setEditingDepartment(null);
                 setUnlimitedChecked(false);
+                setSelectedDepartment("");
+                setNoneChecked(false);
               }, 200);
             }
           }}
@@ -523,6 +532,39 @@ const PositionsSetups = () => {
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
+                  )}
+                </div>
+                {/* Select Department */}
+                <div className="grid gap-3">
+                  <Label htmlFor="department" className="text-[#344054]">
+                    Department
+                  </Label>
+                  <Select
+                    value={selectedDepartment}
+                    onValueChange={(value) => {
+                      setSelectedDepartment(value);
+                      if (errors.department) {
+                        setErrors({ ...errors, department: undefined });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {departmentsList?.map((dept) => (
+                          <SelectItem key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {errors.department && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.department}
+                    </p>
                   )}
                 </div>
                 <div className="grid gap-3">
