@@ -18,7 +18,6 @@ export const getPositionById = async (id) => {
 };
 
 export const updatePosition = async (id, payload) => {
-  console.log("Updating position with ID:", id, "and payload:", payload);
   const res = await API.put(`/api/positions/${id}`, payload);
   return res.data;
 };

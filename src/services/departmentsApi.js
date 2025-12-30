@@ -27,7 +27,6 @@ export const getDepartmentById = async (id) => {
 };
 
 export const updateDepartment = async (id, payload) => {
-  console.log("Updating department with ID:", id, "and payload:", payload);
   const res = await API.put(`/api/departments/${id}`, payload);
   return res.data;
 };

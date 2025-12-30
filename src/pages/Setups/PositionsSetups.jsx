@@ -195,7 +195,6 @@ const PositionsSetups = () => {
     queryFn: fetchDepartmentsList,
     enabled: false, // Don't fetch on mount, only when manually triggered
   });
-  console.log("Positions Data:", data);
 
   // ---------------------------------------------------------------------------
   // Create Position Mutation
@@ -462,8 +461,6 @@ const PositionsSetups = () => {
       setErrors(newErrors);
       return;
     }
-
-    console.log("Payload:", payload);
 
     if (editingPosition) {
       // Update existing position
