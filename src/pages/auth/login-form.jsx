@@ -22,7 +22,8 @@ import { useDispatch } from "react-redux";
 import { login } from "@/redux/slices/authSlice";
 import { useNavigate } from "react-router";
 import { loginUser } from "@/services/authApi";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import logo from "@/assets/taj-logo.png";
 
@@ -116,11 +117,7 @@ const LoginForm = ({ className, ...props }) => {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
-                    {showPassword ? (
-                      <EyeOff size={18} />
-                    ) : (
-                      <Eye size={18} />
-                    )}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
                 {errors.password && (
@@ -133,7 +130,7 @@ const LoginForm = ({ className, ...props }) => {
                 <Button type="submit" variant="green" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Spinner />
                       Logging in
                     </>
                   ) : (

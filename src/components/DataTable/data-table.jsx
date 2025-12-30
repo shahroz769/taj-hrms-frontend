@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import styles from "./data-table.module.css";
 
 const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
@@ -26,7 +26,7 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
             <tr>
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
-                  <Loader2 className={styles.loader} />
+                  <Spinner className={styles.loader} />
                   <p className={styles.stateText}>Loading departments...</p>
                 </div>
               </td>
@@ -35,7 +35,9 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
             <tr>
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.errorContainer}>
-                  <p className={styles.errorText}>Error loading departments. Please try again.</p>
+                  <p className={styles.errorText}>
+                    Error loading departments. Please try again.
+                  </p>
                 </div>
               </td>
             </tr>

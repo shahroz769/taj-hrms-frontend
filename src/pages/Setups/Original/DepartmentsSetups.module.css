@@ -1,27 +1,7 @@
-.containerMain {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.containerTitle {
+.container {
   background-color: #ffffff;
-  margin: 16px 16px 0px 16px;
+  margin: 16px;
   padding: 20px;
-  border-radius: 16px;
-}
-
-.containerControls {
-  background-color: #ffffff;
-  margin: 0px 16px 0px 16px;
-  padding: 20px;
-  border-radius: 16px;
-}
-
-.containerTable {
-  background-color: #ffffff;
-  margin: 0px 16px 0px 16px;
-  padding: 0px 20px 20px 20px;
   border-radius: 16px;
 }
 
@@ -40,6 +20,7 @@
 
 .controls {
   display: flex;
+  margin-top: 16px;
   gap: 12px;
 }
 

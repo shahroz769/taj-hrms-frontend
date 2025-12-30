@@ -1,5 +1,5 @@
 // React
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 // React Router
 import { useSearchParams } from "react-router";
@@ -8,10 +8,10 @@ import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleXIcon,
-  Loader2,
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
   TrashIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +28,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -72,13 +77,12 @@ import {
   createPosition,
   deletePosition,
   fetchPositions,
+  fetchPositionsFilters,
   updatePosition,
 } from "@/services/positionsApi";
 
 // Services
-import {
-  fetchDepartmentsList
-} from "@/services/departmentsApi";
+import { fetchDepartmentsList } from "@/services/departmentsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -128,6 +132,10 @@ const PositionsSetups = () => {
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedFilterPosition, setSelectedFilterPosition] = useState("");
+  const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
+  const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
 
   // ===========================================================================
   // EFFECTS
@@ -187,10 +195,48 @@ const PositionsSetups = () => {
     queryFn: () => fetchPositions({ limit, page, search: debouncedSearch }),
   });
 
+  const {
+    data: filters,
+    isLoading: isCheckingFilters,
+    refetch: fetchFilters,
+  } = useQuery({
+    queryKey: ["positionsFilters"],
+    queryFn: () => fetchPositionsFilters(),
+    enabled: false,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Extract Unique Filter Values
+  // ---------------------------------------------------------------------------
+  const filtersList = filters?.positionsFiltersList ?? [];
+
+  const uniquePositions = React.useMemo(
+    () => [...new Set(filtersList.map((item) => item.name))].filter(Boolean),
+    [filtersList]
+  );
+
+  const uniqueReportsTo = React.useMemo(
+    () =>
+      [...new Set(filtersList.map((item) => item.reportsTo))].filter(Boolean),
+    [filtersList]
+  );
+
+  const uniqueDepartments = React.useMemo(
+    () =>
+      [...new Set(filtersList.map((item) => item.department?.name))].filter(
+        Boolean
+      ),
+    [filtersList]
+  );
+
   // ---------------------------------------------------------------------------
   // Fetch Departments List Query (lazy loading)
   // ---------------------------------------------------------------------------
-  const { data: departmentsList, isLoading: isCheckingDepartments, refetch: fetchDepartments } = useQuery({
+  const {
+    data: departmentsList,
+    isLoading: isCheckingDepartments,
+    refetch: fetchDepartments,
+  } = useQuery({
     queryKey: ["departmentsList"],
     queryFn: fetchDepartmentsList,
     enabled: false, // Don't fetch on mount, only when manually triggered
@@ -415,9 +461,7 @@ const PositionsSetups = () => {
     const payload = {
       name: formData.get("position-name"),
       department: selectedDepartment,
-      reportsTo: noneChecked
-        ? "None"
-        : formData.get("reports-to"),
+      reportsTo: noneChecked ? "None" : formData.get("reports-to"),
       employeeLimit: unlimitedChecked
         ? "Unlimited"
         : formData.get("employee-limit"),
@@ -488,6 +532,7 @@ const PositionsSetups = () => {
 
   return (
     <div className={styles.container}>
+      {/* Header */}
       <div className={styles.header}>
         <h1 className={styles.title}>Positions Setup</h1>
         <Dialog
@@ -511,11 +556,7 @@ const PositionsSetups = () => {
             onClick={handleAddPositionClick}
             disabled={isCheckingDepartments}
           >
-            {isCheckingDepartments ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <PlusIcon size={16} />
-            )}
+            {isCheckingDepartments ? <Spinner /> : <PlusIcon size={16} />}
             Add Position
           </Button>
           <DialogContent className="sm:max-w-125">
@@ -674,7 +715,7 @@ const PositionsSetups = () => {
                 >
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Spinner />
                       {editingPosition ? "Updating" : "Creating"}
                     </>
                   ) : editingPosition ? (
@@ -689,6 +730,7 @@ const PositionsSetups = () => {
         </Dialog>
       </div>
 
+      {/* Controls */}
       <div className={styles.controls}>
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
@@ -728,6 +770,113 @@ const PositionsSetups = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        {/* Filters */}
+        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Filters"
+              className="cursor-pointer"
+              disabled={isCheckingFilters}
+              onClick={async (e) => {
+                e.preventDefault();
+                const result = await fetchFilters();
+                if (result.data) {
+                  setFilterPopoverOpen(true);
+                }
+              }}
+            >
+              {isCheckingFilters ? <Spinner /> : <SlidersHorizontalIcon />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="leading-none font-medium">Filters</h4>
+                <p className="text-muted-foreground text-sm">
+                  Apply the filters for the positions.
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="position">Position</Label>
+                  <Select
+                    value={selectedFilterPosition}
+                    onValueChange={(value) => {
+                      setSelectedFilterPosition(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select a position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniquePositions.map((positionName) => (
+                          <SelectItem key={positionName} value={positionName}>
+                            {positionName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="reportsTo">Reports To</Label>
+                  <Select
+                    value={selectedFilterReportsTo}
+                    onValueChange={(value) => {
+                      setSelectedFilterReportsTo(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select reports to" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniqueReportsTo.map((reportsTo) => (
+                          <SelectItem key={reportsTo} value={reportsTo}>
+                            {reportsTo}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="department">Department</Label>
+                  <Select
+                    value={selectedFilterDepartment}
+                    onValueChange={(value) => {
+                      setSelectedFilterDepartment(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniqueDepartments.map((deptName) => (
+                          <SelectItem key={deptName} value={deptName}>
+                            {deptName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                variant="green"
+                aria-label="Submit"
+                className="cursor-pointer"
+              >
+                Apply
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <DataTable
@@ -893,7 +1042,7 @@ const PositionsSetups = () => {
             >
               {deleteMutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner />
                   Deleting
                 </>
               ) : (

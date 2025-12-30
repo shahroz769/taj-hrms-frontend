@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router";
 import { useSelector } from "react-redux";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const isLogin = useSelector((state) => state.auth.isLogin);
@@ -9,8 +9,16 @@ const ProtectedRoute = ({ allowedRoles }) => {
 
   if (isAuthChecking) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100vw", height: "100vh" }}>
-        <Loader2 className="h-15 w-15 animate-spin" style={{ color: "#02542D" }} />
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100vw",
+          height: "100vh",
+        }}
+      >
+        <Spinner className="size-15 text-[#02542D]" />
       </div>
     );
   }

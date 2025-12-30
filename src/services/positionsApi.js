@@ -7,6 +7,11 @@ export const fetchPositions = async ({ page = 1, limit = 10, search = "" }) => {
   return res.data;
 };
 
+export const fetchPositionsFilters = async () => {
+  const res = await API.get(`/api/positions/filters`);
+  return res.data;
+};
+
 export const createPosition = async (payload) => {
   const res = await API.post(`/api/positions`, payload);
   return res.data;
