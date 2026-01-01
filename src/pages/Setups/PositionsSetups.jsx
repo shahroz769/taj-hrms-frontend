@@ -801,28 +801,6 @@ const PositionsSetups = () => {
               </div>
               <div className="grid gap-2">
                 <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="position">Position</Label>
-                  <Select
-                    value={selectedFilterPosition}
-                    onValueChange={(value) => {
-                      setSelectedFilterPosition(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select a position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniquePositions.map((positionName) => (
-                          <SelectItem key={positionName} value={positionName}>
-                            {positionName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-3 items-center gap-4">
                   <Label htmlFor="reportsTo">Reports To</Label>
                   <Select
                     value={selectedFilterReportsTo}
@@ -867,13 +845,22 @@ const PositionsSetups = () => {
                   </Select>
                 </div>
               </div>
-              <Button
-                variant="green"
-                aria-label="Submit"
-                className="cursor-pointer"
-              >
-                Apply
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="green"
+                  aria-label="Submit"
+                  className="cursor-pointer flex-1"
+                >
+                  Apply
+                </Button>
+                <Button
+                  variant="outline"
+                  aria-label="Submit"
+                  className="cursor-pointer flex-1"
+                >
+                  Reset
+                </Button>
+              </div>
             </div>
           </PopoverContent>
         </Popover>

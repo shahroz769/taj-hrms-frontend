@@ -1,7 +1,16 @@
 import { Spinner } from "@/components/ui/spinner";
 import styles from "./data-table.module.css";
 
-const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
+const DataTable = ({
+  columns,
+  data,
+  onEdit,
+  onDelete,
+  onApprove,
+  onReject,
+  isLoading,
+  isError,
+}) => {
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
@@ -27,7 +36,7 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
                   <Spinner className={styles.loader} />
-                  <p className={styles.stateText}>Loading departments...</p>
+                  <p className={styles.stateText}>Loading shifts...</p>
                 </div>
               </td>
             </tr>
@@ -36,7 +45,7 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.errorContainer}>
                   <p className={styles.errorText}>
-                    Error loading departments. Please try again.
+                    Error loading data. Please try again.
                   </p>
                 </div>
               </td>
@@ -45,7 +54,7 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
             <tr>
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
-                  <p className={styles.stateText}>No departments found.</p>
+                  <p className={styles.stateText}>No data found.</p>
                 </div>
               </td>
             </tr>
@@ -67,10 +76,26 @@ const DataTable = ({ columns, data, onEdit, onDelete, isLoading, isError }) => {
                           )}
                           {onDelete && (
                             <button
-                              className={styles.actionButtonDelete}
+                              className={styles.actionButton}
                               onClick={() => onDelete(row)}
                             >
                               {column.renderDelete(row)}
+                            </button>
+                          )}
+                          {onApprove && column.renderApprove && (
+                            <button
+                              className={styles.actionButton}
+                              onClick={() => onApprove(row)}
+                            >
+                              {column.renderApprove(row)}
+                            </button>
+                          )}
+                          {onReject && column.renderReject && (
+                            <button
+                              className={styles.actionButton}
+                              onClick={() => onReject(row)}
+                            >
+                              {column.renderReject(row)}
                             </button>
                           )}
                         </div>
