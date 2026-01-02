@@ -76,33 +76,28 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 
 // Services
-
 import {
-  createLeaveType,
-  deleteLeaveType,
-  fetchLeaveTypes,
-  updateLeaveType,
-  updateLeaveTypeStatus,
-} from "@/services/leaveTypesApi";
+  createLeavePolicy,
+  deleteLeavePolicy,
+  fetchLeavePolicies,
+  updateLeavePolicy,
+  updateLeavePolicyStatus,
+} from "@/services/leavePoliciesApi";
+
+// Services
+import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
 
 // Utils
-import {
-  formatDate,
-  formatTimeToAMPM,
-  calculateShiftHours,
-  formatWorkingDaysInitials,
-} from "@/utils/dateUtils";
+import { formatDate } from "@/utils/dateUtils";
 
 // Styles
-import styles from "./LeavesTypes.module.css";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Textarea } from "@/components/ui/textarea";
+import styles from "./LeavesPolicies.module.css";
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const LeavesTypes = () => {
+const LeavesPolicies = () => {
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -130,17 +125,15 @@ const LeavesTypes = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingShift, setEditingShift] = useState(null);
+  const [editingPosition, setEditingPosition] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingShift, setDeletingShift] = useState(null);
+  const [deletingPosition, setDeletingPosition] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [selectedWorkingDays, setSelectedWorkingDays] = useState([]);
-  const [selectedIsPaid, setSelectedIsPaid] = useState("");
-  const [approvingShiftId, setApprovingShiftId] = useState(null);
-  const [rejectingShiftId, setRejectingShiftId] = useState(null);
+  const [approvingPolicyId, setApprovingPolicyId] = useState(null);
+  const [rejectingPolicyId, setRejectingPolicyId] = useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -193,110 +186,121 @@ const LeavesTypes = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Shifts Query
+  // Fetch Positions Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["leave-types", { limit, page, search: debouncedSearch }],
-    queryFn: () => fetchLeaveTypes({ limit, page, search: debouncedSearch }),
+    queryKey: ["leavePolicies", { limit, page, search: debouncedSearch }],
+    queryFn: () => fetchLeavePolicies({ limit, page, search: debouncedSearch }),
   });
 
   // ---------------------------------------------------------------------------
-  // Create Shift Mutation
+  // Fetch Leave Types List Query (lazy loading)
+  // ---------------------------------------------------------------------------
+  const {
+    data: leaveTypesList,
+    isLoading: isCheckingLeaveTypes,
+    refetch: fetchLeaveTypes,
+  } = useQuery({
+    queryKey: ["leaveTypesList"],
+    queryFn: fetchLeaveTypesList,
+    enabled: false,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Create Leave Policy Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createLeaveType,
+    mutationFn: createLeavePolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingShift(null);
-      setSelectedIsPaid("");
-      toast.success("Leave type created successfully");
+      setEditingPosition(null);
+      toast.success("Leave policy created successfully");
     },
     onError: (error) => {
-      console.error("Error creating leave type:", error);
+      console.error("Error creating leave policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create leave type";
+        error.response?.data?.message || "Failed to create leave policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Shift Mutation
+  // Update Leave Policy Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateLeaveType(id, payload),
+    mutationFn: ({ id, payload }) => updateLeavePolicy(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingShift(null);
-      setSelectedIsPaid("");
-      toast.success("Leave type updated successfully");
+      setEditingPosition(null);
+      toast.success("Leave policy updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating leave type:", error);
+      console.error("Error updating leave policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update leave type";
+        error.response?.data?.message || "Failed to update leave policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Shift Mutation
+  // Delete Leave Policy Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteLeaveType,
+    mutationFn: deleteLeavePolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDeleteDialogOpen(false);
-      setDeletingShift(null);
-      toast.success("Leave type deleted successfully");
+      setDeletingPosition(null);
+      toast.success("Leave policy deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting leave type:", error);
+      console.error("Error deleting leave policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete leave type";
+        error.response?.data?.message || "Failed to delete leave policy";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Approve Shift Mutation
+  // Approve Policy Mutation
   // ---------------------------------------------------------------------------
   const approveMutation = useMutation({
-    mutationFn: ({ id }) => updateLeaveTypeStatus(id, "Approved"),
+    mutationFn: ({ id }) => updateLeavePolicyStatus(id, "Approved"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
-      setApprovingShiftId(null);
-      toast.success("Leave type approved successfully");
+      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      setApprovingPolicyId(null);
+      toast.success("Leave policy approved successfully");
     },
     onError: (error) => {
-      console.error("Error approving leave type:", error);
-      setApprovingShiftId(null);
+      console.error("Error approving leave policy:", error);
+      setApprovingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve leave type";
+        error.response?.data?.message || "Failed to approve leave policy";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Reject Shift Mutation
+  // Reject Policy Mutation
   // ---------------------------------------------------------------------------
   const rejectMutation = useMutation({
-    mutationFn: ({ id }) => updateLeaveTypeStatus(id, "Rejected"),
+    mutationFn: ({ id }) => updateLeavePolicyStatus(id, "Rejected"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
-      setRejectingShiftId(null);
-      toast.success("Leave type rejected successfully");
+      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      setRejectingPolicyId(null);
+      toast.success("Leave policy rejected successfully");
     },
     onError: (error) => {
-      console.error("Error rejecting leave type:", error);
-      setRejectingShiftId(null);
+      console.error("Error rejecting leave policy:", error);
+      setRejectingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to reject leave type";
+        error.response?.data?.message || "Failed to reject leave policy";
       toast.error(errorMessage);
     },
   });
@@ -307,7 +311,7 @@ const LeavesTypes = () => {
   const columns = [
     {
       key: "name",
-      label: "Leave Name",
+      label: "Policy Name",
     },
     {
       key: "createdBy",
@@ -317,21 +321,17 @@ const LeavesTypes = () => {
     {
       key: "createdAt",
       label: "Creation Date",
-      render: (row) => (row.createdAt ? formatDate(row.createdAt) : "-"),
+      render: (row) => formatDate(row.createdAt),
     },
     {
-      key: "isPaid",
-      label: "Nature",
+      key: "yearlyOffs",
+      label: "Yearly Offs",
       render: (row) => {
-        return row.isPaid ? (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-            Paid
-          </Badge>
-        ) : (
-          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-            Unpaid
-          </Badge>
+        const totalDays = row.entitlements?.reduce(
+          (sum, entitlement) => sum + (entitlement.days || 0),
+          0
         );
+        return totalDays || 0;
       },
     },
     {
@@ -369,14 +369,14 @@ const LeavesTypes = () => {
       renderDelete: () => <TrashIcon size={18} />,
       renderApprove: (row) => {
         if (row.status !== "Pending" && row.status !== "Rejected") return null;
-        if (approvingShiftId === row._id) {
+        if (approvingPolicyId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <CheckCircle2 size={18} />;
       },
       renderReject: (row) => {
         if (row.status !== "Pending") return null;
-        if (rejectingShiftId === row._id) {
+        if (rejectingPolicyId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <XCircle size={18} />;
@@ -391,21 +391,35 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
-  const handleEdit = (row) => {
-    // Set all the editing states
-    setEditingShift(row);
-    setSelectedIsPaid(row.isPaid !== undefined ? row.isPaid.toString() : "");
+  const handleEdit = async (row) => {
+    // Fetch leave types first
+    const result = await fetchLeaveTypes();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message || "Failed to fetch leave types";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add leave type first");
+      return;
+    }
+
+    // Set editing state
+    setEditingPosition(row);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingShift(row);
+    setDeletingPosition(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingShift) {
-      deleteMutation.mutate(deletingShift._id);
+    if (deletingPosition) {
+      deleteMutation.mutate(deletingPosition._id);
     }
   };
 
@@ -414,24 +428,39 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   const handleApprove = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingShiftId || rejectingShiftId) return;
+    if (approvingPolicyId || rejectingPolicyId) return;
 
-    setApprovingShiftId(row._id);
+    setApprovingPolicyId(row._id);
     approveMutation.mutate({ id: row._id });
   };
 
   const handleReject = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingShiftId || rejectingShiftId) return;
+    if (approvingPolicyId || rejectingPolicyId) return;
 
-    setRejectingShiftId(row._id);
+    setRejectingPolicyId(row._id);
     rejectMutation.mutate({ id: row._id });
   };
 
   // ---------------------------------------------------------------------------
-  // Add Shift Handler
+  // Add Leave Policy Handler
   // ---------------------------------------------------------------------------
-  const handleAddShiftClick = () => {
+  const handleAddPositionClick = async () => {
+    const result = await fetchLeaveTypes();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message || "Failed to fetch leave types";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add leave type first");
+      return;
+    }
+
+    // If departments exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -475,40 +504,78 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateLeaveType = (e) => {
+  const handleCreatePosition = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
-    const leaveTypeName = formData.get("leave-type-name");
 
-    // Validate
+    // Collect leave policy name
+    const policyName = formData.get("leave-policy-name");
+
+    // Collect leave type days dynamically
+    const entitlements = [];
     const newErrors = {};
 
-    // Validate leave type name
-    if (!leaveTypeName?.trim()) {
-      newErrors.name = "Leave type name is required";
+    // Validate policy name
+    if (!policyName?.trim()) {
+      newErrors.name = "Leave policy name is required";
     }
 
-    // Validate nature of leaves (isPaid)
-    if (!selectedIsPaid) {
-      newErrors.isPaid = "Please select nature of leaves";
+    // Process each leave type
+    if (leaveTypesList && leaveTypesList.length > 0) {
+      leaveTypesList.forEach((leaveType) => {
+        const daysValue = formData.get(`leave-days-${leaveType._id}`);
+
+        // Validate each leave type days input
+        if (daysValue === null || daysValue === "" || daysValue === undefined) {
+          newErrors[
+            `leaveType-${leaveType._id}`
+          ] = `Days for ${leaveType.name} is required`;
+        } else {
+          const days = Number(daysValue);
+
+          // Check if it's a valid number
+          if (isNaN(days) || !Number.isInteger(days)) {
+            newErrors[
+              `leaveType-${leaveType._id}`
+            ] = `Days must be a valid number`;
+          }
+          // Check if it's negative
+          else if (days < 0) {
+            newErrors[`leaveType-${leaveType._id}`] = `Days cannot be negative`;
+          }
+          // Check if it exceeds 30
+          else if (days > 30) {
+            newErrors[`leaveType-${leaveType._id}`] = `Days cannot exceed 30`;
+          }
+          // Valid: add to entitlements (0 is allowed)
+          else {
+            entitlements.push({
+              leaveType: leaveType._id,
+              days: days,
+            });
+          }
+        }
+      });
     }
 
+    // If there are validation errors, show them and stop
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    // Build the payload
     const payload = {
-      name: leaveTypeName,
-      isPaid: selectedIsPaid === "true",
+      name: policyName,
+      entitlements: entitlements,
     };
 
-    if (editingShift) {
-      // Update existing leave type
+    if (editingPosition) {
+      // Update existing leave policy
       updateMutation.mutate(
-        { id: editingShift._id, payload },
+        { id: editingPosition._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -516,7 +583,7 @@ const LeavesTypes = () => {
         }
       );
     } else {
-      // Create new leave type
+      // Create new leave policy
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -533,7 +600,7 @@ const LeavesTypes = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Leaves Types</h1>
+        <h1 className={styles.title}>Leaves Policies Setup</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -541,8 +608,7 @@ const LeavesTypes = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingShift(null);
-                setSelectedIsPaid("");
+                setEditingPosition(null);
               }, 200);
             }
           }}
@@ -550,67 +616,82 @@ const LeavesTypes = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddShiftClick}
+            onClick={handleAddPositionClick}
+            disabled={isCheckingLeaveTypes}
           >
-            <PlusIcon size={16} />
-            Add Leave Type
+            {isCheckingLeaveTypes ? <Spinner /> : <PlusIcon size={16} />}
+            Add Leave Policy
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingShift ? "Edit Leave Type" : "Add Leave Type"}
+                {editingPosition ? "Edit Leave Policy" : "Add Leave Policy"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingShift
-                  ? "Edit the leave type information below"
-                  : "Create a new leave type by entering the name and employee limits"}
+                {editingPosition
+                  ? "Edit the leave policy information below"
+                  : "Create a new leave policy by entering the name and employee limits"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateLeaveType}>
+            <form onSubmit={handleCreatePosition}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
                 </div>
               )}
               <div className="grid gap-4">
-                {/* Leave Type Name */}
                 <div className="grid gap-3">
-                  <Label htmlFor="leave-type-name" className="text-[#344054]">
-                    Leave Type Name
+                  <Label htmlFor="leave-policy-name" className="text-[#344054]">
+                    Leave Policy Name
                   </Label>
                   <Input
-                    id="leave-type-name"
-                    name="leave-type-name"
-                    placeholder="Enter leave type name"
-                    defaultValue={editingShift?.name || ""}
+                    id="leave-policy-name"
+                    name="leave-policy-name"
+                    placeholder="Enter leave policy name"
+                    defaultValue={editingPosition?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
-                {/* Nature of Leaves (Paid/Unpaid) */}
-                <div className="grid gap-3">
-                  <Label htmlFor="nature-of-leaves" className="text-[#344054]">
-                    Nature of Leaves
-                  </Label>
-                  <Select
-                    value={selectedIsPaid}
-                    onValueChange={(value) => setSelectedIsPaid(value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select nature of leaves" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="true">Paid</SelectItem>
-                        <SelectItem value="false">Unpaid</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.isPaid && (
-                    <p className="text-sm text-red-500 mt-1">{errors.isPaid}</p>
-                  )}
-                </div>
+
+                {/* Dynamic Days Inputs for Each Leave Type */}
+                {leaveTypesList && leaveTypesList.length > 0 && (
+                  <div className="grid gap-3">
+                    {leaveTypesList.map((leaveType) => {
+                      // Find existing entitlement days for edit mode
+                      const existingEntitlement =
+                        editingPosition?.entitlements?.find(
+                          (ent) =>
+                            ent.leaveType?._id === leaveType._id ||
+                            ent.leaveType === leaveType._id
+                        );
+                      const defaultDays = existingEntitlement?.days ?? "";
+
+                      return (
+                        <div key={leaveType._id} className="grid gap-2">
+                          <Label
+                            htmlFor={`leave-days-${leaveType._id}`}
+                            className="text-[#344054] text-sm"
+                          >
+                            {leaveType.name} Leaves
+                          </Label>
+                          <Input
+                            id={`leave-days-${leaveType._id}`}
+                            name={`leave-days-${leaveType._id}`}
+                            placeholder={`Enter days for ${leaveType.name} leaves`}
+                            defaultValue={defaultDays}
+                          />
+                          {errors[`leaveType-${leaveType._id}`] && (
+                            <p className="text-sm text-red-500 mt-1">
+                              {errors[`leaveType-${leaveType._id}`]}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <DialogFooter className="mt-4">
                 <DialogClose asChild>
@@ -631,9 +712,9 @@ const LeavesTypes = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingShift ? "Updating" : "Creating"}
+                      {editingPosition ? "Updating" : "Creating"}
                     </>
-                  ) : editingShift ? (
+                  ) : editingPosition ? (
                     "Update"
                   ) : (
                     "Create"
@@ -650,7 +731,7 @@ const LeavesTypes = () => {
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search Leave Types..."
+            placeholder="Search Leaves Policies..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -685,105 +766,11 @@ const LeavesTypes = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
-
-        {/* Filters */}
-        {/* <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Filters"
-              className="cursor-pointer"
-              disabled={isCheckingFilters}
-              onClick={async (e) => {
-                e.preventDefault();
-                const result = await fetchFilters();
-                if (result.data) {
-                  setFilterPopoverOpen(true);
-                }
-              }}
-            >
-              {isCheckingFilters ? <Spinner /> : <SlidersHorizontalIcon />}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <h4 className="leading-none font-medium">Filters</h4>
-                <p className="text-muted-foreground text-sm">
-                  Apply the filters for the positions.
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="reportsTo">Reports To</Label>
-                  <Select
-                    value={selectedFilterReportsTo}
-                    onValueChange={(value) => {
-                      setSelectedFilterReportsTo(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select reports to" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniqueReportsTo.map((reportsTo) => (
-                          <SelectItem key={reportsTo} value={reportsTo}>
-                            {reportsTo}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="department">Department</Label>
-                  <Select
-                    value={selectedFilterDepartment}
-                    onValueChange={(value) => {
-                      setSelectedFilterDepartment(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniqueDepartments.map((deptName) => (
-                          <SelectItem key={deptName} value={deptName}>
-                            {deptName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="green"
-                  aria-label="Submit"
-                  className="cursor-pointer flex-1"
-                >
-                  Apply
-                </Button>
-                <Button
-                  variant="outline"
-                  aria-label="Submit"
-                  className="cursor-pointer flex-1"
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover> */}
       </div>
 
       <DataTable
         columns={columns}
-        data={data?.leaveTypes || []}
+        data={data?.leavePolicies || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleApprove}
@@ -914,7 +901,7 @@ const LeavesTypes = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingShift(null);
+              setDeletingPosition(null);
             }, 200);
           }
         }}
@@ -922,12 +909,12 @@ const LeavesTypes = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Shift
+              Delete Position
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the shift{" "}
+              Are you sure you want to delete the position{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingShift?.name}"
+                "{deletingPosition?.name}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>
@@ -960,4 +947,4 @@ const LeavesTypes = () => {
   );
 };
 
-export default LeavesTypes;
+export default LeavesPolicies;

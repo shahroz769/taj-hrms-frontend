@@ -16,6 +16,7 @@ import Contracts from "./pages/Workforce/Contracts";
 import AttendanceRecords from "./pages/Attendance/AttendanceRecords";
 import LeavesApplications from "./pages/Leaves/LeavesApplications";
 import LeavesTypes from "./pages/Leaves/LeavesTypes";
+import LeavesPolicies from "./pages/Leaves/LeavesPolicies";
 import WorkProgressReports from "./pages/Compliance/WorkProgressReports";
 import DisciplinaryActions from "./pages/Compliance/DisciplinaryActions";
 import EmployeeProgressReports from "./pages/Compliance/EmployeeProgressReports";
@@ -111,6 +112,7 @@ function App() {
 
                 {/* Leaves */}
                 <Route path="/leaves-types" element={<LeavesTypes />} />
+                <Route path="/leaves-policies" element={<LeavesPolicies />} />
                 <Route
                   path="/leaves-applications"
                   element={<LeavesApplications />}

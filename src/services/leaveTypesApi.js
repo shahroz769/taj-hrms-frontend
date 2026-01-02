@@ -1,9 +1,18 @@
 import API from "./api";
 
-export const fetchLeaveTypes = async ({ page = 1, limit = 10, search = "" }) => {
+export const fetchLeaveTypes = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+}) => {
   const res = await API.get(`/api/leave-types`, {
     params: { page, limit, search },
   });
+  return res.data;
+};
+
+export const fetchLeaveTypesList = async () => {
+  const res = await API.get(`/api/leave-types/list`);
   return res.data;
 };
 
@@ -25,4 +34,4 @@ export const deleteLeaveType = async (id) => {
 export const updateLeaveTypeStatus = async (id, status) => {
   const res = await API.patch(`/api/leave-types/${id}/status`, { status });
   return res.data;
-}
+};
