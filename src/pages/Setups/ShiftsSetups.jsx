@@ -80,19 +80,20 @@ import {
   createShift,
   deleteShift,
   fetchShifts,
-  fetchShiftsFilters,
   updateShift,
+  updateShiftStatus,
+  // fetchShiftsFilters,
 } from "@/services/shiftsApi";
-import {
-  createPosition,
-  deletePosition,
-  fetchPositions,
-  fetchPositionsFilters,
-  updatePosition,
-} from "@/services/positionsApi";
+// import {
+//   // createPosition,
+//   // deletePosition,
+//   // fetchPositions,
+//   fetchPositionsFilters,
+//   // updatePosition,
+// } from "@/services/positionsApi";
 
 // Services
-import { fetchDepartmentsList } from "@/services/departmentsApi";
+// import { fetchDepartmentsList } from "@/services/departmentsApi";
 
 // Utils
 import {
@@ -104,6 +105,8 @@ import {
 
 // Styles
 import styles from "./ShiftsSetups.module.css";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Textarea } from "@/components/ui/textarea";
 
 // ============================================================================
 // COMPONENT
@@ -135,22 +138,21 @@ const ShiftsSetups = () => {
   // ===========================================================================
   // STATE
   // ===========================================================================
-  const [unlimitedChecked, setUnlimitedChecked] = useState(false);
-  const [noneChecked, setNoneChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingPosition, setEditingPosition] = useState(null);
+  const [editingShift, setEditingShift] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingPosition, setDeletingPosition] = useState(null);
+  const [deletingShift, setDeletingShift] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedFilterPosition, setSelectedFilterPosition] = useState("");
-  const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
-  const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
-  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  // const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
+  // const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
+  // const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [selectedWorkingDays, setSelectedWorkingDays] = useState([]);
+  const [approvingShiftId, setApprovingShiftId] = useState(null);
+  const [rejectingShiftId, setRejectingShiftId] = useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -210,118 +212,103 @@ const ShiftsSetups = () => {
     queryFn: () => fetchShifts({ limit, page, search: debouncedSearch }),
   });
 
-  console.log(data);
-
-  const {
-    data: filters,
-    isLoading: isCheckingFilters,
-    refetch: fetchFilters,
-  } = useQuery({
-    queryKey: ["positionsFilters"],
-    queryFn: () => fetchPositionsFilters(),
-    enabled: false,
-  });
-
   // ---------------------------------------------------------------------------
-  // Extract Unique Filter Values
-  // ---------------------------------------------------------------------------
-  const filtersList = filters?.positionsFiltersList ?? [];
-
-  const uniquePositions = React.useMemo(
-    () => [...new Set(filtersList.map((item) => item.name))].filter(Boolean),
-    [filtersList]
-  );
-
-  const uniqueReportsTo = React.useMemo(
-    () =>
-      [...new Set(filtersList.map((item) => item.reportsTo))].filter(Boolean),
-    [filtersList]
-  );
-
-  const uniqueDepartments = React.useMemo(
-    () =>
-      [...new Set(filtersList.map((item) => item.department?.name))].filter(
-        Boolean
-      ),
-    [filtersList]
-  );
-
-  // ---------------------------------------------------------------------------
-  // Fetch Departments List Query (lazy loading)
-  // ---------------------------------------------------------------------------
-  const {
-    data: departmentsList,
-    isLoading: isCheckingDepartments,
-    refetch: fetchDepartments,
-  } = useQuery({
-    queryKey: ["departmentsList"],
-    queryFn: fetchDepartmentsList,
-    enabled: false, // Don't fetch on mount, only when manually triggered
-  });
-
-  // ---------------------------------------------------------------------------
-  // Create Position Mutation
+  // Create Shift Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createPosition,
+    mutationFn: createShift,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["positions"] });
-      setUnlimitedChecked(false);
-      setNoneChecked(false);
-      setSelectedDepartment("");
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setSelectedWorkingDays([]);
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
-      toast.success("Position created successfully");
+      setEditingShift(null);
+      toast.success("Shift created successfully");
     },
     onError: (error) => {
-      console.error("Error creating position:", error);
+      console.error("Error creating shift:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create position";
+        error.response?.data?.message || "Failed to create shift";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Position Mutation
+  // Update Shift Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updatePosition(id, payload),
+    mutationFn: ({ id, payload }) => updateShift(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["positions"] });
-      setUnlimitedChecked(false);
-      setNoneChecked(false);
-      setSelectedDepartment("");
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setSelectedWorkingDays([]);
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
-      toast.success("Position updated successfully");
+      setEditingShift(null);
+      toast.success("Shift updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating position:", error);
+      console.error("Error updating shift:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update position";
+        error.response?.data?.message || "Failed to update shift";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Position Mutation
+  // Delete Shift Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deletePosition,
+    mutationFn: deleteShift,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["positions"] });
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
       setDeleteDialogOpen(false);
-      setDeletingPosition(null);
-      toast.success("Position deleted successfully");
+      setDeletingShift(null);
+      toast.success("Shift deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting position:", error);
+      console.error("Error deleting shift:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete position";
+        error.response?.data?.message || "Failed to delete shift";
+      toast.error(errorMessage);
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Approve Shift Mutation
+  // ---------------------------------------------------------------------------
+  const approveMutation = useMutation({
+    mutationFn: ({ id }) => updateShiftStatus(id, "Approved"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setApprovingShiftId(null);
+      toast.success("Shift approved successfully");
+    },
+    onError: (error) => {
+      console.error("Error approving shift:", error);
+      setApprovingShiftId(null);
+      const errorMessage =
+        error.response?.data?.message || "Failed to approve shift";
+      toast.error(errorMessage);
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Reject Shift Mutation
+  // ---------------------------------------------------------------------------
+  const rejectMutation = useMutation({
+    mutationFn: ({ id }) => updateShiftStatus(id, "Rejected"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setRejectingShiftId(null);
+      toast.success("Shift rejected successfully");
+    },
+    onError: (error) => {
+      console.error("Error rejecting shift:", error);
+      setRejectingShiftId(null);
+      const errorMessage =
+        error.response?.data?.message || "Failed to reject shift";
       toast.error(errorMessage);
     },
   });
@@ -350,18 +337,13 @@ const ShiftsSetups = () => {
       render: (row) => formatWorkingDaysInitials(row.workingDays),
     },
     {
-      key: "intervals",
-      label: "Intervals",
-      render: (row) => row.intervals?.length || 0,
-    },
-    {
       key: "shiftHours",
       label: "Shift Hrs",
       render: (row) => calculateShiftHours(row.startTime, row.endTime),
     },
     {
       key: "createdBy",
-      label: "Requested By",
+      label: "Created By",
       render: (row) => row.createdBy || "-",
     },
     {
@@ -399,13 +381,23 @@ const ShiftsSetups = () => {
     {
       key: "actions",
       label: "Actions",
-      align: "right",
+      align: "center",
       renderEdit: () => <PencilIcon size={18} />,
       renderDelete: () => <TrashIcon size={18} />,
-      renderApprove: (row) =>
-        row.status === "Pending" ? <CheckCircle2 size={18} /> : null,
-      renderReject: (row) =>
-        row.status === "Pending" ? <XCircle size={18} /> : null,
+      renderApprove: (row) => {
+        if (row.status !== "Pending" && row.status !== "Rejected") return null;
+        if (approvingShiftId === row._id) {
+          return <Spinner className="h-4 w-4" />;
+        }
+        return <CheckCircle2 size={18} />;
+      },
+      renderReject: (row) => {
+        if (row.status !== "Pending") return null;
+        if (rejectingShiftId === row._id) {
+          return <Spinner className="h-4 w-4" />;
+        }
+        return <XCircle size={18} />;
+      },
     },
   ];
 
@@ -416,38 +408,21 @@ const ShiftsSetups = () => {
   // ---------------------------------------------------------------------------
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
-  const handleEdit = async (row) => {
-    // Fetch departments first
-    const result = await fetchDepartments();
-
-    if (result.isError) {
-      const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch departments";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!result.data || result.data.length === 0) {
-      toast.error("Add department first");
-      return;
-    }
-
+  const handleEdit = (row) => {
     // Set all the editing states
-    setEditingPosition(row);
-    setSelectedDepartment(row.department?._id || "");
-    setUnlimitedChecked(row.employeeLimit === "Unlimited");
-    setNoneChecked(row.reportsTo === "None" || !row.reportsTo);
+    setEditingShift(row);
+    setSelectedWorkingDays(row.workingDays || []);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingPosition(row);
+    setDeletingShift(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingPosition) {
-      deleteMutation.mutate(deletingPosition._id);
+    if (deletingShift) {
+      deleteMutation.mutate(deletingShift._id);
     }
   };
 
@@ -455,32 +430,25 @@ const ShiftsSetups = () => {
   // Approve & Reject Handlers
   // ---------------------------------------------------------------------------
   const handleApprove = (row) => {
-    console.log("Approve shift ID:", row._id);
+    // Prevent multiple clicks while pending
+    if (approvingShiftId || rejectingShiftId) return;
+
+    setApprovingShiftId(row._id);
+    approveMutation.mutate({ id: row._id });
   };
 
   const handleReject = (row) => {
-    console.log("Reject shift ID:", row._id);
+    // Prevent multiple clicks while pending
+    if (approvingShiftId || rejectingShiftId) return;
+
+    setRejectingShiftId(row._id);
+    rejectMutation.mutate({ id: row._id });
   };
 
   // ---------------------------------------------------------------------------
-  // Add Position Handler
+  // Add Shift Handler
   // ---------------------------------------------------------------------------
-  const handleAddPositionClick = async () => {
-    const result = await fetchDepartments();
-
-    if (result.isError) {
-      const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch departments";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!result.data || result.data.length === 0) {
-      toast.error("Add department first");
-      return;
-    }
-
-    // If departments exist, open the dialog
+  const handleAddShiftClick = () => {
     setDialogOpen(true);
   };
 
@@ -524,52 +492,32 @@ const ShiftsSetups = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreatePosition = (e) => {
+  const handleCreateShift = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
-    const payload = {
-      name: formData.get("position-name"),
-      department: selectedDepartment,
-      reportsTo: noneChecked ? "None" : formData.get("reports-to"),
-      employeeLimit: unlimitedChecked
-        ? "Unlimited"
-        : formData.get("employee-limit"),
-    };
+    const shiftName = formData.get("shift-name");
+    const startTime = formData.get("shift-start-time");
+    const endTime = formData.get("shift-end-time");
+    const notes = formData.get("shift-notes");
 
     // Validate
     const newErrors = {};
 
-    if (!payload.name?.trim()) {
-      newErrors.name = "Position name is required";
+    // Validate shift name
+    if (!shiftName?.trim()) {
+      newErrors.name = "Shift name is required";
     }
 
-    if (!payload.department) {
-      newErrors.department = "Department is required";
+    // Validate working days (at least 1 day must be selected)
+    if (!selectedWorkingDays || selectedWorkingDays.length === 0) {
+      newErrors.workingDays = "Select working days for the shift";
     }
 
-    if (!noneChecked && !payload.reportsTo?.trim()) {
-      newErrors.reportsTo = "Reports to is required";
-    }
-
-    if (!unlimitedChecked && !payload.employeeLimit?.trim()) {
-      newErrors.employeeLimit = "Employee limit is required";
-    }
-
-    // Validate position count is a positive integer when not unlimited
-    if (!unlimitedChecked && payload.employeeLimit?.trim()) {
-      const employeeLimitValue = payload.employeeLimit.trim();
-      const isValidNumber = /^\d+$/.test(employeeLimitValue); // Only positive integers
-      const numericValue = Number(employeeLimitValue);
-
-      if (
-        !isValidNumber ||
-        numericValue <= 0 ||
-        !Number.isInteger(numericValue)
-      ) {
-        newErrors.employeeLimit = "Employee limit must be a proper number";
-      }
+    // Validate notes (max 250 characters)
+    if (notes && notes.length > 250) {
+      newErrors.notes = "Notes must not exceed 250 characters";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -577,21 +525,31 @@ const ShiftsSetups = () => {
       return;
     }
 
-    if (editingPosition) {
-      // Update existing position
+    const payload = {
+      name: shiftName,
+      startTime: startTime,
+      endTime: endTime,
+      workingDays: selectedWorkingDays,
+      notes: notes || "",
+    };
+
+    if (editingShift) {
+      // Update existing shift
       updateMutation.mutate(
-        { id: editingPosition._id, payload },
+        { id: editingShift._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
+            setSelectedWorkingDays([]);
           },
         }
       );
     } else {
-      // Create new position
+      // Create new shift
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
+          setSelectedWorkingDays([]);
         },
       });
     }
@@ -613,10 +571,8 @@ const ShiftsSetups = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingPosition(null);
-                setUnlimitedChecked(false);
-                setSelectedDepartment("");
-                setNoneChecked(false);
+                setEditingShift(null);
+                setSelectedWorkingDays([]);
               }, 200);
             }
           }}
@@ -624,24 +580,23 @@ const ShiftsSetups = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddPositionClick}
-            disabled={isCheckingDepartments}
+            onClick={handleAddShiftClick}
           >
-            {isCheckingDepartments ? <Spinner /> : <PlusIcon size={16} />}
+            <PlusIcon size={16} />
             Add Shift
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingPosition ? "Edit Position" : "Add Position"}
+                {editingShift ? "Edit Shift" : "Add Shift"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingPosition
-                  ? "Edit the position information below"
-                  : "Create a new position by entering the name and employee limits"}
+                {editingShift
+                  ? "Edit the shift information below"
+                  : "Create a new shift by entering the name and employee limits"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreatePosition}>
+            <form onSubmit={handleCreateShift}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
@@ -649,122 +604,125 @@ const ShiftsSetups = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="position-name" className="text-[#344054]">
-                    Position Name
+                  <Label htmlFor="shift-name" className="text-[#344054]">
+                    Shift Name
                   </Label>
                   <Input
-                    id="position-name"
-                    name="position-name"
-                    placeholder="Enter position name"
-                    defaultValue={editingPosition?.name || ""}
+                    id="shift-name"
+                    name="shift-name"
+                    placeholder="Enter shift name"
+                    defaultValue={editingShift?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
-                {/* Select Department */}
+                {/* Select Shift Start & End Time */}
+                <div className="flex gap-4">
+                  <div className="flex flex-col gap-3 flex-1">
+                    <Label
+                      htmlFor="shift-start-time"
+                      className="text-[#344054]"
+                    >
+                      Shift Start Time
+                    </Label>
+                    <Input
+                      type="time"
+                      id="shift-start-time"
+                      name="shift-start-time"
+                      step="1"
+                      defaultValue={editingShift?.startTime || "09:00:00"}
+                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-3 flex-1">
+                    <Label htmlFor="shift-end-time" className="text-[#344054]">
+                      Shift End Time
+                    </Label>
+                    <Input
+                      type="time"
+                      id="shift-end-time"
+                      name="shift-end-time"
+                      step="1"
+                      defaultValue={editingShift?.endTime || "17:00:00"}
+                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    />
+                  </div>
+                </div>
+                {/* Working Days */}
                 <div className="grid gap-3">
-                  <Label htmlFor="department" className="text-[#344054]">
-                    Department
+                  <Label htmlFor="working-days" className="text-[#344054]">
+                    Working days
                   </Label>
-                  <Select
-                    value={selectedDepartment}
-                    onValueChange={(value) => {
-                      setSelectedDepartment(value);
-                      if (errors.department) {
-                        setErrors({ ...errors, department: undefined });
-                      }
-                    }}
+                  <ToggleGroup
+                    type="multiple"
+                    className="flex flex-wrap gap-2"
+                    value={selectedWorkingDays}
+                    onValueChange={setSelectedWorkingDays}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {departmentsList?.map((dept) => (
-                          <SelectItem key={dept._id} value={dept._id}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.department && (
+                    <ToggleGroupItem
+                      value="Monday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Mon
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Tuesday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Tue
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Wednesday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Wed
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Thursday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Thu
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Friday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Fri
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Saturday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Sat
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="Sunday"
+                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                    >
+                      Sun
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  {errors.workingDays && (
                     <p className="text-sm text-red-500 mt-1">
-                      {errors.department}
+                      {errors.workingDays}
                     </p>
                   )}
                 </div>
+                {/* Shift notes */}
                 <div className="grid gap-3">
-                  <Label htmlFor="reports-to" className="text-[#344054]">
-                    Reports To
+                  <Label htmlFor="shift-notes" className="text-[#344054]">
+                    Notes
                   </Label>
-                  <InputGroup className={styles.searchInput}>
-                    <InputGroupInput
-                      id="reports-to"
-                      name="reports-to"
-                      placeholder="Enter employee ID"
-                      disabled={noneChecked}
-                      defaultValue={
-                        editingPosition?.reportsTo !== "None"
-                          ? editingPosition?.reportsTo || ""
-                          : ""
-                      }
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <Checkbox
-                        checked={noneChecked}
-                        onCheckedChange={(checked) => {
-                          setNoneChecked(checked);
-                          if (checked && errors.reportsTo) {
-                            setErrors({ ...errors, reportsTo: undefined });
-                          }
-                        }}
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
-                      />
-                      <p>None</p>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  {errors.reportsTo && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.reportsTo}
-                    </p>
-                  )}
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="employee-limit" className="text-[#344054]">
-                    Employee Limit
-                  </Label>
-                  <InputGroup className={styles.searchInput}>
-                    <InputGroupInput
-                      id="employee-limit"
-                      name="employee-limit"
-                      placeholder="Enter employee limit"
-                      disabled={unlimitedChecked}
-                      defaultValue={
-                        editingPosition?.employeeLimit !== "Unlimited"
-                          ? editingPosition?.employeeLimit || ""
-                          : ""
-                      }
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <Checkbox
-                        checked={unlimitedChecked}
-                        onCheckedChange={(checked) => {
-                          setUnlimitedChecked(checked);
-                          if (checked && errors.employeeLimit) {
-                            setErrors({ ...errors, employeeLimit: undefined });
-                          }
-                        }}
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
-                      />
-                      <p>Unlimited</p>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  {errors.employeeLimit && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.employeeLimit}
-                    </p>
+                  <Textarea
+                    id="shift-notes"
+                    name="shift-notes"
+                    placeholder="Add notes if any..."
+                    maxLength={250}
+                    defaultValue={editingShift?.notes || ""}
+                  />
+                  {errors.notes && (
+                    <p className="text-sm text-red-500 mt-1">{errors.notes}</p>
                   )}
                 </div>
               </div>
@@ -787,9 +745,9 @@ const ShiftsSetups = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingPosition ? "Updating" : "Creating"}
+                      {editingShift ? "Updating" : "Creating"}
                     </>
-                  ) : editingPosition ? (
+                  ) : editingShift ? (
                     "Update"
                   ) : (
                     "Create"
@@ -843,7 +801,7 @@ const ShiftsSetups = () => {
         </Select>
 
         {/* Filters */}
-        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+        {/* <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -934,7 +892,7 @@ const ShiftsSetups = () => {
               </div>
             </div>
           </PopoverContent>
-        </Popover>
+        </Popover> */}
       </div>
 
       <DataTable
@@ -1070,7 +1028,7 @@ const ShiftsSetups = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingPosition(null);
+              setDeletingShift(null);
             }, 200);
           }
         }}
@@ -1078,12 +1036,12 @@ const ShiftsSetups = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Position
+              Delete Shift
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the position{" "}
+              Are you sure you want to delete the shift{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingPosition?.name}"
+                "{deletingShift?.name}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>

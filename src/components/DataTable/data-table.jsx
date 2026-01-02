@@ -22,6 +22,8 @@ const DataTable = ({
                 className={
                   column.align === "right"
                     ? styles.tableHeaderRight
+                    : column.align === "center"
+                    ? styles.tableHeaderCenter
                     : styles.tableHeader
                 }
               >
@@ -64,8 +66,21 @@ const DataTable = ({
                 {columns.map((column, index) => {
                   if (column.key === "actions") {
                     return (
-                      <td key={index} className={styles.tableCellRight}>
-                        <div className={styles.actionsContainer}>
+                      <td 
+                        key={index} 
+                        className={
+                          column.align === "center"
+                            ? styles.tableCellCenter
+                            : styles.tableCellRight
+                        }
+                      >
+                        <div 
+                          className={
+                            column.align === "center"
+                              ? styles.actionsContainerCenter
+                              : styles.actionsContainer
+                          }
+                        >
                           {onEdit && (
                             <button
                               className={styles.actionButton}
@@ -82,7 +97,7 @@ const DataTable = ({
                               {column.renderDelete(row)}
                             </button>
                           )}
-                          {onApprove && column.renderApprove && (
+                          {onApprove && column.renderApprove && column.renderApprove(row) && (
                             <button
                               className={styles.actionButton}
                               onClick={() => onApprove(row)}
@@ -90,7 +105,7 @@ const DataTable = ({
                               {column.renderApprove(row)}
                             </button>
                           )}
-                          {onReject && column.renderReject && (
+                          {onReject && column.renderReject && column.renderReject(row) && (
                             <button
                               className={styles.actionButton}
                               onClick={() => onReject(row)}

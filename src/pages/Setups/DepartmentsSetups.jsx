@@ -265,7 +265,7 @@ const DepartmentsSetups = () => {
     {
       key: "actions",
       label: "Actions",
-      align: "right",
+      align: "center",
       renderEdit: () => <PencilIcon size={18} />,
       renderDelete: () => <TrashIcon size={18} />,
     },
@@ -403,351 +403,344 @@ const DepartmentsSetups = () => {
   // ===========================================================================
 
   return (
-    <div className={styles.containerMain}>
-      <div className={styles.containerTitle}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>Departments Setup</h1>
-          <Dialog
-            open={dialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) {
-                setErrors({});
-                setTimeout(() => {
-                  setEditingDepartment(null);
-                  setUnlimitedChecked(false);
-                }, 200);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button variant="green" className="cursor-pointer">
-                <PlusIcon size={16} />
-                Add Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-125">
-              <DialogHeader>
-                <DialogTitle className="flex justify-center text-[#02542D]">
-                  {editingDepartment ? "Edit Department" : "Add Department"}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  {editingDepartment
-                    ? "Edit the department information below"
-                    : "Create a new department by entering the name and position limits"}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateDepartment}>
-                {errors.server && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <p className="text-sm text-red-600">{errors.server}</p>
-                  </div>
-                )}
-                <div className="grid gap-4">
-                  <div className="grid gap-3">
-                    <Label htmlFor="department-name" className="text-[#344054]">
-                      Department Name
-                    </Label>
-                    <Input
-                      id="department-name"
-                      name="department-name"
-                      placeholder="Enter department name"
-                      defaultValue={editingDepartment?.name || ""}
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-3">
-                    <Label htmlFor="position-limits" className="text-[#344054]">
-                      Position Limits
-                    </Label>
-                    <InputGroup className={styles.searchInput}>
-                      <InputGroupInput
-                        id="position-limits"
-                        name="position-limits"
-                        placeholder="Enter position limits"
-                        disabled={unlimitedChecked}
-                        defaultValue={
-                          editingDepartment?.positionCount !== "Unlimited"
-                            ? editingDepartment?.positionCount || ""
-                            : ""
-                        }
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <Checkbox
-                          checked={unlimitedChecked}
-                          onCheckedChange={(checked) => {
-                            setUnlimitedChecked(checked);
-                            if (checked && errors.positionCount) {
-                              setErrors({
-                                ...errors,
-                                positionCount: undefined,
-                              });
-                            }
-                          }}
-                          className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
-                        />
-                        <p>Unlimited</p>
-                      </InputGroupAddon>
-                    </InputGroup>
-                    {errors.positionCount && (
-                      <p className="text-sm text-red-500 mt-1">
-                        {errors.positionCount}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter className="mt-4">
-                  <DialogClose asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="cursor-pointer"
-                    >
-                      Cancel
-                    </Button>
-                  </DialogClose>
-                  <Button
-                    type="submit"
-                    variant="green"
-                    disabled={mutation.isPending || updateMutation.isPending}
-                    className="cursor-pointer"
-                  >
-                    {mutation.isPending || updateMutation.isPending ? (
-                      <>
-                        <Spinner />
-                        {editingDepartment ? "Updating" : "Creating"}
-                      </>
-                    ) : editingDepartment ? (
-                      "Update"
-                    ) : (
-                      "Create"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-      <div className={styles.containerControls}>
-        <div className={styles.controls}>
-          {/* Search */}
-          <InputGroup className={styles.tableSearchInput}>
-            <InputGroupInput
-              placeholder="Search Departments..."
-              value={searchValue}
-              onChange={handleSearchChange}
-            />
-            <InputGroupAddon>
-              <SearchIcon />
-            </InputGroupAddon>
-            <InputGroupAddon
-              align="inline-end"
-              className="cursor-pointer hover:text-[#02542D]"
-              onClick={handleClearSearch}
-            >
-              {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
-            </InputGroupAddon>
-          </InputGroup>
-
-          {/* Page Limit */}
-          <Select
-            value={limit.toString()}
-            onValueChange={handleLimitChange}
-            className={styles.pageLimitSelect}
-          >
-            <SelectTrigger className="w-45">
-              <SelectValue placeholder="Select page limit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="5">5 items</SelectItem>
-                <SelectItem value="10">10 items</SelectItem>
-                <SelectItem value="25">25 items</SelectItem>
-                <SelectItem value="50">50 items</SelectItem>
-                <SelectItem value="100">100 items</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className={styles.containerTable}>
-        <DataTable
-          columns={columns}
-          data={data?.departments || []}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          isLoading={isLoading}
-          isError={isError}
-        />
-
-        {data?.pagination && data.pagination.totalPages > 1 && (
-          <Pagination className="pt-[16px]">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handlePreviousPage();
-                  }}
-                  className={
-                    page === 1
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-
-              {/* Render page numbers */}
-              {(() => {
-                const { currentPage, totalPages } = data.pagination;
-                const pages = [];
-
-                // Always show first page
-                pages.push(
-                  <PaginationItem key={1}>
-                    <PaginationLink
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(1);
-                      }}
-                      isActive={currentPage === 1}
-                      className="cursor-pointer"
-                    >
-                      1
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-
-                // Show ellipsis if needed
-                if (currentPage > 3) {
-                  pages.push(
-                    <PaginationItem key="ellipsis-start">
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  );
-                }
-
-                // Show pages around current page
-                for (
-                  let i = Math.max(2, currentPage - 1);
-                  i <= Math.min(totalPages - 1, currentPage + 1);
-                  i++
-                ) {
-                  pages.push(
-                    <PaginationItem key={i}>
-                      <PaginationLink
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(i);
-                        }}
-                        isActive={currentPage === i}
-                        className="cursor-pointer"
-                      >
-                        {i}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                }
-
-                // Show ellipsis if needed
-                if (currentPage < totalPages - 2) {
-                  pages.push(
-                    <PaginationItem key="ellipsis-end">
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  );
-                }
-
-                // Always show last page if there's more than one page
-                if (totalPages > 1) {
-                  pages.push(
-                    <PaginationItem key={totalPages}>
-                      <PaginationLink
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(totalPages);
-                        }}
-                        isActive={currentPage === totalPages}
-                        className="cursor-pointer"
-                      >
-                        {totalPages}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                }
-
-                return pages;
-              })()}
-
-              <PaginationItem>
-                <PaginationNext
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNextPage();
-                  }}
-                  className={
-                    page === data.pagination.totalPages
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
-
-        <AlertDialog
-          open={deleteDialogOpen}
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Departments Setup</h1>
+        <Dialog
+          open={dialogOpen}
           onOpenChange={(open) => {
-            setDeleteDialogOpen(open);
+            setDialogOpen(open);
             if (!open) {
+              setErrors({});
               setTimeout(() => {
-                setDeletingDepartment(null);
+                setEditingDepartment(null);
+                setUnlimitedChecked(false);
               }, 200);
             }
           }}
         >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#02542D]">
-                Delete Department
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete the department{" "}
-                <span className="font-semibold text-[#02542D]">
-                  "{deletingDepartment?.name}"
-                </span>
-                ? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                disabled={deleteMutation.isPending}
-                className="cursor-pointer"
-              >
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={deleteMutation.isPending}
-                className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer"
-              >
-                {deleteMutation.isPending ? (
-                  <>
-                    <Spinner />
-                    Deleting
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          <DialogTrigger asChild>
+            <Button variant="green" className="cursor-pointer">
+              <PlusIcon size={16} />
+              Add Department
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-125">
+            <DialogHeader>
+              <DialogTitle className="flex justify-center text-[#02542D]">
+                {editingDepartment ? "Edit Department" : "Add Department"}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                {editingDepartment
+                  ? "Edit the department information below"
+                  : "Create a new department by entering the name and position limits"}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateDepartment}>
+              {errors.server && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{errors.server}</p>
+                </div>
+              )}
+              <div className="grid gap-4">
+                <div className="grid gap-3">
+                  <Label htmlFor="department-name" className="text-[#344054]">
+                    Department Name
+                  </Label>
+                  <Input
+                    id="department-name"
+                    name="department-name"
+                    placeholder="Enter department name"
+                    defaultValue={editingDepartment?.name || ""}
+                  />
+                  {errors.name && (
+                    <p className="text-sm text-red-500 mt-1">{errors.name}</p>
+                  )}
+                </div>
+                <div className="grid gap-3">
+                  <Label htmlFor="position-limits" className="text-[#344054]">
+                    Position Limits
+                  </Label>
+                  <InputGroup className={styles.searchInput}>
+                    <InputGroupInput
+                      id="position-limits"
+                      name="position-limits"
+                      placeholder="Enter position limits"
+                      disabled={unlimitedChecked}
+                      defaultValue={
+                        editingDepartment?.positionCount !== "Unlimited"
+                          ? editingDepartment?.positionCount || ""
+                          : ""
+                      }
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <Checkbox
+                        checked={unlimitedChecked}
+                        onCheckedChange={(checked) => {
+                          setUnlimitedChecked(checked);
+                          if (checked && errors.positionCount) {
+                            setErrors({ ...errors, positionCount: undefined });
+                          }
+                        }}
+                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                      />
+                      <p>Unlimited</p>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  {errors.positionCount && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.positionCount}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="submit"
+                  variant="green"
+                  disabled={mutation.isPending || updateMutation.isPending}
+                  className="cursor-pointer"
+                >
+                  {mutation.isPending || updateMutation.isPending ? (
+                    <>
+                      <Spinner />
+                      {editingDepartment ? "Updating" : "Creating"}
+                    </>
+                  ) : editingDepartment ? (
+                    "Update"
+                  ) : (
+                    "Create"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      <div className={styles.controls}>
+        {/* Search */}
+        <InputGroup className={styles.tableSearchInput}>
+          <InputGroupInput
+            placeholder="Search Departments..."
+            value={searchValue}
+            onChange={handleSearchChange}
+          />
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupAddon
+            align="inline-end"
+            className="cursor-pointer hover:text-[#02542D]"
+            onClick={handleClearSearch}
+          >
+            {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
+          </InputGroupAddon>
+        </InputGroup>
+
+        {/* Page Limit */}
+        <Select
+          value={limit.toString()}
+          onValueChange={handleLimitChange}
+          className={styles.pageLimitSelect}
+        >
+          <SelectTrigger className="w-45">
+            <SelectValue placeholder="Select page limit" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="5">5 items</SelectItem>
+              <SelectItem value="10">10 items</SelectItem>
+              <SelectItem value="25">25 items</SelectItem>
+              <SelectItem value="50">50 items</SelectItem>
+              <SelectItem value="100">100 items</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={data?.departments || []}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        isLoading={isLoading}
+        isError={isError}
+      />
+
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <Pagination className="pt-5">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePreviousPage();
+                }}
+                className={
+                  page === 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+
+            {/* Render page numbers */}
+            {(() => {
+              const { currentPage, totalPages } = data.pagination;
+              const pages = [];
+
+              // Always show first page
+              pages.push(
+                <PaginationItem key={1}>
+                  <PaginationLink
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePageChange(1);
+                    }}
+                    isActive={currentPage === 1}
+                    className="cursor-pointer"
+                  >
+                    1
+                  </PaginationLink>
+                </PaginationItem>
+              );
+
+              // Show ellipsis if needed
+              if (currentPage > 3) {
+                pages.push(
+                  <PaginationItem key="ellipsis-start">
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+
+              // Show pages around current page
+              for (
+                let i = Math.max(2, currentPage - 1);
+                i <= Math.min(totalPages - 1, currentPage + 1);
+                i++
+              ) {
+                pages.push(
+                  <PaginationItem key={i}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(i);
+                      }}
+                      isActive={currentPage === i}
+                      className="cursor-pointer"
+                    >
+                      {i}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              // Show ellipsis if needed
+              if (currentPage < totalPages - 2) {
+                pages.push(
+                  <PaginationItem key="ellipsis-end">
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+
+              // Always show last page if there's more than one page
+              if (totalPages > 1) {
+                pages.push(
+                  <PaginationItem key={totalPages}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(totalPages);
+                      }}
+                      isActive={currentPage === totalPages}
+                      className="cursor-pointer"
+                    >
+                      {totalPages}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              return pages;
+            })()}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNextPage();
+                }}
+                className={
+                  page === data.pagination.totalPages
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setTimeout(() => {
+              setDeletingDepartment(null);
+            }, 200);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#02542D]">
+              Delete Department
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the department{" "}
+              <span className="font-semibold text-[#02542D]">
+                "{deletingDepartment?.name}"
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="cursor-pointer"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Spinner />
+                  Deleting
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

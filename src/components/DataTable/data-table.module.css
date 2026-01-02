@@ -34,6 +34,14 @@
   color: #02542d;
 }
 
+.tableHeaderCenter {
+  padding: 16px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #02542d;
+}
+
 .tableRow {
   border-bottom: 1px solid #f3f4f6;
   transition: background-color 0.2s ease;
@@ -61,15 +69,26 @@
   font-size: 16px;
 }
 
+.tableCellCenter {
+  padding: 16px 0;
+  text-align: center;
+  font-size: 16px;
+}
+
 .stateCell {
   padding: 0;
   text-align: center;
 }
 
-/* Actions */
 .actionsContainer {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+}
+
+.actionsContainerCenter {
+  display: flex;
+  justify-content: center;
   gap: 12px;
 }
 

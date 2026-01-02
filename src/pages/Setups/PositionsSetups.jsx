@@ -343,7 +343,7 @@ const PositionsSetups = () => {
     {
       key: "actions",
       label: "Actions",
-      align: "right",
+      align: "center",
       renderEdit: () => <PencilIcon size={18} />,
       renderDelete: () => <TrashIcon size={18} />,
     },
