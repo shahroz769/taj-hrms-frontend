@@ -57,8 +57,8 @@ export const sidebarItems = [
     collapsible: true,
     collapseIcon: ChevronDownIcon,
     children: [
-      { label: "Leaves Types", path: "/leaves/types" },
-      { label: "Leaves Applications", path: "/leaves/applications" },
+      { label: "Leaves Types", path: "/leaves-types" },
+      { label: "Leaves Applications", path: "/leaves-applications" },
     ],
   },
   {

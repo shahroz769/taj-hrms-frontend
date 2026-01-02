@@ -110,9 +110,9 @@ function App() {
                 />
 
                 {/* Leaves */}
-                <Route path="/leaves/types" element={<LeavesTypes />} />
+                <Route path="/leaves-types" element={<LeavesTypes />} />
                 <Route
-                  path="/leaves/applications"
+                  path="/leaves-applications"
                   element={<LeavesApplications />}
                 />
 
