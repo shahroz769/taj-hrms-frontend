@@ -527,35 +527,34 @@ const LeavesPolicies = () => {
       leaveTypesList.forEach((leaveType) => {
         const daysValue = formData.get(`leave-days-${leaveType._id}`);
 
-        // Validate each leave type days input
+        // Skip empty values - they are allowed
         if (daysValue === null || daysValue === "" || daysValue === undefined) {
+          // Empty values are allowed, just skip this leave type
+          return;
+        }
+
+        const days = Number(daysValue);
+
+        // Check if it's a valid number
+        if (isNaN(days) || !Number.isInteger(days)) {
           newErrors[
             `leaveType-${leaveType._id}`
-          ] = `Days for ${leaveType.name} is required`;
-        } else {
-          const days = Number(daysValue);
-
-          // Check if it's a valid number
-          if (isNaN(days) || !Number.isInteger(days)) {
-            newErrors[
-              `leaveType-${leaveType._id}`
-            ] = `Days must be a valid number`;
-          }
-          // Check if it's negative
-          else if (days < 0) {
-            newErrors[`leaveType-${leaveType._id}`] = `Days cannot be negative`;
-          }
-          // Check if it exceeds 30
-          else if (days > 30) {
-            newErrors[`leaveType-${leaveType._id}`] = `Days cannot exceed 30`;
-          }
-          // Valid: add to entitlements (0 is allowed)
-          else {
-            entitlements.push({
-              leaveType: leaveType._id,
-              days: days,
-            });
-          }
+          ] = `Days must be a valid number`;
+        }
+        // Check if it's negative
+        else if (days < 0) {
+          newErrors[`leaveType-${leaveType._id}`] = `Days cannot be negative`;
+        }
+        // Check if it exceeds 30
+        else if (days > 30) {
+          newErrors[`leaveType-${leaveType._id}`] = `Days cannot exceed 30`;
+        }
+        // Valid: add to entitlements (0 is allowed)
+        else {
+          entitlements.push({
+            leaveType: leaveType._id,
+            days: days,
+          });
         }
       });
     }

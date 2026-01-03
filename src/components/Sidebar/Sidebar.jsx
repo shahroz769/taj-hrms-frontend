@@ -17,6 +17,31 @@ import { useState, useMemo } from "react";
 // import { useDispatch } from "react-redux";
 // import { logoutUser } from "@/services/authApi";
 
+// Local storage key for sidebar state
+const STORAGE_KEY = "sidebar-open-items";
+
+// Helper function to load sidebar state from local storage
+const loadFromLocalStorage = () => {
+  try {
+    const savedState = localStorage.getItem(STORAGE_KEY);
+    if (savedState) {
+      return JSON.parse(savedState);
+    }
+  } catch (error) {
+    console.error("Error loading sidebar state from local storage:", error);
+  }
+  return {};
+};
+
+// Helper function to save sidebar state to local storage
+const saveToLocalStorage = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    console.error("Error saving sidebar state to local storage:", error);
+  }
+};
+
 const Sidebar = () => {
   const role = useSelector((state) => state.auth.user?.role);
   const location = useLocation();
@@ -36,8 +61,10 @@ const Sidebar = () => {
     [role]
   );
 
-  // Calculate initial open state based on current path
+  // Calculate initial open state based on current path and local storage
   const getInitialOpenItems = () => {
+    const savedState = loadFromLocalStorage();
+
     const initialOpen = {};
     filteredSidebarItems.forEach((item, index) => {
       if (item.children) {
@@ -46,6 +73,8 @@ const Sidebar = () => {
         );
         if (hasActiveChild) {
           initialOpen[index] = true;
+        } else if (savedState.hasOwnProperty(index)) {
+          initialOpen[index] = savedState[index];
         }
       }
     });
@@ -55,10 +84,14 @@ const Sidebar = () => {
   const [openItems, setOpenItems] = useState(getInitialOpenItems);
 
   const toggleItem = (index) => {
-    setOpenItems((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+    setOpenItems((prev) => {
+      const newState = {
+        ...prev,
+        [index]: !prev[index],
+      };
+      saveToLocalStorage(newState);
+      return newState;
+    });
   };
 
   return (

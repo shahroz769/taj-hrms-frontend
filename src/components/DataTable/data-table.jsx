@@ -1,4 +1,9 @@
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import styles from "./data-table.module.css";
 
 const DataTable = ({
@@ -66,15 +71,15 @@ const DataTable = ({
                 {columns.map((column, index) => {
                   if (column.key === "actions") {
                     return (
-                      <td 
-                        key={index} 
+                      <td
+                        key={index}
                         className={
                           column.align === "center"
                             ? styles.tableCellCenter
                             : styles.tableCellRight
                         }
                       >
-                        <div 
+                        <div
                           className={
                             column.align === "center"
                               ? styles.actionsContainerCenter
@@ -82,37 +87,69 @@ const DataTable = ({
                           }
                         >
                           {onEdit && (
-                            <button
-                              className={styles.actionButton}
-                              onClick={() => onEdit(row)}
-                            >
-                              {column.renderEdit(row)}
-                            </button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={styles.actionButton}
+                                  onClick={() => onEdit(row)}
+                                >
+                                  {column.renderEdit(row)}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Edit</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                           {onDelete && (
-                            <button
-                              className={styles.actionButton}
-                              onClick={() => onDelete(row)}
-                            >
-                              {column.renderDelete(row)}
-                            </button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className={styles.actionButton}
+                                  onClick={() => onDelete(row)}
+                                >
+                                  {column.renderDelete(row)}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
-                          {onApprove && column.renderApprove && column.renderApprove(row) && (
-                            <button
-                              className={styles.actionButton}
-                              onClick={() => onApprove(row)}
-                            >
-                              {column.renderApprove(row)}
-                            </button>
-                          )}
-                          {onReject && column.renderReject && column.renderReject(row) && (
-                            <button
-                              className={styles.actionButton}
-                              onClick={() => onReject(row)}
-                            >
-                              {column.renderReject(row)}
-                            </button>
-                          )}
+                          {onApprove &&
+                            column.renderApprove &&
+                            column.renderApprove(row) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className={styles.actionButton}
+                                    onClick={() => onApprove(row)}
+                                  >
+                                    {column.renderApprove(row)}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Approve</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          {onReject &&
+                            column.renderReject &&
+                            column.renderReject(row) && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    className={styles.actionButton}
+                                    onClick={() => onReject(row)}
+                                  >
+                                    {column.renderReject(row)}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Reject</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                         </div>
                       </td>
                     );
