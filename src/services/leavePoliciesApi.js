@@ -7,8 +7,8 @@ export const fetchLeavePolicies = async ({ page = 1, limit = 10, search = "" }) 
   return res.data;
 };
 
-export const fetchLeavePoliciesFilters = async () => {
-  const res = await API.get(`/api/leave-policies/filters`);
+export const fetchLeavePoliciesList = async () => {
+  const res = await API.get(`/api/leave-policies/list`);
   return res.data;
 };
 

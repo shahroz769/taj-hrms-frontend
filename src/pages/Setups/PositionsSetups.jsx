@@ -83,6 +83,7 @@ import {
 
 // Services
 import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchLeavePoliciesList } from "@/services/leavePoliciesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -132,9 +133,12 @@ const PositionsSetups = () => {
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedLeavePolicy, setSelectedLeavePolicy] = useState("");
   const [selectedFilterPosition, setSelectedFilterPosition] = useState("");
   const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
   const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
+  const [selectedFilterLeavePolicy, setSelectedFilterLeavePolicy] =
+    useState("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
 
   // ===========================================================================
@@ -195,6 +199,8 @@ const PositionsSetups = () => {
     queryFn: () => fetchPositions({ limit, page, search: debouncedSearch }),
   });
 
+  console.log(data);
+
   const {
     data: filters,
     isLoading: isCheckingFilters,
@@ -229,6 +235,14 @@ const PositionsSetups = () => {
     [filtersList]
   );
 
+  const uniqueLeavePolicies = React.useMemo(
+    () =>
+      [...new Set(filtersList.map((item) => item.leavePolicy?.name))].filter(
+        Boolean
+      ),
+    [filtersList]
+  );
+
   // ---------------------------------------------------------------------------
   // Fetch Departments List Query (lazy loading)
   // ---------------------------------------------------------------------------
@@ -243,6 +257,19 @@ const PositionsSetups = () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Fetch Leave Policies List Query (lazy loading)
+  // ---------------------------------------------------------------------------
+  const {
+    data: leavePoliciesList,
+    isLoading: isCheckingLeavePolicies,
+    refetch: fetchLeavePolicies,
+  } = useQuery({
+    queryKey: ["leavePoliciesList"],
+    queryFn: fetchLeavePoliciesList,
+    enabled: false, // Don't fetch on mount, only when manually triggered
+  });
+
+  // ---------------------------------------------------------------------------
   // Create Position Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
@@ -252,6 +279,7 @@ const PositionsSetups = () => {
       setUnlimitedChecked(false);
       setNoneChecked(false);
       setSelectedDepartment("");
+      setSelectedLeavePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -276,6 +304,7 @@ const PositionsSetups = () => {
       setUnlimitedChecked(false);
       setNoneChecked(false);
       setSelectedDepartment("");
+      setSelectedLeavePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -328,6 +357,11 @@ const PositionsSetups = () => {
       render: (row) => row.department?.name || "-",
     },
     {
+      key: "leavePolicy",
+      label: "Leave Policy",
+      render: (row) => row.leavePolicy?.name || "-",
+    },
+    {
       key: "employeeLimit",
       label: "Employees Limit",
     },
@@ -357,24 +391,42 @@ const PositionsSetups = () => {
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
   const handleEdit = async (row) => {
-    // Fetch departments first
-    const result = await fetchDepartments();
+    // Fetch departments and leave policies first
+    const [deptResult, leavePolicyResult] = await Promise.all([
+      fetchDepartments(),
+      fetchLeavePolicies(),
+    ]);
 
-    if (result.isError) {
+    if (deptResult.isError) {
       const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch departments";
+        deptResult.error?.response?.data?.message ||
+        "Failed to fetch departments";
       toast.error(errorMessage);
       return;
     }
 
-    if (!result.data || result.data.length === 0) {
+    if (!deptResult.data || deptResult.data.length === 0) {
       toast.error("Add department first");
+      return;
+    }
+
+    if (leavePolicyResult.isError) {
+      const errorMessage =
+        leavePolicyResult.error?.response?.data?.message ||
+        "Failed to fetch leave policies";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!leavePolicyResult.data || leavePolicyResult.data.length === 0) {
+      toast.error("Add leave policy first");
       return;
     }
 
     // Set all the editing states
     setEditingPosition(row);
     setSelectedDepartment(row.department?._id || "");
+    setSelectedLeavePolicy(row.leavePolicy?._id || "");
     setUnlimitedChecked(row.employeeLimit === "Unlimited");
     setNoneChecked(row.reportsTo === "None" || !row.reportsTo);
     setDialogOpen(true);
@@ -395,21 +447,38 @@ const PositionsSetups = () => {
   // Add Position Handler
   // ---------------------------------------------------------------------------
   const handleAddPositionClick = async () => {
-    const result = await fetchDepartments();
+    const [deptResult, leavePolicyResult] = await Promise.all([
+      fetchDepartments(),
+      fetchLeavePolicies(),
+    ]);
 
-    if (result.isError) {
+    if (deptResult.isError) {
       const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch departments";
+        deptResult.error?.response?.data?.message ||
+        "Failed to fetch departments";
       toast.error(errorMessage);
       return;
     }
 
-    if (!result.data || result.data.length === 0) {
+    if (!deptResult.data || deptResult.data.length === 0) {
       toast.error("Add department first");
       return;
     }
 
-    // If departments exist, open the dialog
+    if (leavePolicyResult.isError) {
+      const errorMessage =
+        leavePolicyResult.error?.response?.data?.message ||
+        "Failed to fetch leave policies";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!leavePolicyResult.data || leavePolicyResult.data.length === 0) {
+      toast.error("Add leave policy first");
+      return;
+    }
+
+    // If departments and leave policies exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -461,6 +530,7 @@ const PositionsSetups = () => {
     const payload = {
       name: formData.get("position-name"),
       department: selectedDepartment,
+      leavePolicy: selectedLeavePolicy,
       reportsTo: noneChecked ? "None" : formData.get("reports-to"),
       employeeLimit: unlimitedChecked
         ? "Unlimited"
@@ -476,6 +546,10 @@ const PositionsSetups = () => {
 
     if (!payload.department) {
       newErrors.department = "Department is required";
+    }
+
+    if (!payload.leavePolicy) {
+      newErrors.leavePolicy = "Leave policy is required";
     }
 
     if (!noneChecked && !payload.reportsTo?.trim()) {
@@ -545,6 +619,7 @@ const PositionsSetups = () => {
                 setEditingPosition(null);
                 setUnlimitedChecked(false);
                 setSelectedDepartment("");
+                setSelectedLeavePolicy("");
                 setNoneChecked(false);
               }, 200);
             }
@@ -554,9 +629,13 @@ const PositionsSetups = () => {
             variant="green"
             className="cursor-pointer"
             onClick={handleAddPositionClick}
-            disabled={isCheckingDepartments}
+            disabled={isCheckingDepartments || isCheckingLeavePolicies}
           >
-            {isCheckingDepartments ? <Spinner /> : <PlusIcon size={16} />}
+            {isCheckingDepartments || isCheckingLeavePolicies ? (
+              <Spinner />
+            ) : (
+              <PlusIcon size={16} />
+            )}
             Add Position
           </Button>
           <DialogContent className="sm:max-w-125">
@@ -621,6 +700,39 @@ const PositionsSetups = () => {
                   {errors.department && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.department}
+                    </p>
+                  )}
+                </div>
+                {/* Select Leave Policy */}
+                <div className="grid gap-3">
+                  <Label htmlFor="leavePolicy" className="text-[#344054]">
+                    Leave Policy
+                  </Label>
+                  <Select
+                    value={selectedLeavePolicy}
+                    onValueChange={(value) => {
+                      setSelectedLeavePolicy(value);
+                      if (errors.leavePolicy) {
+                        setErrors({ ...errors, leavePolicy: undefined });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a leave policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {leavePoliciesList?.map((policy) => (
+                          <SelectItem key={policy._id} value={policy._id}>
+                            {policy.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {errors.leavePolicy && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.leavePolicy}
                     </p>
                   )}
                 </div>
@@ -838,6 +950,28 @@ const PositionsSetups = () => {
                         {uniqueDepartments.map((deptName) => (
                           <SelectItem key={deptName} value={deptName}>
                             {deptName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="leavePolicy">Leave Policy</Label>
+                  <Select
+                    value={selectedFilterLeavePolicy}
+                    onValueChange={(value) => {
+                      setSelectedFilterLeavePolicy(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select leave policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniqueLeavePolicies.map((leavePolicy) => (
+                          <SelectItem key={leavePolicy} value={leavePolicy}>
+                            {leavePolicy}
                           </SelectItem>
                         ))}
                       </SelectGroup>
