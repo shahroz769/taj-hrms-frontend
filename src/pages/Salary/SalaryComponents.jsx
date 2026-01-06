@@ -76,27 +76,32 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 
 // Services
-
 import {
-  createLeaveType,
-  deleteLeaveType,
-  fetchLeaveTypes,
-  updateLeaveType,
-  updateLeaveTypeStatus,
-} from "@/services/leaveTypesApi";
+  createSalaryComponent,
+  deleteSalaryComponent,
+  fetchSalaryComponents,
+  updateSalaryComponent,
+  updateSalaryComponentStatus,
+} from "@/services/salaryComponentsApi";
 
 // Utils
-import { formatDate } from "@/utils/dateUtils";
+import {
+  formatDate,
+  formatTimeToAMPM,
+  calculateShiftHours,
+  formatWorkingDaysInitials,
+} from "@/utils/dateUtils";
 
 // Styles
-import styles from "./LeavesTypes.module.css";
+import styles from "./SalaryComponents.module.css";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Textarea } from "@/components/ui/textarea";
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const LeavesTypes = () => {
+const SalaryComponents = () => {
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -124,16 +129,17 @@ const LeavesTypes = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingLeaveType, setEditingLeaveType] = useState(null);
+  const [editingSalaryComponent, setEditingSalaryComponent] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingLeaveType, setDeletingLeaveType] = useState(null);
+  const [deletingSalaryComponent, setDeletingSalaryComponent] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [selectedIsPaid, setSelectedIsPaid] = useState("");
-  const [approvingLeaveTypeId, setApprovingLeaveTypeId] = useState(null);
-  const [rejectingLeaveTypeId, setRejectingLeaveTypeId] = useState(null);
+  const [approvingSalaryComponentId, setApprovingSalaryComponentId] =
+    useState(null);
+  const [rejectingSalaryComponentId, setRejectingSalaryComponentId] =
+    useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -186,110 +192,109 @@ const LeavesTypes = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Leave Types Query
+  // Fetch Shifts Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["leave-types", { limit, page, search: debouncedSearch }],
-    queryFn: () => fetchLeaveTypes({ limit, page, search: debouncedSearch }),
+    queryKey: ["salary-components", { limit, page, search: debouncedSearch }],
+    queryFn: () =>
+      fetchSalaryComponents({ limit, page, search: debouncedSearch }),
   });
 
   // ---------------------------------------------------------------------------
-  // Create Leave Type Mutation
+  // Create Salary Component Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createLeaveType,
+    mutationFn: createSalaryComponent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingLeaveType(null);
-      setSelectedIsPaid("");
-      toast.success("Leave type created successfully");
+      setEditingSalaryComponent(null);
+      toast.success("Salary component created successfully");
     },
     onError: (error) => {
-      console.error("Error creating leave type:", error);
+      console.error("Error creating salary component:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create leave type";
+        error.response?.data?.message || "Failed to create salary component";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Leave Type Mutation
+  // Update Salary Component Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateLeaveType(id, payload),
+    mutationFn: ({ id, payload }) => updateSalaryComponent(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingLeaveType(null);
-      setSelectedIsPaid("");
-      toast.success("Leave type updated successfully");
+      setEditingSalaryComponent(null);
+      toast.success("Salary component updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating leave type:", error);
+      console.error("Error updating salary component:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update leave type";
+        error.response?.data?.message || "Failed to update salary component";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Leave Type Mutation
+  // Delete Salary Component Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteLeaveType,
+    mutationFn: deleteSalaryComponent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
+      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
       setDeleteDialogOpen(false);
-      setDeletingLeaveType(null);
-      toast.success("Leave type deleted successfully");
+      setDeletingSalaryComponent(null);
+      toast.success("Salary component deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting leave type:", error);
+      console.error("Error deleting salary component:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete leave type";
+        error.response?.data?.message || "Failed to delete salary component";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Approve Leave Type Mutation
+  // Approve Salary Component Mutation
   // ---------------------------------------------------------------------------
   const approveMutation = useMutation({
-    mutationFn: ({ id }) => updateLeaveTypeStatus(id, "Approved"),
+    mutationFn: ({ id }) => updateSalaryComponentStatus(id, "Approved"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
-      setApprovingLeaveTypeId(null);
-      toast.success("Leave type approved successfully");
+      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
+      setApprovingSalaryComponentId(null);
+      toast.success("Salary component approved successfully");
     },
     onError: (error) => {
-      console.error("Error approving leave type:", error);
-      setApprovingLeaveTypeId(null);
+      console.error("Error approving salary component:", error);
+      setApprovingSalaryComponentId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve leave type";
+        error.response?.data?.message || "Failed to approve salary component";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Reject Leave Type Mutation
+  // Reject Salary Component Mutation
   // ---------------------------------------------------------------------------
   const rejectMutation = useMutation({
-    mutationFn: ({ id }) => updateLeaveTypeStatus(id, "Rejected"),
+    mutationFn: ({ id }) => updateSalaryComponentStatus(id, "Rejected"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leave-types"] });
-      setRejectingLeaveTypeId(null);
-      toast.success("Leave type rejected successfully");
+      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
+      setRejectingSalaryComponentId(null);
+      toast.success("Salary component rejected successfully");
     },
     onError: (error) => {
-      console.error("Error rejecting leave type:", error);
-      setRejectingLeaveTypeId(null);
+      console.error("Error rejecting salary component:", error);
+      setRejectingSalaryComponentId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to reject leave type";
+        error.response?.data?.message || "Failed to reject salary component";
       toast.error(errorMessage);
     },
   });
@@ -300,7 +305,7 @@ const LeavesTypes = () => {
   const columns = [
     {
       key: "name",
-      label: "Leave Name",
+      label: "Component Name",
     },
     {
       key: "createdBy",
@@ -311,21 +316,6 @@ const LeavesTypes = () => {
       key: "createdAt",
       label: "Creation Date",
       render: (row) => (row.createdAt ? formatDate(row.createdAt) : "-"),
-    },
-    {
-      key: "isPaid",
-      label: "Nature",
-      render: (row) => {
-        return row.isPaid ? (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-            Paid
-          </Badge>
-        ) : (
-          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-            Unpaid
-          </Badge>
-        );
-      },
     },
     {
       key: "status",
@@ -362,14 +352,14 @@ const LeavesTypes = () => {
       renderDelete: () => <TrashIcon size={18} />,
       renderApprove: (row) => {
         if (row.status !== "Pending" && row.status !== "Rejected") return null;
-        if (approvingLeaveTypeId === row._id) {
+        if (approvingSalaryComponentId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <CheckCircle2 size={18} />;
       },
       renderReject: (row) => {
         if (row.status !== "Pending") return null;
-        if (rejectingLeaveTypeId === row._id) {
+        if (rejectingSalaryComponentId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <XCircle size={18} />;
@@ -386,19 +376,18 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   const handleEdit = (row) => {
     // Set all the editing states
-    setEditingLeaveType(row);
-    setSelectedIsPaid(row.isPaid !== undefined ? row.isPaid.toString() : "");
+    setEditingSalaryComponent(row);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingLeaveType(row);
+    setDeletingSalaryComponent(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingLeaveType) {
-      deleteMutation.mutate(deletingLeaveType._id);
+    if (deletingSalaryComponent) {
+      deleteMutation.mutate(deletingSalaryComponent._id);
     }
   };
 
@@ -407,24 +396,24 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   const handleApprove = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingLeaveTypeId || rejectingLeaveTypeId) return;
+    if (approvingSalaryComponentId || rejectingSalaryComponentId) return;
 
-    setApprovingLeaveTypeId(row._id);
+    setApprovingSalaryComponentId(row._id);
     approveMutation.mutate({ id: row._id });
   };
 
   const handleReject = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingLeaveTypeId || rejectingLeaveTypeId) return;
+    if (approvingSalaryComponentId || rejectingSalaryComponentId) return;
 
-    setRejectingLeaveTypeId(row._id);
+    setRejectingSalaryComponentId(row._id);
     rejectMutation.mutate({ id: row._id });
   };
 
   // ---------------------------------------------------------------------------
-  // Add Leave Type Handler
+  // Add Salary Component Handler
   // ---------------------------------------------------------------------------
-  const handleAddLeaveTypeClick = () => {
+  const handleAddSalaryComponentClick = () => {
     setDialogOpen(true);
   };
 
@@ -468,24 +457,19 @@ const LeavesTypes = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateLeaveType = (e) => {
+  const handleCreateSalaryComponent = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
-    const leaveTypeName = formData.get("leave-type-name");
+    const salaryComponentName = formData.get("salary-component-name");
 
     // Validate
     const newErrors = {};
 
-    // Validate leave type name
-    if (!leaveTypeName?.trim()) {
-      newErrors.name = "Leave type name is required";
-    }
-
-    // Validate nature of leaves (isPaid)
-    if (!selectedIsPaid) {
-      newErrors.isPaid = "Please select nature of leaves";
+    // Validate salary component name
+    if (!salaryComponentName?.trim()) {
+      newErrors.name = "Salary component name is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -494,14 +478,13 @@ const LeavesTypes = () => {
     }
 
     const payload = {
-      name: leaveTypeName,
-      isPaid: selectedIsPaid === "true",
+      name: salaryComponentName,
     };
 
-    if (editingLeaveType) {
-      // Update existing leave type
+    if (editingSalaryComponent) {
+      // Update existing salary component
       updateMutation.mutate(
-        { id: editingLeaveType._id, payload },
+        { id: editingSalaryComponent._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -509,7 +492,7 @@ const LeavesTypes = () => {
         }
       );
     } else {
-      // Create new leave type
+      // Create new salary component
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -526,7 +509,7 @@ const LeavesTypes = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Leaves Types</h1>
+        <h1 className={styles.title}>Salary Components</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -534,8 +517,7 @@ const LeavesTypes = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingLeaveType(null);
-                setSelectedIsPaid("");
+                setEditingSalaryComponent(null);
               }, 200);
             }
           }}
@@ -543,65 +525,47 @@ const LeavesTypes = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddLeaveTypeClick}
+            onClick={handleAddSalaryComponentClick}
           >
             <PlusIcon size={16} />
-            Add Leave Type
+            Add Salary Component
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingLeaveType ? "Edit Leave Type" : "Add Leave Type"}
+                {editingSalaryComponent
+                  ? "Edit Salary Component"
+                  : "Add Salary Component"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingLeaveType
-                  ? "Edit the leave type information below"
-                  : "Create a new leave type by entering the name and nature"}
+                {editingSalaryComponent
+                  ? "Edit the salary component information below"
+                  : "Create a new salary component by entering the name and employee limits"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateLeaveType}>
+            <form onSubmit={handleCreateSalaryComponent}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
                 </div>
               )}
               <div className="grid gap-4">
-                {/* Leave Type Name */}
+                {/* Salary Component Name */}
                 <div className="grid gap-3">
-                  <Label htmlFor="leave-type-name" className="text-[#344054]">
-                    Leave Type Name
+                  <Label
+                    htmlFor="salary-component-name"
+                    className="text-[#344054]"
+                  >
+                    Salary Component Name
                   </Label>
                   <Input
-                    id="leave-type-name"
-                    name="leave-type-name"
-                    placeholder="Enter leave type name"
-                    defaultValue={editingLeaveType?.name || ""}
+                    id="salary-component-name"
+                    name="salary-component-name"
+                    placeholder="Enter salary component name"
+                    defaultValue={editingSalaryComponent?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-                  )}
-                </div>
-                {/* Nature of Leaves (Paid/Unpaid) */}
-                <div className="grid gap-3">
-                  <Label htmlFor="nature-of-leaves" className="text-[#344054]">
-                    Nature of Leaves
-                  </Label>
-                  <Select
-                    value={selectedIsPaid}
-                    onValueChange={(value) => setSelectedIsPaid(value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select nature of leaves" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="true">Paid</SelectItem>
-                        <SelectItem value="false">Unpaid</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.isPaid && (
-                    <p className="text-sm text-red-500 mt-1">{errors.isPaid}</p>
                   )}
                 </div>
               </div>
@@ -624,9 +588,9 @@ const LeavesTypes = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingLeaveType ? "Updating" : "Creating"}
+                      {editingSalaryComponent ? "Updating" : "Creating"}
                     </>
-                  ) : editingLeaveType ? (
+                  ) : editingSalaryComponent ? (
                     "Update"
                   ) : (
                     "Create"
@@ -643,7 +607,7 @@ const LeavesTypes = () => {
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search Leave Types..."
+            placeholder="Search Salary Components..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -678,11 +642,105 @@ const LeavesTypes = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        {/* Filters */}
+        {/* <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Filters"
+              className="cursor-pointer"
+              disabled={isCheckingFilters}
+              onClick={async (e) => {
+                e.preventDefault();
+                const result = await fetchFilters();
+                if (result.data) {
+                  setFilterPopoverOpen(true);
+                }
+              }}
+            >
+              {isCheckingFilters ? <Spinner /> : <SlidersHorizontalIcon />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="leading-none font-medium">Filters</h4>
+                <p className="text-muted-foreground text-sm">
+                  Apply the filters for the positions.
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="reportsTo">Reports To</Label>
+                  <Select
+                    value={selectedFilterReportsTo}
+                    onValueChange={(value) => {
+                      setSelectedFilterReportsTo(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select reports to" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniqueReportsTo.map((reportsTo) => (
+                          <SelectItem key={reportsTo} value={reportsTo}>
+                            {reportsTo}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="department">Department</Label>
+                  <Select
+                    value={selectedFilterDepartment}
+                    onValueChange={(value) => {
+                      setSelectedFilterDepartment(value);
+                    }}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {uniqueDepartments.map((deptName) => (
+                          <SelectItem key={deptName} value={deptName}>
+                            {deptName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="green"
+                  aria-label="Submit"
+                  className="cursor-pointer flex-1"
+                >
+                  Apply
+                </Button>
+                <Button
+                  variant="outline"
+                  aria-label="Submit"
+                  className="cursor-pointer flex-1"
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover> */}
       </div>
 
       <DataTable
         columns={columns}
-        data={data?.leaveTypes || []}
+        data={data?.salaryComponents || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleApprove}
@@ -813,7 +871,7 @@ const LeavesTypes = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingLeaveType(null);
+              setDeletingSalaryComponent(null);
             }, 200);
           }
         }}
@@ -821,12 +879,12 @@ const LeavesTypes = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Leave Type
+              Delete Salary Component
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the leave type{" "}
+              Are you sure you want to delete the salary component{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingLeaveType?.name}"
+                "{deletingSalaryComponent?.name}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>
@@ -859,4 +917,4 @@ const LeavesTypes = () => {
   );
 };
 
-export default LeavesTypes;
+export default SalaryComponents;

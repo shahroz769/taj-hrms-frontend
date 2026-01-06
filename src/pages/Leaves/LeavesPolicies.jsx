@@ -12,7 +12,6 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
-  SlidersHorizontalIcon,
   TrashIcon,
   XCircle,
 } from "lucide-react";
@@ -30,14 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -71,7 +65,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectLabel,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -125,9 +118,9 @@ const LeavesPolicies = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingPosition, setEditingPosition] = useState(null);
+  const [editingLeavePolicy, setEditingLeavePolicy] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingPosition, setDeletingPosition] = useState(null);
+  const [deletingLeavePolicy, setDeletingLeavePolicy] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
@@ -186,7 +179,7 @@ const LeavesPolicies = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Positions Query
+  // Fetch Leave Policies Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["leavePolicies", { limit, page, search: debouncedSearch }],
@@ -215,7 +208,7 @@ const LeavesPolicies = () => {
       queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
+      setEditingLeavePolicy(null);
       toast.success("Leave policy created successfully");
     },
     onError: (error) => {
@@ -236,7 +229,7 @@ const LeavesPolicies = () => {
       queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
+      setEditingLeavePolicy(null);
       toast.success("Leave policy updated successfully");
     },
     onError: (error) => {
@@ -256,7 +249,7 @@ const LeavesPolicies = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
       setDeleteDialogOpen(false);
-      setDeletingPosition(null);
+      setDeletingLeavePolicy(null);
       toast.success("Leave policy deleted successfully");
     },
     onError: (error) => {
@@ -408,18 +401,18 @@ const LeavesPolicies = () => {
     }
 
     // Set editing state
-    setEditingPosition(row);
+    setEditingLeavePolicy(row);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingPosition(row);
+    setDeletingLeavePolicy(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingPosition) {
-      deleteMutation.mutate(deletingPosition._id);
+    if (deletingLeavePolicy) {
+      deleteMutation.mutate(deletingLeavePolicy._id);
     }
   };
 
@@ -445,7 +438,7 @@ const LeavesPolicies = () => {
   // ---------------------------------------------------------------------------
   // Add Leave Policy Handler
   // ---------------------------------------------------------------------------
-  const handleAddPositionClick = async () => {
+  const handleAddLeavePolicyClick = async () => {
     const result = await fetchLeaveTypes();
 
     if (result.isError) {
@@ -460,7 +453,7 @@ const LeavesPolicies = () => {
       return;
     }
 
-    // If departments exist, open the dialog
+    // If leave types exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -504,7 +497,7 @@ const LeavesPolicies = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreatePosition = (e) => {
+  const handleCreateLeavePolicy = (e) => {
     e.preventDefault();
     setErrors({});
 
@@ -571,10 +564,10 @@ const LeavesPolicies = () => {
       entitlements: entitlements,
     };
 
-    if (editingPosition) {
+    if (editingLeavePolicy) {
       // Update existing leave policy
       updateMutation.mutate(
-        { id: editingPosition._id, payload },
+        { id: editingLeavePolicy._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -607,7 +600,7 @@ const LeavesPolicies = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingPosition(null);
+                setEditingLeavePolicy(null);
               }, 200);
             }
           }}
@@ -615,7 +608,7 @@ const LeavesPolicies = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddPositionClick}
+            onClick={handleAddLeavePolicyClick}
             disabled={isCheckingLeaveTypes}
           >
             {isCheckingLeaveTypes ? <Spinner /> : <PlusIcon size={16} />}
@@ -624,15 +617,15 @@ const LeavesPolicies = () => {
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingPosition ? "Edit Leave Policy" : "Add Leave Policy"}
+                {editingLeavePolicy ? "Edit Leave Policy" : "Add Leave Policy"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingPosition
+                {editingLeavePolicy
                   ? "Edit the leave policy information below"
                   : "Create a new leave policy by entering the name and employee limits"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreatePosition}>
+            <form onSubmit={handleCreateLeavePolicy}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
@@ -647,7 +640,7 @@ const LeavesPolicies = () => {
                     id="leave-policy-name"
                     name="leave-policy-name"
                     placeholder="Enter leave policy name"
-                    defaultValue={editingPosition?.name || ""}
+                    defaultValue={editingLeavePolicy?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
@@ -660,7 +653,7 @@ const LeavesPolicies = () => {
                     {leaveTypesList.map((leaveType) => {
                       // Find existing entitlement days for edit mode
                       const existingEntitlement =
-                        editingPosition?.entitlements?.find(
+                        editingLeavePolicy?.entitlements?.find(
                           (ent) =>
                             ent.leaveType?._id === leaveType._id ||
                             ent.leaveType === leaveType._id
@@ -711,9 +704,9 @@ const LeavesPolicies = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingPosition ? "Updating" : "Creating"}
+                      {editingLeavePolicy ? "Updating" : "Creating"}
                     </>
-                  ) : editingPosition ? (
+                  ) : editingLeavePolicy ? (
                     "Update"
                   ) : (
                     "Create"
@@ -900,7 +893,7 @@ const LeavesPolicies = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingPosition(null);
+              setDeletingLeavePolicy(null);
             }, 200);
           }
         }}
@@ -908,12 +901,12 @@ const LeavesPolicies = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Position
+              Delete Leave Policy
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the position{" "}
+              Are you sure you want to delete the leave policy{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingPosition?.name}"
+                "{deletingLeavePolicy?.name}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>

@@ -7,6 +7,7 @@ import {
   CalendarCheckIcon,
   MessageSquareWarningIcon,
   ChevronDownIcon,
+  CircleDollarSignIcon,
 } from "lucide-react";
 
 export const sidebarItems = [
@@ -60,6 +61,17 @@ export const sidebarItems = [
       { label: "Leaves Types", path: "/leaves/types" },
       { label: "Leaves Policies", path: "/leaves/policies" },
       { label: "Leaves Applications", path: "/leaves/applications" },
+    ],
+  },
+  {
+    label: "Salary",
+    icon: CircleDollarSignIcon,
+    roles: [ROLES.admin, ROLES.supervisor],
+    collapsible: true,
+    collapseIcon: ChevronDownIcon,
+    children: [
+      { label: "Salary Components", path: "/salary/components" },
+      { label: "Salary Policies", path: "/salary/policies" },
     ],
   },
   {

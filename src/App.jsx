@@ -25,6 +25,8 @@ import { ROLES } from "./utils/roles";
 import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { Toaster } from "@/components/ui/sonner";
+import SalaryComponents from "./pages/Salary/SalaryComponents";
+import SalaryPolicies from "./pages/Salary/SalaryPolicies";
 
 function App() {
   const dispatch = useDispatch();
@@ -117,6 +119,13 @@ function App() {
                   path="/leaves/applications"
                   element={<LeavesApplications />}
                 />
+
+                {/* Salary */}
+                <Route
+                  path="/salary/components"
+                  element={<SalaryComponents />}
+                />
+                <Route path="/salary/policies" element={<SalaryPolicies />} />
 
                 {/* Compliance */}
                 <Route
