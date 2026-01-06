@@ -12,7 +12,6 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
-  SlidersHorizontalIcon,
   TrashIcon,
   XCircle,
 } from "lucide-react";
@@ -30,14 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -46,7 +40,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
@@ -71,19 +64,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectLabel,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
 // Services
-import {
-  createLeavePolicy,
-  deleteLeavePolicy,
-  fetchLeavePolicies,
-  updateLeavePolicy,
-  updateLeavePolicyStatus,
-} from "@/services/leavePoliciesApi";
-
 import {
   createSalaryPolicy,
   deleteSalaryPolicy,
@@ -92,8 +76,7 @@ import {
   updateSalaryPolicyStatus,
 } from "@/services/salaryPoliciesApi";
 
-// Services
-import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
+import { fetchSalaryComponentsList } from "@/services/salaryComponentsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -133,9 +116,9 @@ const SalaryPolicies = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingPosition, setEditingPosition] = useState(null);
+  const [editingSalaryPolicy, setEditingSalaryPolicy] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingPosition, setDeletingPosition] = useState(null);
+  const [deletingSalaryPolicy, setDeletingSalaryPolicy] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
@@ -194,83 +177,84 @@ const SalaryPolicies = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Positions Query
+  // Fetch Salary Policies Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["leavePolicies", { limit, page, search: debouncedSearch }],
-    queryFn: () => fetchLeavePolicies({ limit, page, search: debouncedSearch }),
+    queryKey: ["salaryPolicies", { limit, page, search: debouncedSearch }],
+    queryFn: () =>
+      fetchSalaryPolicies({ limit, page, search: debouncedSearch }),
   });
 
   // ---------------------------------------------------------------------------
-  // Fetch Leave Types List Query (lazy loading)
+  // Fetch Salary Components List Query (lazy loading)
   // ---------------------------------------------------------------------------
   const {
-    data: leaveTypesList,
-    isLoading: isCheckingLeaveTypes,
-    refetch: fetchLeaveTypes,
+    data: salaryComponentsList,
+    isLoading: isCheckingSalaryComponents,
+    refetch: fetchSalaryComponents,
   } = useQuery({
-    queryKey: ["leaveTypesList"],
-    queryFn: fetchLeaveTypesList,
+    queryKey: ["salaryComponentsList"],
+    queryFn: fetchSalaryComponentsList,
     enabled: false,
   });
 
   // ---------------------------------------------------------------------------
-  // Create Leave Policy Mutation
+  // Create Salary Policy Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createLeavePolicy,
+    mutationFn: createSalaryPolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
-      toast.success("Leave policy created successfully");
+      setEditingSalaryPolicy(null);
+      toast.success("Salary policy created successfully");
     },
     onError: (error) => {
-      console.error("Error creating leave policy:", error);
+      console.error("Error creating salary policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create leave policy";
+        error.response?.data?.message || "Failed to create salary policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Leave Policy Mutation
+  // Update Salary Policy Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateLeavePolicy(id, payload),
+    mutationFn: ({ id, payload }) => updateSalaryPolicy(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingPosition(null);
-      toast.success("Leave policy updated successfully");
+      setEditingSalaryPolicy(null);
+      toast.success("Salary policy updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating leave policy:", error);
+      console.error("Error updating salary policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update leave policy";
+        error.response?.data?.message || "Failed to update salary policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Leave Policy Mutation
+  // Delete Salary Policy Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteLeavePolicy,
+    mutationFn: deleteSalaryPolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
       setDeleteDialogOpen(false);
-      setDeletingPosition(null);
-      toast.success("Leave policy deleted successfully");
+      setDeletingSalaryPolicy(null);
+      toast.success("Salary policy deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting leave policy:", error);
+      console.error("Error deleting salary policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete leave policy";
+        error.response?.data?.message || "Failed to delete salary policy";
       toast.error(errorMessage);
     },
   });
@@ -279,17 +263,17 @@ const SalaryPolicies = () => {
   // Approve Policy Mutation
   // ---------------------------------------------------------------------------
   const approveMutation = useMutation({
-    mutationFn: ({ id }) => updateLeavePolicyStatus(id, "Approved"),
+    mutationFn: ({ id }) => updateSalaryPolicyStatus(id, "Approved"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
       setApprovingPolicyId(null);
-      toast.success("Leave policy approved successfully");
+      toast.success("Salary policy approved successfully");
     },
     onError: (error) => {
-      console.error("Error approving leave policy:", error);
+      console.error("Error approving salary policy:", error);
       setApprovingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve leave policy";
+        error.response?.data?.message || "Failed to approve salary policy";
       toast.error(errorMessage);
     },
   });
@@ -298,17 +282,17 @@ const SalaryPolicies = () => {
   // Reject Policy Mutation
   // ---------------------------------------------------------------------------
   const rejectMutation = useMutation({
-    mutationFn: ({ id }) => updateLeavePolicyStatus(id, "Rejected"),
+    mutationFn: ({ id }) => updateSalaryPolicyStatus(id, "Rejected"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leavePolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
       setRejectingPolicyId(null);
-      toast.success("Leave policy rejected successfully");
+      toast.success("Salary policy rejected successfully");
     },
     onError: (error) => {
-      console.error("Error rejecting leave policy:", error);
+      console.error("Error rejecting salary policy:", error);
       setRejectingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to reject leave policy";
+        error.response?.data?.message || "Failed to reject salary policy";
       toast.error(errorMessage);
     },
   });
@@ -332,14 +316,14 @@ const SalaryPolicies = () => {
       render: (row) => formatDate(row.createdAt),
     },
     {
-      key: "yearlyOffs",
-      label: "Yearly Offs",
+      key: "totalAmount",
+      label: "Gross Pay",
       render: (row) => {
-        const totalDays = row.entitlements?.reduce(
-          (sum, entitlement) => sum + (entitlement.days || 0),
+        const totalAmount = row.components?.reduce(
+          (sum, component) => sum + (component.amount || 0),
           0
         );
-        return totalDays || 0;
+        return totalAmount ? `Rs. ${totalAmount.toLocaleString()}` : "Rs. 0";
       },
     },
     {
@@ -400,34 +384,35 @@ const SalaryPolicies = () => {
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
   const handleEdit = async (row) => {
-    // Fetch leave types first
-    const result = await fetchLeaveTypes();
+    // Fetch salary components first
+    const result = await fetchSalaryComponents();
 
     if (result.isError) {
       const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch leave types";
+        result.error?.response?.data?.message ||
+        "Failed to fetch salary components";
       toast.error(errorMessage);
       return;
     }
 
     if (!result.data || result.data.length === 0) {
-      toast.error("Add leave type first");
+      toast.error("Add salary component first");
       return;
     }
 
     // Set editing state
-    setEditingPosition(row);
+    setEditingSalaryPolicy(row);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingPosition(row);
+    setDeletingSalaryPolicy(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingPosition) {
-      deleteMutation.mutate(deletingPosition._id);
+    if (deletingSalaryPolicy) {
+      deleteMutation.mutate(deletingSalaryPolicy._id);
     }
   };
 
@@ -451,24 +436,25 @@ const SalaryPolicies = () => {
   };
 
   // ---------------------------------------------------------------------------
-  // Add Leave Policy Handler
+  // Add Salary Policy Handler
   // ---------------------------------------------------------------------------
-  const handleAddPositionClick = async () => {
-    const result = await fetchLeaveTypes();
+  const handleAddSalaryPolicyClick = async () => {
+    const result = await fetchSalaryComponents();
 
     if (result.isError) {
       const errorMessage =
-        result.error?.response?.data?.message || "Failed to fetch leave types";
+        result.error?.response?.data?.message ||
+        "Failed to fetch salary components";
       toast.error(errorMessage);
       return;
     }
 
     if (!result.data || result.data.length === 0) {
-      toast.error("Add leave type first");
+      toast.error("Add salary component first");
       return;
     }
 
-    // If departments exist, open the dialog
+    // If salary components exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -512,56 +498,56 @@ const SalaryPolicies = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreatePosition = (e) => {
+  const handleCreateSalaryPolicy = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
 
-    // Collect leave policy name
-    const policyName = formData.get("leave-policy-name");
+    // Collect salary policy name
+    const policyName = formData.get("salary-policy-name");
 
-    // Collect leave type days dynamically
-    const entitlements = [];
+    // Collect salary component amounts dynamically
+    const components = [];
     const newErrors = {};
 
     // Validate policy name
     if (!policyName?.trim()) {
-      newErrors.name = "Leave policy name is required";
+      newErrors.name = "Salary policy name is required";
     }
 
-    // Process each leave type
-    if (leaveTypesList && leaveTypesList.length > 0) {
-      leaveTypesList.forEach((leaveType) => {
-        const daysValue = formData.get(`leave-days-${leaveType._id}`);
+    // Process each salary component
+    if (salaryComponentsList && salaryComponentsList.length > 0) {
+      salaryComponentsList.forEach((component) => {
+        const amountValue = formData.get(`component-amount-${component._id}`);
 
         // Skip empty values - they are allowed
-        if (daysValue === null || daysValue === "" || daysValue === undefined) {
-          // Empty values are allowed, just skip this leave type
+        if (
+          amountValue === null ||
+          amountValue === "" ||
+          amountValue === undefined
+        ) {
+          // Empty values are allowed, just skip this component
           return;
         }
 
-        const days = Number(daysValue);
+        const amount = Number(amountValue);
 
         // Check if it's a valid number
-        if (isNaN(days) || !Number.isInteger(days)) {
+        if (isNaN(amount)) {
           newErrors[
-            `leaveType-${leaveType._id}`
-          ] = `Days must be a valid number`;
+            `component-${component._id}`
+          ] = `Amount must be a valid number`;
         }
         // Check if it's negative
-        else if (days < 0) {
-          newErrors[`leaveType-${leaveType._id}`] = `Days cannot be negative`;
+        else if (amount < 0) {
+          newErrors[`component-${component._id}`] = `Amount cannot be negative`;
         }
-        // Check if it exceeds 30
-        else if (days > 30) {
-          newErrors[`leaveType-${leaveType._id}`] = `Days cannot exceed 30`;
-        }
-        // Valid: add to entitlements (0 is allowed)
+        // Valid: add to components (0 is allowed)
         else {
-          entitlements.push({
-            leaveType: leaveType._id,
-            days: days,
+          components.push({
+            salaryComponent: component._id,
+            amount: amount,
           });
         }
       });
@@ -576,13 +562,13 @@ const SalaryPolicies = () => {
     // Build the payload
     const payload = {
       name: policyName,
-      entitlements: entitlements,
+      components: components,
     };
 
-    if (editingPosition) {
-      // Update existing leave policy
+    if (editingSalaryPolicy) {
+      // Update existing salary policy
       updateMutation.mutate(
-        { id: editingPosition._id, payload },
+        { id: editingSalaryPolicy._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -590,7 +576,7 @@ const SalaryPolicies = () => {
         }
       );
     } else {
-      // Create new leave policy
+      // Create new salary policy
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -607,7 +593,7 @@ const SalaryPolicies = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Leaves Policies Setup</h1>
+        <h1 className={styles.title}>Salary Policies Setup</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -615,7 +601,7 @@ const SalaryPolicies = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingPosition(null);
+                setEditingSalaryPolicy(null);
               }, 200);
             }
           }}
@@ -623,24 +609,26 @@ const SalaryPolicies = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddPositionClick}
-            disabled={isCheckingLeaveTypes}
+            onClick={handleAddSalaryPolicyClick}
+            disabled={isCheckingSalaryComponents}
           >
-            {isCheckingLeaveTypes ? <Spinner /> : <PlusIcon size={16} />}
-            Add Leave Policy
+            {isCheckingSalaryComponents ? <Spinner /> : <PlusIcon size={16} />}
+            Add Salary Policy
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingPosition ? "Edit Leave Policy" : "Add Leave Policy"}
+                {editingSalaryPolicy
+                  ? "Edit Salary Policy"
+                  : "Add Salary Policy"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingPosition
-                  ? "Edit the leave policy information below"
-                  : "Create a new leave policy by entering the name and employee limits"}
+                {editingSalaryPolicy
+                  ? "Edit the salary policy information below"
+                  : "Create a new salary policy by entering the name and component amounts"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreatePosition}>
+            <form onSubmit={handleCreateSalaryPolicy}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
@@ -648,50 +636,54 @@ const SalaryPolicies = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="leave-policy-name" className="text-[#344054]">
-                    Leave Policy Name
+                  <Label
+                    htmlFor="salary-policy-name"
+                    className="text-[#344054]"
+                  >
+                    Salary Policy Name
                   </Label>
                   <Input
-                    id="leave-policy-name"
-                    name="leave-policy-name"
-                    placeholder="Enter leave policy name"
-                    defaultValue={editingPosition?.name || ""}
+                    id="salary-policy-name"
+                    name="salary-policy-name"
+                    placeholder="Enter salary policy name"
+                    defaultValue={editingSalaryPolicy?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
 
-                {/* Dynamic Days Inputs for Each Leave Type */}
-                {leaveTypesList && leaveTypesList.length > 0 && (
+                {/* Dynamic Amount Inputs for Each Salary Component */}
+                {salaryComponentsList && salaryComponentsList.length > 0 && (
                   <div className="grid gap-3">
-                    {leaveTypesList.map((leaveType) => {
-                      // Find existing entitlement days for edit mode
-                      const existingEntitlement =
-                        editingPosition?.entitlements?.find(
-                          (ent) =>
-                            ent.leaveType?._id === leaveType._id ||
-                            ent.leaveType === leaveType._id
+                    {salaryComponentsList.map((component) => {
+                      // Find existing component amount for edit mode
+                      const existingComponent =
+                        editingSalaryPolicy?.components?.find(
+                          (comp) =>
+                            comp.salaryComponent?._id === component._id ||
+                            comp.salaryComponent === component._id
                         );
-                      const defaultDays = existingEntitlement?.days ?? "";
+                      const defaultAmount = existingComponent?.amount ?? "";
 
                       return (
-                        <div key={leaveType._id} className="grid gap-2">
+                        <div key={component._id} className="grid gap-2">
                           <Label
-                            htmlFor={`leave-days-${leaveType._id}`}
+                            htmlFor={`component-amount-${component._id}`}
                             className="text-[#344054] text-sm"
                           >
-                            {leaveType.name} Leaves
+                            {component.name}
                           </Label>
                           <Input
-                            id={`leave-days-${leaveType._id}`}
-                            name={`leave-days-${leaveType._id}`}
-                            placeholder={`Enter days for ${leaveType.name} leaves`}
-                            defaultValue={defaultDays}
+                            id={`component-amount-${component._id}`}
+                            name={`component-amount-${component._id}`}
+                            placeholder={`Enter amount for ${component.name}`}
+                            defaultValue={defaultAmount}
+                            type="number"
                           />
-                          {errors[`leaveType-${leaveType._id}`] && (
+                          {errors[`component-${component._id}`] && (
                             <p className="text-sm text-red-500 mt-1">
-                              {errors[`leaveType-${leaveType._id}`]}
+                              {errors[`component-${component._id}`]}
                             </p>
                           )}
                         </div>
@@ -719,9 +711,9 @@ const SalaryPolicies = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingPosition ? "Updating" : "Creating"}
+                      {editingSalaryPolicy ? "Updating" : "Creating"}
                     </>
-                  ) : editingPosition ? (
+                  ) : editingSalaryPolicy ? (
                     "Update"
                   ) : (
                     "Create"
@@ -738,7 +730,7 @@ const SalaryPolicies = () => {
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search Leaves Policies..."
+            placeholder="Search Salary Policies..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -777,7 +769,7 @@ const SalaryPolicies = () => {
 
       <DataTable
         columns={columns}
-        data={data?.leavePolicies || []}
+        data={data?.salaryPolicies || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleApprove}
@@ -824,7 +816,7 @@ const SalaryPolicies = () => {
                 </PaginationItem>
               );
 
-              // Show ellipsis if needed
+              // Show ellipsis if there are pages between 1 and current-1
               if (currentPage > 3) {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
@@ -833,29 +825,59 @@ const SalaryPolicies = () => {
                 );
               }
 
-              // Show pages around current page
-              for (
-                let i = Math.max(2, currentPage - 1);
-                i <= Math.min(totalPages - 1, currentPage + 1);
-                i++
-              ) {
+              // Show page before current (if not already shown)
+              if (currentPage > 2) {
                 pages.push(
-                  <PaginationItem key={i}>
+                  <PaginationItem key={currentPage - 1}>
                     <PaginationLink
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(i);
+                        handlePageChange(currentPage - 1);
                       }}
-                      isActive={currentPage === i}
                       className="cursor-pointer"
                     >
-                      {i}
+                      {currentPage - 1}
                     </PaginationLink>
                   </PaginationItem>
                 );
               }
 
-              // Show ellipsis if needed
+              // Show current page (if not first or last)
+              if (currentPage !== 1 && currentPage !== totalPages) {
+                pages.push(
+                  <PaginationItem key={currentPage}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage);
+                      }}
+                      isActive={true}
+                      className="cursor-pointer"
+                    >
+                      {currentPage}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              // Show page after current (if not already shown)
+              if (currentPage < totalPages - 1) {
+                pages.push(
+                  <PaginationItem key={currentPage + 1}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage + 1);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {currentPage + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+
+              // Show ellipsis if there are pages between current+1 and last
               if (currentPage < totalPages - 2) {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
@@ -864,7 +886,7 @@ const SalaryPolicies = () => {
                 );
               }
 
-              // Always show last page if there's more than one page
+              // Always show last page (if more than 1 page total)
               if (totalPages > 1) {
                 pages.push(
                   <PaginationItem key={totalPages}>
@@ -892,7 +914,7 @@ const SalaryPolicies = () => {
                   handleNextPage();
                 }}
                 className={
-                  page === data.pagination.totalPages
+                  data.pagination.currentPage === data.pagination.totalPages
                     ? "pointer-events-none opacity-50"
                     : "cursor-pointer"
                 }
@@ -902,50 +924,23 @@ const SalaryPolicies = () => {
         </Pagination>
       )}
 
-      <AlertDialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) {
-            setTimeout(() => {
-              setDeletingPosition(null);
-            }, 200);
-          }
-        }}
-      >
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
-              Delete Position
-            </AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the position{" "}
-              <span className="font-semibold text-[#02542D]">
-                "{deletingPosition?.name}"
-              </span>
-              ? This action cannot be undone.
+              This will permanently delete the salary policy "
+              {deletingSalaryPolicy?.name}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleteMutation.isPending}
-              className="cursor-pointer"
-            >
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
-              className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer"
+              className="bg-red-600 hover:bg-red-700"
             >
-              {deleteMutation.isPending ? (
-                <>
-                  <Spinner />
-                  Deleting
-                </>
-              ) : (
-                "Delete"
-              )}
+              {deleteMutation.isPending ? <Spinner /> : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
