@@ -10,6 +10,8 @@ lerna-debug.log*
 .env
 .env.local
 
+taj-hrms-backend
+
 node_modules
 dist
 dist-ssr
