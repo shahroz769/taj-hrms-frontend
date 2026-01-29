@@ -39,7 +39,7 @@ export const sidebarItems = [
     children: [
       { label: "All Employees", path: "/workforce/employees" },
       // { label: "Shift Requests", path: "/workforce/shift-requests" },
-      { label: "Shift Assignments", path: "/workforce/shift-assignments" },
+      // { label: "Shift Assignments", path: "/workforce/shift-assignments" },
       { label: "Contracts", path: "/workforce/contracts" },
     ],
   },

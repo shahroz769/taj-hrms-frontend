@@ -5,17 +5,35 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 // External Libraries
-import { useQuery } from "@tanstack/react-query";
-import { CircleXIcon, PencilIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CalendarIcon,
+  CircleXIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
 
 // Components
 import DataTable from "@/components/DataTable/data-table";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -25,6 +43,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -37,9 +60,13 @@ import { Spinner } from "@/components/ui/spinner";
 
 // Services
 import { fetchEmployees } from "@/services/employeesApi";
+import {
+  assignShiftToEmployees,
+  fetchShiftsList,
+} from "@/services/employeeShiftsApi";
 
 // Utils
-import { formatDate } from "@/utils/dateUtils";
+import { formatDate, formatTimeToAMPM } from "@/utils/dateUtils";
 
 // Styles
 import styles from "./AllEmployees.module.css";
@@ -54,6 +81,7 @@ const AllEmployees = () => {
   // ===========================================================================
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
   // Initial Values from URL
@@ -79,6 +107,14 @@ const AllEmployees = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
+
+  // Selection state
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+
+  // Modal state
+  const [assignShiftModalOpen, setAssignShiftModalOpen] = useState(false);
+  const [selectedShiftId, setSelectedShiftId] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(new Date());
 
   // ===========================================================================
   // EFFECTS
@@ -125,6 +161,13 @@ const AllEmployees = () => {
     setSearchParams(params, { replace: true });
   }, [limit, page, debouncedSearch, setSearchParams]);
 
+  // ---------------------------------------------------------------------------
+  // Clear selection when page changes
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    setSelectedEmployeeIds([]);
+  }, [page, limit, debouncedSearch]);
+
   // ===========================================================================
   // REACT QUERY
   // ===========================================================================
@@ -132,6 +175,38 @@ const AllEmployees = () => {
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["employees", { limit, page, search: debouncedSearch }],
     queryFn: () => fetchEmployees({ limit, page, search: debouncedSearch }),
+  });
+
+  // Shifts list query (lazy loading)
+  const {
+    data: shiftsList,
+    isLoading: isLoadingShifts,
+    refetch: refetchShiftsList,
+  } = useQuery({
+    queryKey: ["shiftsList"],
+    queryFn: fetchShiftsList,
+    enabled: false,
+  });
+
+  // ===========================================================================
+  // MUTATIONS
+  // ===========================================================================
+
+  const assignShiftMutation = useMutation({
+    mutationFn: assignShiftToEmployees,
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setSelectedEmployeeIds([]);
+      setAssignShiftModalOpen(false);
+      setSelectedShiftId("");
+      setEffectiveDate(new Date());
+      toast.success(response.message || "Shift assigned successfully");
+    },
+    onError: (error) => {
+      const errorMessage =
+        error.response?.data?.message || "Failed to assign shift";
+      toast.error(errorMessage);
+    },
   });
 
   // ===========================================================================
@@ -199,8 +274,19 @@ const AllEmployees = () => {
     },
     {
       key: "assignedShifts",
-      label: "Assigned Shifts",
-      render: () => "-",
+      label: "Assigned Shift",
+      render: (row) =>
+        row.currentShift ? (
+          <div>
+            <span className="font-medium">{row.currentShift.name}</span>
+            <span className="text-xs text-muted-foreground block">
+              {formatTimeToAMPM(row.currentShift.startTime)} -{" "}
+              {formatTimeToAMPM(row.currentShift.endTime)}
+            </span>
+          </div>
+        ) : (
+          "-"
+        ),
     },
     {
       key: "joiningDate",
@@ -221,6 +307,33 @@ const AllEmployees = () => {
 
   const handleEdit = (row) => {
     navigate(`/workforce/employees/${row._id}/edit`);
+  };
+
+  const handleSelectionChange = (newSelection) => {
+    setSelectedEmployeeIds(newSelection);
+  };
+
+  const handleAssignShiftClick = async () => {
+    setAssignShiftModalOpen(true);
+    await refetchShiftsList();
+  };
+
+  const handleAssignConfirm = () => {
+    if (!selectedShiftId) {
+      toast.error("Please select a shift");
+      return;
+    }
+
+    if (!effectiveDate) {
+      toast.error("Please select an effective date");
+      return;
+    }
+
+    assignShiftMutation.mutate({
+      employeeIds: selectedEmployeeIds,
+      shiftId: selectedShiftId,
+      effectiveDate: format(effectiveDate, "yyyy-MM-dd"),
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -268,12 +381,114 @@ const AllEmployees = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>All Employees</h1>
-        <Link to="/workforce/employees/add">
-          <Button variant="green" className="cursor-pointer">
-            <PlusIcon size={16} />
-            Add New Employee
-          </Button>
-        </Link>
+        {selectedEmployeeIds.length > 0 ? (
+          <Dialog
+            open={assignShiftModalOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                setAssignShiftModalOpen(false);
+                setSelectedShiftId("");
+                setEffectiveDate(new Date());
+              }
+            }}
+          >
+            <Button
+              variant="green"
+              className="cursor-pointer"
+              onClick={handleAssignShiftClick}
+              disabled={isLoadingShifts}
+            >
+              {isLoadingShifts ? <Spinner /> : <CalendarIcon size={16} />}
+              Assign Shift
+            </Button>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Assign Shift</DialogTitle>
+                <DialogDescription>
+                  Assign a shift to {selectedEmployeeIds.length} selected
+                  employee(s).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="shift">Shift</Label>
+                  <Select
+                    value={selectedShiftId}
+                    onValueChange={setSelectedShiftId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a shift" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {shiftsList?.map((shift) => (
+                          <SelectItem key={shift._id} value={shift._id}>
+                            {shift.name} ({formatTimeToAMPM(shift.startTime)} -{" "}
+                            {formatTimeToAMPM(shift.endTime)})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Effective From</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full justify-start text-left font-normal ${!effectiveDate && "text-muted-foreground"}`}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {effectiveDate ? (
+                          format(effectiveDate, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={effectiveDate}
+                        onSelect={setEffectiveDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setAssignShiftModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="green"
+                  onClick={handleAssignConfirm}
+                  disabled={assignShiftMutation.isPending}
+                >
+                  {assignShiftMutation.isPending ? (
+                    <>
+                      <Spinner /> Assigning...
+                    </>
+                  ) : (
+                    "Assign"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Link to="/workforce/employees/add">
+            <Button variant="green" className="cursor-pointer">
+              <PlusIcon size={16} />
+              Add New Employee
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className={styles.controls}>
@@ -312,6 +527,7 @@ const AllEmployees = () => {
               <SelectItem value="25">25 items</SelectItem>
               <SelectItem value="50">50 items</SelectItem>
               <SelectItem value="100">100 items</SelectItem>
+              <SelectItem value="0">All items</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -324,6 +540,9 @@ const AllEmployees = () => {
         isLoading={isLoading}
         isError={isError}
         loadingText="Loading employees..."
+        selectable={true}
+        selectedIds={selectedEmployeeIds}
+        onSelectionChange={handleSelectionChange}
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
