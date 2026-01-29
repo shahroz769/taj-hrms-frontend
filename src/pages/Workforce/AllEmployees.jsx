@@ -12,6 +12,7 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -64,6 +65,8 @@ import {
   assignShiftToEmployees,
   fetchShiftsList,
 } from "@/services/employeeShiftsApi";
+import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchPositionsFilters } from "@/services/positionsApi";
 
 // Utils
 import { formatDate, formatTimeToAMPM } from "@/utils/dateUtils";
@@ -107,6 +110,32 @@ const AllEmployees = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
+
+  // Filter state
+  const [filterDepartment, setFilterDepartment] = useState(
+    searchParams.get("department") || "",
+  );
+  const [filterPosition, setFilterPosition] = useState(
+    searchParams.get("position") || "",
+  );
+  const [filterStatus, setFilterStatus] = useState(
+    searchParams.get("status") || "",
+  );
+  const [filterType, setFilterType] = useState(searchParams.get("type") || "");
+  const [filterShift, setFilterShift] = useState(
+    searchParams.get("shift") || "",
+  );
+
+  // UI state
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [isFiltersLoading, setIsFiltersLoading] = useState(false);
+
+  // Temporary filter state (for popover)
+  const [tempFilterDepartment, setTempFilterDepartment] = useState("");
+  const [tempFilterPosition, setTempFilterPosition] = useState("");
+  const [tempFilterStatus, setTempFilterStatus] = useState("");
+  const [tempFilterType, setTempFilterType] = useState("");
+  const [tempFilterShift, setTempFilterShift] = useState("");
 
   // Selection state
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
@@ -158,8 +187,24 @@ const AllEmployees = () => {
       params.search = debouncedSearch;
     }
 
+    if (filterDepartment) params.department = filterDepartment;
+    if (filterPosition) params.position = filterPosition;
+    if (filterStatus) params.status = filterStatus;
+    if (filterType) params.type = filterType;
+    if (filterShift) params.shift = filterShift;
+
     setSearchParams(params, { replace: true });
-  }, [limit, page, debouncedSearch, setSearchParams]);
+  }, [
+    limit,
+    page,
+    debouncedSearch,
+    filterDepartment,
+    filterPosition,
+    filterStatus,
+    filterType,
+    filterShift,
+    setSearchParams,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Clear selection when page changes
@@ -173,8 +218,30 @@ const AllEmployees = () => {
   // ===========================================================================
 
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["employees", { limit, page, search: debouncedSearch }],
-    queryFn: () => fetchEmployees({ limit, page, search: debouncedSearch }),
+    queryKey: [
+      "employees",
+      {
+        limit,
+        page,
+        search: debouncedSearch,
+        department: filterDepartment,
+        position: filterPosition,
+        status: filterStatus,
+        type: filterType,
+        shift: filterShift,
+      },
+    ],
+    queryFn: () =>
+      fetchEmployees({
+        limit,
+        page,
+        search: debouncedSearch,
+        department: filterDepartment,
+        position: filterPosition,
+        status: filterStatus,
+        type: filterType,
+        shift: filterShift,
+      }),
   });
 
   // Shifts list query (lazy loading)
@@ -187,6 +254,34 @@ const AllEmployees = () => {
     queryFn: fetchShiftsList,
     enabled: false,
   });
+
+  // Departments list query (lazy loading)
+  const {
+    data: departmentsList,
+    isLoading: isLoadingDepartments,
+    refetch: fetchDepartments,
+  } = useQuery({
+    queryKey: ["departmentsList"],
+    queryFn: fetchDepartmentsList,
+    enabled: false,
+  });
+
+  // Positions filters query (lazy loading)
+  const {
+    data: positionsFilters,
+    isLoading: isLoadingPositionsFilters,
+    refetch: fetchPositionsFiltersData,
+  } = useQuery({
+    queryKey: ["positionsFilters"],
+    queryFn: fetchPositionsFilters,
+    enabled: false,
+  });
+
+  // Extract unique position names
+  const uniquePositionNames =
+    positionsFilters?.positionsFiltersList
+      ?.map((p) => p.name)
+      .filter((value, index, self) => self.indexOf(value) === index) || [];
 
   // ===========================================================================
   // MUTATIONS
@@ -283,6 +378,9 @@ const AllEmployees = () => {
               {formatTimeToAMPM(row.currentShift.startTime)} -{" "}
               {formatTimeToAMPM(row.currentShift.endTime)}
             </span>
+            <span className="text-xs text-muted-foreground block">
+              {formatDate(row.currentShift.effectiveDate)}
+            </span>
           </div>
         ) : (
           "-"
@@ -334,6 +432,57 @@ const AllEmployees = () => {
       shiftId: selectedShiftId,
       effectiveDate: format(effectiveDate, "yyyy-MM-dd"),
     });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Filter Handlers
+  // ---------------------------------------------------------------------------
+  const handleFilterClick = async (e) => {
+    e.preventDefault();
+    setIsFiltersLoading(true);
+    try {
+      await Promise.all([
+        fetchDepartments(),
+        fetchPositionsFiltersData(),
+        refetchShiftsList(),
+      ]);
+      setTempFilterDepartment(filterDepartment);
+      setTempFilterPosition(filterPosition);
+      setTempFilterStatus(filterStatus);
+      setTempFilterType(filterType);
+      setTempFilterShift(filterShift);
+      setFilterPopoverOpen(true);
+    } catch (error) {
+      toast.error("Failed to load filter data");
+    } finally {
+      setIsFiltersLoading(false);
+    }
+  };
+
+  const handleApplyFilters = () => {
+    setFilterDepartment(tempFilterDepartment);
+    setFilterPosition(tempFilterPosition);
+    setFilterStatus(tempFilterStatus);
+    setFilterType(tempFilterType);
+    setFilterShift(tempFilterShift);
+    setPage(1); // Reset to page 1
+    setFilterPopoverOpen(false);
+  };
+
+  const handleResetFilters = () => {
+    setTempFilterDepartment("");
+    setTempFilterPosition("");
+    setTempFilterStatus("");
+    setTempFilterType("");
+    setTempFilterShift("");
+
+    setFilterDepartment("");
+    setFilterPosition("");
+    setFilterStatus("");
+    setFilterType("");
+    setFilterShift("");
+    setPage(1);
+    setFilterPopoverOpen(false);
   };
 
   // ---------------------------------------------------------------------------
@@ -531,6 +680,168 @@ const AllEmployees = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        {/* Filters */}
+        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Filters"
+              className="cursor-pointer"
+              disabled={isFiltersLoading}
+              onClick={handleFilterClick}
+            >
+              {isFiltersLoading ? <Spinner /> : <SlidersHorizontalIcon />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="end">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="leading-none font-medium">Filters</h4>
+                <p className="text-muted-foreground text-sm">
+                  Apply the filters for the employees.
+                </p>
+              </div>
+              <div className="grid gap-2">
+                {/* Department */}
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="department">Department</Label>
+                  <Select
+                    value={tempFilterDepartment}
+                    onValueChange={setTempFilterDepartment}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value=" ">All Departments</SelectItem>
+                        {departmentsList?.map((dept) => (
+                          <SelectItem key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Position */}
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="position">Position</Label>
+                  <Select
+                    value={tempFilterPosition}
+                    onValueChange={setTempFilterPosition}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value=" ">All Positions</SelectItem>
+                        {uniquePositionNames.map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Status */}
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={tempFilterStatus}
+                    onValueChange={setTempFilterStatus}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value=" ">All Statuses</SelectItem>
+                        {["Active", "Inactive", "Resigned", "Terminated"].map(
+                          (status) => (
+                            <SelectItem key={status} value={status}>
+                              {status}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Type */}
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={tempFilterType}
+                    onValueChange={setTempFilterType}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value=" ">All Types</SelectItem>
+                        {["Permanent", "Contract", "Part Time"].map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Shift */}
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <Label htmlFor="shift">Shift</Label>
+                  <Select
+                    value={tempFilterShift}
+                    onValueChange={setTempFilterShift}
+                  >
+                    <SelectTrigger className="w-full col-span-2">
+                      <SelectValue placeholder="Select shift" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value=" ">All Shifts</SelectItem>
+                        {shiftsList?.map((shift) => (
+                          <SelectItem key={shift._id} value={shift._id}>
+                            {shift.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="green"
+                  aria-label="Apply"
+                  className="cursor-pointer flex-1"
+                  onClick={handleApplyFilters}
+                >
+                  Apply
+                </Button>
+                <Button
+                  variant="outline"
+                  aria-label="Reset"
+                  className="cursor-pointer flex-1"
+                  onClick={handleResetFilters}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <DataTable

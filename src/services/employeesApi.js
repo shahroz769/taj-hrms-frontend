@@ -1,8 +1,26 @@
 import API from "./api";
 
-export const fetchEmployees = async ({ page = 1, limit = 10, search = "" }) => {
+export const fetchEmployees = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  department = "",
+  position = "",
+  status = "",
+  type = "",
+  shift = "",
+}) => {
   const res = await API.get(`/api/employees`, {
-    params: { page, limit, search },
+    params: {
+      page,
+      limit,
+      search,
+      department,
+      position,
+      status,
+      type,
+      shift,
+    },
   });
   return res.data;
 };
