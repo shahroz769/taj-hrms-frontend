@@ -11,6 +11,7 @@ lerna-debug.log*
 .env.local
 
 taj-hrms-backend
+backend
 
 node_modules
 dist

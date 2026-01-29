@@ -218,29 +218,29 @@ const PositionsSetups = () => {
 
   const uniquePositions = React.useMemo(
     () => [...new Set(filtersList.map((item) => item.name))].filter(Boolean),
-    [filtersList]
+    [filtersList],
   );
 
   const uniqueReportsTo = React.useMemo(
     () =>
       [...new Set(filtersList.map((item) => item.reportsTo))].filter(Boolean),
-    [filtersList]
+    [filtersList],
   );
 
   const uniqueDepartments = React.useMemo(
     () =>
       [...new Set(filtersList.map((item) => item.department?.name))].filter(
-        Boolean
+        Boolean,
       ),
-    [filtersList]
+    [filtersList],
   );
 
   const uniqueLeavePolicies = React.useMemo(
     () =>
       [...new Set(filtersList.map((item) => item.leavePolicy?.name))].filter(
-        Boolean
+        Boolean,
       ),
-    [filtersList]
+    [filtersList],
   );
 
   // ---------------------------------------------------------------------------
@@ -588,7 +588,7 @@ const PositionsSetups = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new position
@@ -1007,6 +1007,7 @@ const PositionsSetups = () => {
         onDelete={handleDelete}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading positions..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -1044,7 +1045,7 @@ const PositionsSetups = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -1052,7 +1053,7 @@ const PositionsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -1074,7 +1075,7 @@ const PositionsSetups = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -1083,7 +1084,7 @@ const PositionsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -1101,7 +1102,7 @@ const PositionsSetups = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

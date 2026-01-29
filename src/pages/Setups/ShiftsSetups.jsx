@@ -542,7 +542,7 @@ const ShiftsSetups = () => {
             e.target.reset();
             setSelectedWorkingDays([]);
           },
-        }
+        },
       );
     } else {
       // Create new shift
@@ -904,6 +904,7 @@ const ShiftsSetups = () => {
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading shifts..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -941,7 +942,7 @@ const ShiftsSetups = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -949,7 +950,7 @@ const ShiftsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -971,7 +972,7 @@ const ShiftsSetups = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -980,7 +981,7 @@ const ShiftsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -998,7 +999,7 @@ const ShiftsSetups = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

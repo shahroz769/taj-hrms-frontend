@@ -386,7 +386,7 @@ const DepartmentsSetups = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new department
@@ -575,6 +575,7 @@ const DepartmentsSetups = () => {
         onDelete={handleDelete}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading departments..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -612,7 +613,7 @@ const DepartmentsSetups = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -620,7 +621,7 @@ const DepartmentsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -642,7 +643,7 @@ const DepartmentsSetups = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -651,7 +652,7 @@ const DepartmentsSetups = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -669,7 +670,7 @@ const DepartmentsSetups = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

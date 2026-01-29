@@ -10,6 +10,8 @@ import DepartmentsSetups from "./pages/Setups/DepartmentsSetups";
 import PositionsSetups from "./pages/Setups/PositionsSetups";
 import ShiftsSetups from "./pages/Setups/ShiftsSetups";
 import AllEmployees from "./pages/Workforce/AllEmployees";
+import AddEmployee from "./pages/Workforce/AddEmployee";
+import EditEmployee from "./pages/Workforce/EditEmployee";
 import ShiftsRequests from "./pages/Workforce/ShiftsRequests";
 import ShiftsAssignments from "./pages/Workforce/ShiftsAssignments";
 import Contracts from "./pages/Workforce/Contracts";
@@ -92,9 +94,14 @@ function App() {
                 }
               >
                 {/* Workforce */}
+                <Route path="/workforce/employees" element={<AllEmployees />} />
                 <Route
-                  path="/workforce/all-employees"
-                  element={<AllEmployees />}
+                  path="/workforce/employees/add"
+                  element={<AddEmployee />}
+                />
+                <Route
+                  path="/workforce/employees/:id/edit"
+                  element={<EditEmployee />}
                 />
                 <Route
                   path="/workforce/shift-requests"

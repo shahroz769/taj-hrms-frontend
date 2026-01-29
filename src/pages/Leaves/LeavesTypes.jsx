@@ -506,7 +506,7 @@ const LeavesTypes = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new leave type
@@ -689,6 +689,7 @@ const LeavesTypes = () => {
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading leave types..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -726,7 +727,7 @@ const LeavesTypes = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -734,7 +735,7 @@ const LeavesTypes = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -756,7 +757,7 @@ const LeavesTypes = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -765,7 +766,7 @@ const LeavesTypes = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -783,7 +784,7 @@ const LeavesTypes = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

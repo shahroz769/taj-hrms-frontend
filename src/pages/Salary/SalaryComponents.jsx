@@ -489,7 +489,7 @@ const SalaryComponents = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new salary component
@@ -747,6 +747,7 @@ const SalaryComponents = () => {
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading salary components..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -784,7 +785,7 @@ const SalaryComponents = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -792,7 +793,7 @@ const SalaryComponents = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -814,7 +815,7 @@ const SalaryComponents = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -823,7 +824,7 @@ const SalaryComponents = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -841,7 +842,7 @@ const SalaryComponents = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

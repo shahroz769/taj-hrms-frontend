@@ -322,7 +322,7 @@ const LeavesPolicies = () => {
       render: (row) => {
         const totalDays = row.entitlements?.reduce(
           (sum, entitlement) => sum + (entitlement.days || 0),
-          0
+          0,
         );
         return totalDays || 0;
       },
@@ -530,9 +530,8 @@ const LeavesPolicies = () => {
 
         // Check if it's a valid number
         if (isNaN(days) || !Number.isInteger(days)) {
-          newErrors[
-            `leaveType-${leaveType._id}`
-          ] = `Days must be a valid number`;
+          newErrors[`leaveType-${leaveType._id}`] =
+            `Days must be a valid number`;
         }
         // Check if it's negative
         else if (days < 0) {
@@ -572,7 +571,7 @@ const LeavesPolicies = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new leave policy
@@ -656,7 +655,7 @@ const LeavesPolicies = () => {
                         editingLeavePolicy?.entitlements?.find(
                           (ent) =>
                             ent.leaveType?._id === leaveType._id ||
-                            ent.leaveType === leaveType._id
+                            ent.leaveType === leaveType._id,
                         );
                       const defaultDays = existingEntitlement?.days ?? "";
 
@@ -769,6 +768,7 @@ const LeavesPolicies = () => {
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading leave policies..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -806,7 +806,7 @@ const LeavesPolicies = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if needed
@@ -814,7 +814,7 @@ const LeavesPolicies = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -836,7 +836,7 @@ const LeavesPolicies = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -845,7 +845,7 @@ const LeavesPolicies = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -863,7 +863,7 @@ const LeavesPolicies = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

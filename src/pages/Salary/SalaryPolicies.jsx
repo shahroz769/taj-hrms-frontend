@@ -321,7 +321,7 @@ const SalaryPolicies = () => {
       render: (row) => {
         const totalAmount = row.components?.reduce(
           (sum, component) => sum + (component.amount || 0),
-          0
+          0,
         );
         return totalAmount ? `Rs. ${totalAmount.toLocaleString()}` : "Rs. 0";
       },
@@ -535,9 +535,8 @@ const SalaryPolicies = () => {
 
         // Check if it's a valid number
         if (isNaN(amount)) {
-          newErrors[
-            `component-${component._id}`
-          ] = `Amount must be a valid number`;
+          newErrors[`component-${component._id}`] =
+            `Amount must be a valid number`;
         }
         // Check if it's negative
         else if (amount < 0) {
@@ -573,7 +572,7 @@ const SalaryPolicies = () => {
           onSuccess: () => {
             e.target.reset();
           },
-        }
+        },
       );
     } else {
       // Create new salary policy
@@ -662,7 +661,7 @@ const SalaryPolicies = () => {
                         editingSalaryPolicy?.components?.find(
                           (comp) =>
                             comp.salaryComponent?._id === component._id ||
-                            comp.salaryComponent === component._id
+                            comp.salaryComponent === component._id,
                         );
                       const defaultAmount = existingComponent?.amount ?? "";
 
@@ -776,6 +775,7 @@ const SalaryPolicies = () => {
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
+        loadingText="Loading salary policies..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -813,7 +813,7 @@ const SalaryPolicies = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>
+                </PaginationItem>,
               );
 
               // Show ellipsis if there are pages between 1 and current-1
@@ -821,7 +821,7 @@ const SalaryPolicies = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -838,7 +838,7 @@ const SalaryPolicies = () => {
                     >
                       {currentPage - 1}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -856,7 +856,7 @@ const SalaryPolicies = () => {
                     >
                       {currentPage}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -873,7 +873,7 @@ const SalaryPolicies = () => {
                     >
                       {currentPage + 1}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -882,7 +882,7 @@ const SalaryPolicies = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 
@@ -900,7 +900,7 @@ const SalaryPolicies = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>
+                  </PaginationItem>,
                 );
               }
 

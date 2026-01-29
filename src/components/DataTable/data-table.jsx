@@ -15,6 +15,7 @@ const DataTable = ({
   onReject,
   isLoading,
   isError,
+  loadingText = "Loading data...",
 }) => {
   return (
     <div className={styles.tableWrapper}>
@@ -28,8 +29,8 @@ const DataTable = ({
                   column.align === "right"
                     ? styles.tableHeaderRight
                     : column.align === "center"
-                    ? styles.tableHeaderCenter
-                    : styles.tableHeader
+                      ? styles.tableHeaderCenter
+                      : styles.tableHeader
                 }
               >
                 {column.label}
@@ -43,7 +44,7 @@ const DataTable = ({
               <td colSpan={columns.length} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
                   <Spinner className={styles.loader} />
-                  <p className={styles.stateText}>Loading shifts...</p>
+                  <p className={styles.stateText}>{loadingText}</p>
                 </div>
               </td>
             </tr>
