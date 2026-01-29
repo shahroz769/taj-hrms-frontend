@@ -8,13 +8,11 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  PlusIcon,
-  TrashIcon,
-  UploadIcon,
-  ChevronRightIcon,
-  ChevronDownIcon,
-} from "lucide-react";
+import PlusIcon from "lucide-react/dist/esm/icons/plus";
+import TrashIcon from "lucide-react/dist/esm/icons/trash";
+import UploadIcon from "lucide-react/dist/esm/icons/upload";
+import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
+import ChevronDownIcon from "lucide-react/dist/esm/icons/chevron-down";
 import { toast } from "sonner";
 import { format } from "date-fns";
 

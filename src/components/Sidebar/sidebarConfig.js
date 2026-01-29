@@ -1,14 +1,12 @@
 import { ROLES } from "../../utils/roles";
-import {
-  LayoutGridIcon,
-  FileSlidersIcon,
-  IdCardLanyardIcon,
-  ClipboardClockIcon,
-  CalendarCheckIcon,
-  MessageSquareWarningIcon,
-  ChevronDownIcon,
-  CircleDollarSignIcon,
-} from "lucide-react";
+import LayoutGridIcon from "lucide-react/dist/esm/icons/layout-grid";
+import FileSlidersIcon from "lucide-react/dist/esm/icons/file-sliders";
+import IdCardLanyardIcon from "lucide-react/dist/esm/icons/id-card";
+import ClipboardClockIcon from "lucide-react/dist/esm/icons/clipboard-list";
+import CalendarCheckIcon from "lucide-react/dist/esm/icons/calendar-check";
+import MessageSquareWarningIcon from "lucide-react/dist/esm/icons/message-square-warning";
+import ChevronDownIcon from "lucide-react/dist/esm/icons/chevron-down";
+import CircleDollarSignIcon from "lucide-react/dist/esm/icons/circle-dollar-sign";
 
 export const sidebarItems = [
   {

@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -24,34 +25,42 @@ const DataTable = ({
   // Calculate total columns including checkbox column
   const totalColumns = selectable ? columns.length + 1 : columns.length;
 
-  // Check if all rows are selected
-  const allSelected =
-    data && data.length > 0 && selectedIds.length === data.length;
-  const someSelected =
-    selectedIds.length > 0 && selectedIds.length < (data?.length || 0);
+  // Memoize selection state calculations
+  const { allSelected, someSelected } = useMemo(() => {
+    const all = data && data.length > 0 && selectedIds.length === data.length;
+    const some =
+      selectedIds.length > 0 && selectedIds.length < (data?.length || 0);
+    return { allSelected: all, someSelected: some };
+  }, [data, selectedIds]);
 
-  // Handle select all toggle
-  const handleSelectAll = (checked) => {
-    if (onSelectionChange) {
-      if (checked) {
-        const allIds = data.map((row) => row._id || row.id);
-        onSelectionChange(allIds);
-      } else {
-        onSelectionChange([]);
+  // Memoized handler for select all toggle
+  const handleSelectAll = useCallback(
+    (checked) => {
+      if (onSelectionChange) {
+        if (checked) {
+          const allIds = data.map((row) => row._id || row.id);
+          onSelectionChange(allIds);
+        } else {
+          onSelectionChange([]);
+        }
       }
-    }
-  };
+    },
+    [data, onSelectionChange],
+  );
 
-  // Handle individual row toggle
-  const handleRowSelect = (rowId, checked) => {
-    if (onSelectionChange) {
-      if (checked) {
-        onSelectionChange([...selectedIds, rowId]);
-      } else {
-        onSelectionChange(selectedIds.filter((id) => id !== rowId));
+  // Memoized handler for individual row toggle
+  const handleRowSelect = useCallback(
+    (rowId, checked) => {
+      if (onSelectionChange) {
+        if (checked) {
+          onSelectionChange((prev) => [...prev, rowId]);
+        } else {
+          onSelectionChange((prev) => prev.filter((id) => id !== rowId));
+        }
       }
-    }
-  };
+    },
+    [onSelectionChange],
+  );
 
   return (
     <div className={styles.tableWrapper}>

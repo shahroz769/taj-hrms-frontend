@@ -8,13 +8,11 @@ import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  PlusIcon,
-  TrashIcon,
-  UploadIcon,
-  ChevronRightIcon,
-  ChevronDownIcon,
-} from "lucide-react";
+import PlusIcon from "lucide-react/dist/esm/icons/plus";
+import TrashIcon from "lucide-react/dist/esm/icons/trash";
+import UploadIcon from "lucide-react/dist/esm/icons/upload";
+import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
+import ChevronDownIcon from "lucide-react/dist/esm/icons/chevron-down";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -363,7 +361,9 @@ const AddEmployee = () => {
                 placeholder="Enter father's name"
               />
               {errors.fatherName && (
-                <span className={styles.error}>{errors.fatherName.message}</span>
+                <span className={styles.error}>
+                  {errors.fatherName.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -387,7 +387,9 @@ const AddEmployee = () => {
                 placeholder="Enter contact number"
               />
               {errors.contactNumber && (
-                <span className={styles.error}>{errors.contactNumber.message}</span>
+                <span className={styles.error}>
+                  {errors.contactNumber.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -421,7 +423,9 @@ const AddEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.maritalStatus && (
-                <span className={styles.error}>{errors.maritalStatus.message}</span>
+                <span className={styles.error}>
+                  {errors.maritalStatus.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -489,7 +493,9 @@ const AddEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.employmentType && (
-                <span className={styles.error}>{errors.employmentType.message}</span>
+                <span className={styles.error}>
+                  {errors.employmentType.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -509,7 +515,9 @@ const AddEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.salaryPolicy && (
-                <span className={styles.error}>{errors.salaryPolicy.message}</span>
+                <span className={styles.error}>
+                  {errors.salaryPolicy.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -542,7 +550,9 @@ const AddEmployee = () => {
                 </PopoverContent>
               </Popover>
               {errors.joiningDate && (
-                <span className={styles.error}>{errors.joiningDate.message}</span>
+                <span className={styles.error}>
+                  {errors.joiningDate.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -552,7 +562,9 @@ const AddEmployee = () => {
                 placeholder="Enter current address"
               />
               {errors.currentStreetAddress && (
-                <span className={styles.error}>{errors.currentStreetAddress.message}</span>
+                <span className={styles.error}>
+                  {errors.currentStreetAddress.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -562,7 +574,9 @@ const AddEmployee = () => {
                 placeholder="Enter permanent address"
               />
               {errors.permanentStreetAddress && (
-                <span className={styles.error}>{errors.permanentStreetAddress.message}</span>
+                <span className={styles.error}>
+                  {errors.permanentStreetAddress.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -634,7 +648,9 @@ const AddEmployee = () => {
                     placeholder="Enter name"
                   />
                   {errors.emergencyContact?.[index]?.name && (
-                    <span className={styles.error}>{errors.emergencyContact[index].name.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].name.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -644,7 +660,9 @@ const AddEmployee = () => {
                     placeholder="Enter number"
                   />
                   {errors.emergencyContact?.[index]?.number && (
-                    <span className={styles.error}>{errors.emergencyContact[index].number.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].number.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -654,7 +672,9 @@ const AddEmployee = () => {
                     placeholder="Enter relation"
                   />
                   {errors.emergencyContact?.[index]?.relation && (
-                    <span className={styles.error}>{errors.emergencyContact[index].relation.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].relation.message}
+                    </span>
                   )}
                 </div>
               </div>
@@ -697,7 +717,9 @@ const AddEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.medical?.bloodGroup && (
-                <span className={styles.error}>{errors.medical.bloodGroup.message}</span>
+                <span className={styles.error}>
+                  {errors.medical.bloodGroup.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -981,7 +1003,9 @@ const AddEmployee = () => {
                     placeholder="Enter name"
                   />
                   {errors.guarantor?.[index]?.name && (
-                    <span className={styles.error}>{errors.guarantor[index].name.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].name.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -991,7 +1015,9 @@ const AddEmployee = () => {
                     placeholder="Enter contact"
                   />
                   {errors.guarantor?.[index]?.contactNumber && (
-                    <span className={styles.error}>{errors.guarantor[index].contactNumber.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].contactNumber.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -1001,7 +1027,9 @@ const AddEmployee = () => {
                     placeholder="Enter CNIC"
                   />
                   {errors.guarantor?.[index]?.cnic && (
-                    <span className={styles.error}>{errors.guarantor[index].cnic.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].cnic.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -1011,7 +1039,9 @@ const AddEmployee = () => {
                     placeholder="Enter address"
                   />
                   {errors.guarantor?.[index]?.address && (
-                    <span className={styles.error}>{errors.guarantor[index].address.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].address.message}
+                    </span>
                   )}
                 </div>
               </div>

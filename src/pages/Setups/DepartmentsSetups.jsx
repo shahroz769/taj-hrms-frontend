@@ -6,13 +6,11 @@ import { useSearchParams } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CircleXIcon,
-  PencilIcon,
-  PlusIcon,
-  SearchIcon,
-  TrashIcon,
-} from "lucide-react";
+import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
+import PencilIcon from "lucide-react/dist/esm/icons/pencil";
+import PlusIcon from "lucide-react/dist/esm/icons/plus";
+import SearchIcon from "lucide-react/dist/esm/icons/search";
+import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import { toast } from "sonner";
 
 // Components
