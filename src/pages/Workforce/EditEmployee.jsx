@@ -293,7 +293,8 @@ const EditEmployee = () => {
           ? emp.guarantor
           : [{ name: "", contactNumber: "", cnic: "", address: "" }],
         legal: {
-          involvedInIllegalActivity: emp.legal?.involvedInIllegalActivity || false,
+          involvedInIllegalActivity:
+            emp.legal?.involvedInIllegalActivity || false,
           illegalActivityDetails: emp.legal?.illegalActivityDetails || "",
           convictedBefore: emp.legal?.convictedBefore || false,
           convictedBeforeDetails: emp.legal?.convictedBeforeDetails || "",
@@ -312,7 +313,15 @@ const EditEmployee = () => {
 
       setIsDataLoaded(true);
     }
-  }, [employeeData, reset, isDataLoaded, selectedDepartment, departmentsData, positionsData, salaryPoliciesData]);
+  }, [
+    employeeData,
+    reset,
+    isDataLoaded,
+    selectedDepartment,
+    departmentsData,
+    positionsData,
+    salaryPoliciesData,
+  ]);
 
   // ===========================================================================
   // MUTATION
@@ -508,7 +517,9 @@ const EditEmployee = () => {
                 placeholder="Enter father's name"
               />
               {errors.fatherName && (
-                <span className={styles.error}>{errors.fatherName.message}</span>
+                <span className={styles.error}>
+                  {errors.fatherName.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -532,7 +543,9 @@ const EditEmployee = () => {
                 placeholder="Enter contact number"
               />
               {errors.contactNumber && (
-                <span className={styles.error}>{errors.contactNumber.message}</span>
+                <span className={styles.error}>
+                  {errors.contactNumber.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -566,7 +579,9 @@ const EditEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.maritalStatus && (
-                <span className={styles.error}>{errors.maritalStatus.message}</span>
+                <span className={styles.error}>
+                  {errors.maritalStatus.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -638,7 +653,9 @@ const EditEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.employmentType && (
-                <span className={styles.error}>{errors.employmentType.message}</span>
+                <span className={styles.error}>
+                  {errors.employmentType.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -659,7 +676,9 @@ const EditEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.salaryPolicy && (
-                <span className={styles.error}>{errors.salaryPolicy.message}</span>
+                <span className={styles.error}>
+                  {errors.salaryPolicy.message}
+                </span>
               )}
             </div>
             <div className={styles.formGroup}>
@@ -692,7 +711,9 @@ const EditEmployee = () => {
                 </PopoverContent>
               </Popover>
               {errors.joiningDate && (
-                <span className={styles.error}>{errors.joiningDate.message}</span>
+                <span className={styles.error}>
+                  {errors.joiningDate.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -702,7 +723,9 @@ const EditEmployee = () => {
                 placeholder="Enter current address"
               />
               {errors.currentStreetAddress && (
-                <span className={styles.error}>{errors.currentStreetAddress.message}</span>
+                <span className={styles.error}>
+                  {errors.currentStreetAddress.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -712,7 +735,9 @@ const EditEmployee = () => {
                 placeholder="Enter permanent address"
               />
               {errors.permanentStreetAddress && (
-                <span className={styles.error}>{errors.permanentStreetAddress.message}</span>
+                <span className={styles.error}>
+                  {errors.permanentStreetAddress.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -784,7 +809,9 @@ const EditEmployee = () => {
                     placeholder="Enter name"
                   />
                   {errors.emergencyContact?.[index]?.name && (
-                    <span className={styles.error}>{errors.emergencyContact[index].name.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].name.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -794,7 +821,9 @@ const EditEmployee = () => {
                     placeholder="Enter number"
                   />
                   {errors.emergencyContact?.[index]?.number && (
-                    <span className={styles.error}>{errors.emergencyContact[index].number.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].number.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -804,7 +833,9 @@ const EditEmployee = () => {
                     placeholder="Enter relation"
                   />
                   {errors.emergencyContact?.[index]?.relation && (
-                    <span className={styles.error}>{errors.emergencyContact[index].relation.message}</span>
+                    <span className={styles.error}>
+                      {errors.emergencyContact[index].relation.message}
+                    </span>
                   )}
                 </div>
               </div>
@@ -848,7 +879,9 @@ const EditEmployee = () => {
                 </SelectContent>
               </Select>
               {errors.medical?.bloodGroup && (
-                <span className={styles.error}>{errors.medical.bloodGroup.message}</span>
+                <span className={styles.error}>
+                  {errors.medical.bloodGroup.message}
+                </span>
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -1133,7 +1166,9 @@ const EditEmployee = () => {
                     placeholder="Enter name"
                   />
                   {errors.guarantor?.[index]?.name && (
-                    <span className={styles.error}>{errors.guarantor[index].name.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].name.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -1143,7 +1178,9 @@ const EditEmployee = () => {
                     placeholder="Enter contact"
                   />
                   {errors.guarantor?.[index]?.contactNumber && (
-                    <span className={styles.error}>{errors.guarantor[index].contactNumber.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].contactNumber.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -1153,7 +1190,9 @@ const EditEmployee = () => {
                     placeholder="Enter CNIC"
                   />
                   {errors.guarantor?.[index]?.cnic && (
-                    <span className={styles.error}>{errors.guarantor[index].cnic.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].cnic.message}
+                    </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
@@ -1163,7 +1202,9 @@ const EditEmployee = () => {
                     placeholder="Enter address"
                   />
                   {errors.guarantor?.[index]?.address && (
-                    <span className={styles.error}>{errors.guarantor[index].address.message}</span>
+                    <span className={styles.error}>
+                      {errors.guarantor[index].address.message}
+                    </span>
                   )}
                 </div>
               </div>
