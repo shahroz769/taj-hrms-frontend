@@ -15,6 +15,8 @@ import EditEmployee from "./pages/Workforce/EditEmployee";
 import ShiftsRequests from "./pages/Workforce/ShiftsRequests";
 import ShiftsAssignments from "./pages/Workforce/ShiftsAssignments";
 import Contracts from "./pages/Workforce/Contracts";
+import ContractAttendance from "./pages/Workforce/ContractAttendance";
+import ContractPayments from "./pages/Workforce/ContractPayments";
 import AttendanceRecords from "./pages/Attendance/AttendanceRecords";
 import LeavesApplications from "./pages/Leaves/LeavesApplications";
 import LeavesTypes from "./pages/Leaves/LeavesTypes";
@@ -112,6 +114,14 @@ function App() {
                   element={<ShiftsAssignments />}
                 />
                 <Route path="/workforce/contracts" element={<Contracts />} />
+                <Route
+                  path="/workforce/contracts/:id/attendance"
+                  element={<ContractAttendance />}
+                />
+                <Route
+                  path="/workforce/contracts/:id/payments"
+                  element={<ContractPayments />}
+                />
 
                 {/* Attendance */}
                 <Route

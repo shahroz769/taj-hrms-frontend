@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 // React Router
-import { useSearchParams, Link } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,6 @@ import CalendarIcon from "lucide-react/dist/esm/icons/calendar";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import PencilIcon from "lucide-react/dist/esm/icons/pencil";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
-import SearchIcon from "lucide-react/dist/esm/icons/search";
 import SlidersHorizontalIcon from "lucide-react/dist/esm/icons/sliders-horizontal";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import { toast } from "sonner";
@@ -42,11 +41,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Pagination,
@@ -74,11 +68,12 @@ import { Spinner } from "@/components/ui/spinner";
 
 // Services
 import {
-  createContract,
-  deleteContract,
-  fetchContracts,
-  updateContract,
-} from "@/services/contractsApi";
+  createAttendance,
+  deleteAttendance,
+  fetchAttendancesByContract,
+  updateAttendance,
+} from "@/services/contractAttendancesApi";
+import { getContractById } from "@/services/contractsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -90,7 +85,9 @@ import styles from "../Setups/DepartmentsSetups.module.css";
 // COMPONENT
 // ============================================================================
 
-const Contracts = () => {
+const ContractAttendance = () => {
+  const { id: contractId } = useParams();
+
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -101,7 +98,7 @@ const Contracts = () => {
   // ---------------------------------------------------------------------------
   const getInitialLimit = () => {
     const urlLimit = searchParams.get("limit");
-    return urlLimit ? Number(urlLimit) : 10;
+    return urlLimit ? Number(urlLimit) : 50;
   };
 
   const getInitialPage = () => {
@@ -109,12 +106,12 @@ const Contracts = () => {
     return urlPage ? Number(urlPage) : 1;
   };
 
-  const getInitialSearch = () => {
-    return searchParams.get("search") || "";
+  const getInitialStartDate = () => {
+    return searchParams.get("startDate") || "";
   };
 
-  const getInitialStatus = () => {
-    return searchParams.get("status") || "";
+  const getInitialEndDate = () => {
+    return searchParams.get("endDate") || "";
   };
 
   // ===========================================================================
@@ -122,60 +119,46 @@ const Contracts = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingContract, setEditingContract] = useState(null);
+  const [editingAttendance, setEditingAttendance] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingContract, setDeletingContract] = useState(null);
-  const [searchValue, setSearchValue] = useState(getInitialSearch);
-  const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
+  const [deletingAttendance, setDeletingAttendance] = useState(null);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [startDate, setStartDate] = useState(undefined);
-  const [endDate, setEndDate] = useState(undefined);
-  const [startDateOpen, setStartDateOpen] = useState(false);
-  const [endDateOpen, setEndDateOpen] = useState(false);
-  const [status, setStatus] = useState(getInitialStatus);
-  const [tempStatus, setTempStatus] = useState(getInitialStatus);
+  const [attendanceDate, setAttendanceDate] = useState(undefined);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [laborersPresent, setLaborersPresent] = useState("");
+
+  // Filter state
+  const [filterStartDate, setFilterStartDate] = useState(getInitialStartDate);
+  const [filterEndDate, setFilterEndDate] = useState(getInitialEndDate);
+  const [tempFilterStartDate, setTempFilterStartDate] = useState(
+    getInitialStartDate
+  );
+  const [tempFilterEndDate, setTempFilterEndDate] = useState(
+    getInitialEndDate
+  );
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
-  const [editStatus, setEditStatus] = useState("");
+  const [filterStartDateOpen, setFilterStartDateOpen] = useState(false);
+  const [filterEndDateOpen, setFilterEndDateOpen] = useState(false);
 
   // ===========================================================================
   // EFFECTS
   // ===========================================================================
 
   // ---------------------------------------------------------------------------
-  // Debounce search input
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchValue);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchValue]);
-
-  // ---------------------------------------------------------------------------
-  // Reset to page 1 when debounced search changes (after user stops typing)
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (searchValue !== "") {
-      setPage(1);
-    }
-  }, [debouncedSearch, searchValue]);
-
-  // ---------------------------------------------------------------------------
-  // Reset to page 1 when status filter changes
+  // Reset to page 1 when filters change
   // ---------------------------------------------------------------------------
   useEffect(() => {
     setPage(1);
-  }, [status]);
+  }, [filterStartDate, filterEndDate]);
 
   // ---------------------------------------------------------------------------
-  // Update URL when limit, page, debouncedSearch, or status changes
+  // Update URL when limit, page, or filters change
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const params = {};
 
-    if (limit !== 10) {
+    if (limit !== 50) {
       params.limit = limit.toString();
     }
 
@@ -183,16 +166,16 @@ const Contracts = () => {
       params.page = page.toString();
     }
 
-    if (debouncedSearch) {
-      params.search = debouncedSearch;
+    if (filterStartDate) {
+      params.startDate = filterStartDate;
     }
 
-    if (status) {
-      params.status = status;
+    if (filterEndDate) {
+      params.endDate = filterEndDate;
     }
 
     setSearchParams(params, { replace: true });
-  }, [limit, page, debouncedSearch, status, setSearchParams]);
+  }, [limit, page, filterStartDate, filterEndDate, setSearchParams]);
 
   // ===========================================================================
   // REACT QUERY
@@ -200,79 +183,102 @@ const Contracts = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Contracts Query
+  // Fetch Contract Query
   // ---------------------------------------------------------------------------
-  const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["contracts", { limit, page, search: debouncedSearch, status }],
-    queryFn: () =>
-      fetchContracts({ limit, page, search: debouncedSearch, status }),
+  const { data: contract, isLoading: isLoadingContract } = useQuery({
+    queryKey: ["contract", contractId],
+    queryFn: () => getContractById(contractId),
+    enabled: !!contractId,
+    staleTime: 0, // Always consider data stale to get fresh data
+    refetchOnMount: "always", // Always refetch when component mounts
   });
 
   // ---------------------------------------------------------------------------
-  // Create Contract Mutation
+  // Fetch Attendances Query
+  // ---------------------------------------------------------------------------
+  const { data, isLoading, isError } = useQuery({
+    queryKey: [
+      "attendances",
+      contractId,
+      { limit, page, startDate: filterStartDate, endDate: filterEndDate },
+    ],
+    queryFn: () =>
+      fetchAttendancesByContract(contractId, {
+        limit,
+        page,
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+      }),
+    enabled: !!contractId,
+    staleTime: 0, // Always consider data stale to get fresh data
+    refetchOnMount: "always", // Always refetch when component mounts
+  });
+
+  // ---------------------------------------------------------------------------
+  // Create Attendance Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createContract,
+    mutationFn: createAttendance,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attendances", contractId] });
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contract", contractId] });
       setDialogOpen(false);
       setErrors({});
-      setEditingContract(null);
-      setStartDate(undefined);
-      setEndDate(undefined);
-      toast.success("Contract created successfully");
+      setEditingAttendance(null);
+      setAttendanceDate(undefined);
+      toast.success("Attendance created successfully");
     },
     onError: (error) => {
-      console.error("Error creating contract:", error);
+      console.error("Error creating attendance:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create contract";
+        error.response?.data?.message || "Failed to create attendance";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Contract Mutation
+  // Update Attendance Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateContract(id, payload),
-    onSuccess: (data, variables) => {
+    mutationFn: ({ id, payload }) => updateAttendance(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attendances", contractId] });
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({
-        queryKey: ["attendances", variables.id],
-      });
-      queryClient.invalidateQueries({ queryKey: ["contract", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["contract", contractId] });
       setDialogOpen(false);
       setErrors({});
-      setEditingContract(null);
-      setStartDate(undefined);
-      setEndDate(undefined);
-      toast.success("Contract updated successfully");
+      setEditingAttendance(null);
+      setAttendanceDate(undefined);
+      toast.success("Attendance updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating contract:", error);
+      console.error("Error updating attendance:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update contract";
+        error.response?.data?.message || "Failed to update attendance";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Contract Mutation
+  // Delete Attendance Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteContract,
+    mutationFn: deleteAttendance,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attendances", contractId] });
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contract", contractId] });
       setDeleteDialogOpen(false);
-      setDeletingContract(null);
-      toast.success("Contract deleted successfully");
+      setDeletingAttendance(null);
+      toast.success("Attendance deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting contract:", error);
+      console.error("Error deleting attendance:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete contract";
+        error.response?.data?.message || "Failed to delete attendance";
       toast.error(errorMessage);
     },
   });
@@ -286,109 +292,28 @@ const Contracts = () => {
     return Math.round(num).toLocaleString("en-US");
   };
 
-  const renderStatusBadge = (status) => {
-    if (status === "Active") {
-      return (
-        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-          Active
-        </Badge>
-      );
-    }
-    if (status === "Completed") {
-      return (
-        <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-          Completed
-        </Badge>
-      );
-    }
-    if (status === "Suspended") {
-      return (
-        <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
-          Suspended
-        </Badge>
-      );
-    }
-    return null;
-  };
-
   // ===========================================================================
   // TABLE CONFIGURATION
   // ===========================================================================
   const columns = [
     {
-      key: "contractName",
-      label: "Contract Name",
+      key: "date",
+      label: "Date",
+      render: (row) => formatDate(row.date),
     },
     {
-      key: "startDate",
-      label: "Start Date",
-      render: (row) => formatDate(row.startDate),
+      key: "laborersPresent",
+      label: "Laborers Present",
     },
     {
-      key: "endDate",
-      label: "End Date",
-      render: (row) => formatDate(row.endDate),
+      key: "dayCost",
+      label: "Day Cost",
+      render: (row) => formatNumber(row.dayCost),
     },
     {
-      key: "numberOfLabors",
-      label: "Labor Qty",
-    },
-    {
-      key: "totalDays",
-      label: "Total Days",
-    },
-    {
-      key: "totalDaysWorked",
-      label: "Days Worked",
-    },
-    {
-      key: "perLaborCostPerDay",
-      label: "Amount Per Labor",
-      render: (row) => formatNumber(row.perLaborCostPerDay),
-    },
-    {
-      key: "contractAmount",
-      label: "Total Payment",
-      render: (row) => formatNumber(row.contractAmount),
-    },
-    {
-      key: "totalIncurredAmount",
-      label: "Incurred Payment",
-      render: (row) => formatNumber(row.totalIncurredAmount || 0),
-    },
-    {
-      key: "totalAmountPaid",
-      label: "Amount Paid",
-      render: (row) => formatNumber(row.totalAmountPaid || 0),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) => renderStatusBadge(row.status),
-    },
-    {
-      key: "attendance",
-      label: "Attendance",
-      align: "center",
-      render: (row) => (
-        <div className="flex justify-center">
-          <Button variant="link" asChild>
-            <Link to={`/workforce/contracts/${row._id}/attendance`}>View</Link>
-          </Button>
-        </div>
-      ),
-    },
-    {
-      key: "payment",
-      label: "Payment",
-      align: "center",
-      render: (row) => (
-        <div className="flex justify-center">
-          <Button variant="link" asChild>
-            <Link to={`/workforce/contracts/${row._id}/payments`}>View</Link>
-          </Button>
-        </div>
-      ),
+      key: "createdAt",
+      label: "Marked At",
+      render: (row) => formatDate(row.createdAt),
     },
     {
       key: "actions",
@@ -407,35 +332,21 @@ const Contracts = () => {
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
   const handleEdit = (row) => {
-    setEditingContract(row);
-    setStartDate(row.startDate ? new Date(row.startDate) : undefined);
-    setEndDate(row.endDate ? new Date(row.endDate) : undefined);
-    setEditStatus(row.status || "Active");
+    setEditingAttendance(row);
+    setAttendanceDate(row.date ? new Date(row.date) : undefined);
+    setLaborersPresent(row.laborersPresent?.toString() || "");
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingContract(row);
+    setDeletingAttendance(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingContract) {
-      deleteMutation.mutate(deletingContract._id);
+    if (deletingAttendance) {
+      deleteMutation.mutate(deletingAttendance._id);
     }
-  };
-
-  // ---------------------------------------------------------------------------
-  // Search Handlers
-  // ---------------------------------------------------------------------------
-  const handleSearchChange = (e) => {
-    setSearchValue(e.target.value);
-  };
-
-  const handleClearSearch = () => {
-    setSearchValue("");
-    setDebouncedSearch("");
-    setPage(1);
   };
 
   // ---------------------------------------------------------------------------
@@ -463,57 +374,64 @@ const Contracts = () => {
   };
 
   // ---------------------------------------------------------------------------
+  // Filter Handlers
+  // ---------------------------------------------------------------------------
+  const handleApplyFilters = () => {
+    setFilterStartDate(tempFilterStartDate);
+    setFilterEndDate(tempFilterEndDate);
+    setFilterPopoverOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    setTempFilterStartDate("");
+    setTempFilterEndDate("");
+    setFilterStartDate("");
+    setFilterEndDate("");
+    setFilterPopoverOpen(false);
+  };
+
+  // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateContract = (e) => {
+  const handleCreateAttendance = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
     const payload = {
-      contractName: formData.get("contract-name"),
-      numberOfLabors: Number(formData.get("number-of-labors")),
-      contractAmount: Number(formData.get("contract-amount")),
-      startDate: startDate,
-      endDate: endDate,
+      contractId: contractId,
+      date: attendanceDate,
+      laborersPresent: Number(formData.get("laborers-present")),
     };
-
-    // Add status only when editing
-    if (editingContract) {
-      payload.status = editStatus;
-    }
 
     // Validate
     const newErrors = {};
 
-    if (!payload.contractName?.trim()) {
-      newErrors.contractName = "Contract name is required";
+    if (!attendanceDate) {
+      newErrors.date = "Date is required";
     }
 
-    if (isNaN(payload.numberOfLabors) || payload.numberOfLabors <= 0) {
-      newErrors.numberOfLabors =
-        "Number of labors is required and must be greater than 0";
-    } else if (!Number.isInteger(payload.numberOfLabors)) {
-      newErrors.numberOfLabors = "Number of labors must be a positive integer";
+    if (isNaN(payload.laborersPresent)) {
+      newErrors.laborersPresent = "Number of laborers present is required";
+    } else if (payload.laborersPresent < 0) {
+      newErrors.laborersPresent = "Number of laborers cannot be negative";
+    } else if (!Number.isInteger(payload.laborersPresent)) {
+      newErrors.laborersPresent =
+        "Number of laborers must be a non-negative integer";
     }
 
-    if (isNaN(payload.contractAmount) || payload.contractAmount <= 0) {
-      newErrors.contractAmount =
-        "Contract amount is required and must be greater than 0";
-    } else if (!Number.isInteger(payload.contractAmount)) {
-      newErrors.contractAmount = "Contract amount must be a positive integer";
-    }
+    // Validate date is within contract range
+    if (attendanceDate && contract) {
+      const selectedDate = new Date(attendanceDate);
+      const contractStart = new Date(contract.startDate);
+      const contractEnd = new Date(contract.endDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      contractStart.setHours(0, 0, 0, 0);
+      contractEnd.setHours(0, 0, 0, 0);
 
-    if (!startDate) {
-      newErrors.startDate = "Start date is required";
-    }
-
-    if (!endDate) {
-      newErrors.endDate = "End date is required";
-    }
-
-    if (startDate && endDate && endDate <= startDate) {
-      newErrors.endDate = "End date must be after start date";
+      if (selectedDate < contractStart || selectedDate > contractEnd) {
+        newErrors.date = `Date must be between ${formatDate(contract.startDate)} and ${formatDate(contract.endDate)}`;
+      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -521,18 +439,18 @@ const Contracts = () => {
       return;
     }
 
-    if (editingContract) {
-      // Update existing contract
+    if (editingAttendance) {
+      // Update existing attendance
       updateMutation.mutate(
-        { id: editingContract._id, payload },
+        { id: editingAttendance._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
           },
-        },
+        }
       );
     } else {
-      // Create new contract
+      // Create new attendance
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -545,10 +463,36 @@ const Contracts = () => {
   // RENDER
   // ===========================================================================
 
+  if (isLoadingContract) {
+    return (
+      <div className={styles.container}>
+        <div className="flex items-center justify-center h-64">
+          <Spinner />
+          <span className="ml-2">Loading contract data...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Contracts Management</h1>
+        <div>
+          <h1 className={styles.title}>Contract Attendance</h1>
+          {contract && (
+            <div className="flex gap-2 mt-2">
+              <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
+                {contract.contractName}
+              </Badge>
+              <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
+                {formatDate(contract.startDate)} - {formatDate(contract.endDate)}
+              </Badge>
+              <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
+                {contract.numberOfLabors} Laborers
+              </Badge>
+            </div>
+          )}
+        </div>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -556,10 +500,9 @@ const Contracts = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingContract(null);
-                setStartDate(undefined);
-                setEndDate(undefined);
-                setEditStatus("");
+                setEditingAttendance(null);
+                setAttendanceDate(undefined);
+                setLaborersPresent("");
               }, 200);
             }
           }}
@@ -567,21 +510,21 @@ const Contracts = () => {
           <DialogTrigger asChild>
             <Button variant="green" className="cursor-pointer">
               <PlusIcon size={16} />
-              Create Contract
+              Add Attendance
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingContract ? "Edit Contract" : "Create Contract"}
+                {editingAttendance ? "Edit Attendance" : "Add Attendance"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingContract
-                  ? "Edit the contract information below"
-                  : "Create a new contract by entering the required information"}
+                {editingAttendance
+                  ? "Edit the attendance record"
+                  : "Add a new attendance record"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateContract}>
+            <form onSubmit={handleCreateAttendance}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
@@ -589,155 +532,69 @@ const Contracts = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="contract-name" className="text-[#344054]">
-                    Contract Name
-                  </Label>
-                  <Input
-                    id="contract-name"
-                    name="contract-name"
-                    placeholder="Enter contract name"
-                    defaultValue={editingContract?.contractName || ""}
-                  />
-                  {errors.contractName && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.contractName}
-                    </p>
+                  <Label className="text-[#344054]">Date</Label>
+                  <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="justify-start font-normal"
+                      >
+                        <CalendarIcon />
+                        {attendanceDate ? (
+                          format(attendanceDate, "PPP")
+                        ) : (
+                          <span>Select date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={attendanceDate}
+                        defaultMonth={attendanceDate}
+                        captionLayout="dropdown"
+                        fromDate={contract ? new Date(contract.startDate) : undefined}
+                        toDate={contract ? new Date(contract.endDate) : undefined}
+                        onSelect={(date) => {
+                          setAttendanceDate(date);
+                          setDatePickerOpen(false);
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.date && (
+                    <p className="text-sm text-red-500 mt-1">{errors.date}</p>
                   )}
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="number-of-labors" className="text-[#344054]">
-                    Number of Labors
+                  <Label htmlFor="laborers-present" className="text-[#344054]">
+                    Laborers Present
                   </Label>
                   <Input
-                    id="number-of-labors"
-                    name="number-of-labors"
-                    type="number"
-                    min="1"
-                    placeholder="Enter number of labors"
-                    defaultValue={editingContract?.numberOfLabors || ""}
-                  />
-                  {errors.numberOfLabors && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.numberOfLabors}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid gap-3">
-                  <Label htmlFor="contract-amount" className="text-[#344054]">
-                    Contract Amount
-                  </Label>
-                  <Input
-                    id="contract-amount"
-                    name="contract-amount"
+                    id="laborers-present"
+                    name="laborers-present"
                     type="number"
                     min="0"
-                    step="1"
-                    placeholder="Enter contract amount"
-                    defaultValue={editingContract?.contractAmount || ""}
+                    placeholder="Enter number of laborers present"
+                    value={laborersPresent}
+                    onChange={(e) => setLaborersPresent(e.target.value)}
                   />
-                  {errors.contractAmount && (
+                  {errors.laborersPresent && (
                     <p className="text-sm text-red-500 mt-1">
-                      {errors.contractAmount}
+                      {errors.laborersPresent}
                     </p>
                   )}
                 </div>
 
-                <div className="grid gap-3">
-                  <Label className="text-[#344054]">Start Date</Label>
-                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="justify-start font-normal"
-                      >
-                        <CalendarIcon />
-                        {startDate ? (
-                          format(startDate, "PPP")
-                        ) : (
-                          <span>Select start date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto overflow-hidden p-0"
-                      align="start"
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={startDate}
-                        defaultMonth={startDate}
-                        captionLayout="dropdown"
-                        onSelect={(date) => {
-                          setStartDate(date);
-                          setStartDateOpen(false);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {errors.startDate && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.startDate}
+                {attendanceDate && contract && laborersPresent && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-800">
+                      <span className="font-semibold">Estimated Day Cost:</span>{" "}
+                      {formatNumber(
+                        (Number(laborersPresent) || 0) * (contract.perLaborCostPerDay || 0)
+                      )}
                     </p>
-                  )}
-                </div>
-
-                <div className="grid gap-3">
-                  <Label className="text-[#344054]">End Date</Label>
-                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="justify-start font-normal"
-                      >
-                        <CalendarIcon />
-                        {endDate ? (
-                          format(endDate, "PPP")
-                        ) : (
-                          <span>Select end date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto overflow-hidden p-0"
-                      align="start"
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={endDate}
-                        defaultMonth={endDate}
-                        captionLayout="dropdown"
-                        onSelect={(date) => {
-                          setEndDate(date);
-                          setEndDateOpen(false);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {errors.endDate && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.endDate}
-                    </p>
-                  )}
-                </div>
-
-                {/* Status - Only show when editing */}
-                {editingContract && (
-                  <div className="grid gap-3">
-                    <Label className="text-[#344054]">Status</Label>
-                    <Select value={editStatus} onValueChange={setEditStatus}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Completed">Completed</SelectItem>
-                          <SelectItem value="Suspended">Suspended</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
                   </div>
                 )}
               </div>
@@ -760,9 +617,9 @@ const Contracts = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingContract ? "Updating" : "Creating"}
+                      {editingAttendance ? "Updating" : "Creating"}
                     </>
-                  ) : editingContract ? (
+                  ) : editingAttendance ? (
                     "Update"
                   ) : (
                     "Create"
@@ -775,25 +632,6 @@ const Contracts = () => {
       </div>
 
       <div className={styles.controls}>
-        {/* Search */}
-        <InputGroup className={styles.tableSearchInput}>
-          <InputGroupInput
-            placeholder="Search Contracts..."
-            value={searchValue}
-            onChange={handleSearchChange}
-          />
-          <InputGroupAddon>
-            <SearchIcon />
-          </InputGroupAddon>
-          <InputGroupAddon
-            align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
-            onClick={handleClearSearch}
-          >
-            {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
-          </InputGroupAddon>
-        </InputGroup>
-
         {/* Page Limit */}
         <Select
           value={limit.toString()}
@@ -810,21 +648,13 @@ const Contracts = () => {
               <SelectItem value="25">25 items</SelectItem>
               <SelectItem value="50">50 items</SelectItem>
               <SelectItem value="100">100 items</SelectItem>
+              <SelectItem value="0">All items</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
 
-        {/* Status Filter */}
-        <Popover
-          open={filterPopoverOpen}
-          onOpenChange={(open) => {
-            setFilterPopoverOpen(open);
-            if (open) {
-              // Sync tempStatus with current status when opening
-              setTempStatus(status);
-            }
-          }}
-        >
+        {/* Filters */}
+        <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -838,49 +668,121 @@ const Contracts = () => {
           <PopoverContent className="w-80" align="end">
             <div className="grid gap-4">
               <div className="space-y-2">
-                <h4 className="leading-none font-medium">Status Filter</h4>
+                <h4 className="leading-none font-medium">Date Filters</h4>
                 <p className="text-muted-foreground text-sm">
-                  Filter contracts by status.
+                  Filter attendance by date range.
                 </p>
               </div>
               <div className="grid gap-2">
-                <Label>Status</Label>
-                <Select
-                  value={tempStatus || "all"}
-                  onValueChange={(val) => setTempStatus(val === "all" ? "" : val)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                      <SelectItem value="Suspended">Suspended</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                {/* Start Date */}
+                <div className="grid gap-2">
+                  <Label>Start Date</Label>
+                  <Popover
+                    open={filterStartDateOpen}
+                    onOpenChange={setFilterStartDateOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="justify-start font-normal"
+                      >
+                        <CalendarIcon />
+                        {tempFilterStartDate ? (
+                          format(new Date(tempFilterStartDate), "PPP")
+                        ) : (
+                          <span>Select start date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto overflow-hidden p-0"
+                      align="start"
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={
+                          tempFilterStartDate
+                            ? new Date(tempFilterStartDate + "T00:00:00")
+                            : undefined
+                        }
+                        captionLayout="dropdown"
+                        onSelect={(date) => {
+                          if (date) {
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, "0");
+                            const day = String(date.getDate()).padStart(2, "0");
+                            setTempFilterStartDate(`${year}-${month}-${day}`);
+                          } else {
+                            setTempFilterStartDate("");
+                          }
+                          setFilterStartDateOpen(false);
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* End Date */}
+                <div className="grid gap-2">
+                  <Label>End Date</Label>
+                  <Popover
+                    open={filterEndDateOpen}
+                    onOpenChange={setFilterEndDateOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="justify-start font-normal"
+                      >
+                        <CalendarIcon />
+                        {tempFilterEndDate ? (
+                          format(new Date(tempFilterEndDate), "PPP")
+                        ) : (
+                          <span>Select end date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto overflow-hidden p-0"
+                      align="start"
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={
+                          tempFilterEndDate
+                            ? new Date(tempFilterEndDate + "T00:00:00")
+                            : undefined
+                        }
+                        captionLayout="dropdown"
+                        onSelect={(date) => {
+                          if (date) {
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, "0");
+                            const day = String(date.getDate()).padStart(2, "0");
+                            setTempFilterEndDate(`${year}-${month}-${day}`);
+                          } else {
+                            setTempFilterEndDate("");
+                          }
+                          setFilterEndDateOpen(false);
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
+
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   className="flex-1 cursor-pointer"
-                  onClick={() => {
-                    setTempStatus("");
-                    setStatus("");
-                    setFilterPopoverOpen(false);
-                  }}
+                  onClick={handleClearFilters}
                 >
                   Clear
                 </Button>
                 <Button
                   variant="green"
                   className="flex-1 cursor-pointer"
-                  onClick={() => {
-                    setStatus(tempStatus);
-                    setFilterPopoverOpen(false);
-                  }}
+                  onClick={handleApplyFilters}
                 >
                   Apply
                 </Button>
@@ -892,12 +794,12 @@ const Contracts = () => {
 
       <DataTable
         columns={columns}
-        data={data?.contracts || []}
+        data={data?.attendances || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         isLoading={isLoading}
         isError={isError}
-        loadingText="Loading contracts..."
+        loadingText="Loading attendance records..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -935,7 +837,7 @@ const Contracts = () => {
                   >
                     1
                   </PaginationLink>
-                </PaginationItem>,
+                </PaginationItem>
               );
 
               // Show ellipsis if needed
@@ -943,7 +845,7 @@ const Contracts = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
                     <PaginationEllipsis />
-                  </PaginationItem>,
+                  </PaginationItem>
                 );
               }
 
@@ -965,7 +867,7 @@ const Contracts = () => {
                     >
                       {i}
                     </PaginationLink>
-                  </PaginationItem>,
+                  </PaginationItem>
                 );
               }
 
@@ -974,7 +876,7 @@ const Contracts = () => {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
                     <PaginationEllipsis />
-                  </PaginationItem>,
+                  </PaginationItem>
                 );
               }
 
@@ -992,7 +894,7 @@ const Contracts = () => {
                     >
                       {totalPages}
                     </PaginationLink>
-                  </PaginationItem>,
+                  </PaginationItem>
                 );
               }
 
@@ -1022,7 +924,7 @@ const Contracts = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingContract(null);
+              setDeletingAttendance(null);
             }, 200);
           }
         }}
@@ -1030,12 +932,13 @@ const Contracts = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Contract
+              Delete Attendance
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the contract{" "}
+              Are you sure you want to delete the attendance record for{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingContract?.contractName}"
+                {deletingAttendance?.date &&
+                  formatDate(deletingAttendance.date)}
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>
@@ -1068,4 +971,4 @@ const Contracts = () => {
   );
 };
 
-export default Contracts;
+export default ContractAttendance;
