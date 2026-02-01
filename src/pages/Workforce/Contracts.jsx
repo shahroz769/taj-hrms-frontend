@@ -206,6 +206,8 @@ const Contracts = () => {
     queryKey: ["contracts", { limit, page, search: debouncedSearch, status }],
     queryFn: () =>
       fetchContracts({ limit, page, search: debouncedSearch, status }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // ---------------------------------------------------------------------------

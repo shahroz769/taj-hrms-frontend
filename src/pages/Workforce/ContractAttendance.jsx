@@ -98,7 +98,7 @@ const ContractAttendance = () => {
   // ---------------------------------------------------------------------------
   const getInitialLimit = () => {
     const urlLimit = searchParams.get("limit");
-    return urlLimit ? Number(urlLimit) : 50;
+    return urlLimit ? Number(urlLimit) : 10;
   };
 
   const getInitialPage = () => {
@@ -158,7 +158,7 @@ const ContractAttendance = () => {
   useEffect(() => {
     const params = {};
 
-    if (limit !== 50) {
+    if (limit !== 10) {
       params.limit = limit.toString();
     }
 
