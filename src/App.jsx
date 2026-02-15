@@ -23,14 +23,15 @@ import LeavesTypes from "./pages/Leaves/LeavesTypes";
 import LeavesPolicies from "./pages/Leaves/LeavesPolicies";
 import WorkProgressReports from "./pages/Compliance/WorkProgressReports";
 import DisciplinaryActions from "./pages/Compliance/DisciplinaryActions";
+import WarningTypes from "./pages/Compliance/WarningTypes";
 import EmployeeProgressReports from "./pages/Compliance/EmployeeProgressReports";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { ROLES } from "./utils/roles";
 import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { Toaster } from "@/components/ui/sonner";
-import SalaryComponents from "./pages/Salary/SalaryComponents";
-import SalaryPolicies from "./pages/Salary/SalaryPolicies";
+import AllowanceComponents from "./pages/Allowances/AllowanceComponents";
+import AllowancePolicies from "./pages/Allowances/AllowancePolicies";
 
 function App() {
   const dispatch = useDispatch();
@@ -137,14 +138,18 @@ function App() {
                   element={<LeavesApplications />}
                 />
 
-                {/* Salary */}
+                {/* Allowances */}
                 <Route
-                  path="/salary/components"
-                  element={<SalaryComponents />}
+                  path="/allowances/components"
+                  element={<AllowanceComponents />}
                 />
-                <Route path="/salary/policies" element={<SalaryPolicies />} />
+                <Route path="/allowances/policies" element={<AllowancePolicies />} />
 
                 {/* Compliance */}
+                <Route
+                  path="/compliance/warning-types"
+                  element={<WarningTypes />}
+                />
                 <Route
                   path="/compliance/work-progress-reports"
                   element={<WorkProgressReports />}

@@ -84,7 +84,10 @@ export const employeeSchema = z.object({
     required_error: "Employment type is required",
     invalid_type_error: "Employment type is required"
   }),
-  salaryPolicy: z.string().min(1, "Salary policy is required"),
+  basicSalary: z.union([z.string(), z.number()]).refine(
+    (val) => !isNaN(Number(val)) && Number(val) >= 0,
+    { message: "Basic salary must be a non-negative number" }
+  ),
   joiningDate: z.union([z.string(), z.date()], {
     required_error: "Joining date is required",
   }),

@@ -32,3 +32,11 @@
   max-width: 180px;
   width: 100%;
 }
+
+.descriptionCell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}

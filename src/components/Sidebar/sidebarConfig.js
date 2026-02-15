@@ -62,14 +62,14 @@ export const sidebarItems = [
     ],
   },
   {
-    label: "Salary",
+    label: "Allowances",
     icon: CircleDollarSignIcon,
     roles: [ROLES.admin, ROLES.supervisor],
     collapsible: true,
     collapseIcon: ChevronDownIcon,
     children: [
-      { label: "Salary Components", path: "/salary/components" },
-      { label: "Salary Policies", path: "/salary/policies" },
+      { label: "Allowance Components", path: "/allowances/components" },
+      { label: "Allowance Policies", path: "/allowances/policies" },
     ],
   },
   {
@@ -80,12 +80,16 @@ export const sidebarItems = [
     collapseIcon: ChevronDownIcon,
     children: [
       {
-        label: "Work Progress Reports",
-        path: "/compliance/work-progress-reports",
+        label: "Warning Types",
+        path: "/compliance/warning-types",
       },
       {
         label: "Disciplinary Actions",
         path: "/compliance/disciplinary-actions",
+      },
+      {
+        label: "Work Progress Reports",
+        path: "/compliance/work-progress-reports",
       },
       {
         label: "Employee Progress Reports",

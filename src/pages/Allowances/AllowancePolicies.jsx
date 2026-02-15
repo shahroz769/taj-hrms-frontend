@@ -11,7 +11,6 @@ import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import PencilIcon from "lucide-react/dist/esm/icons/pencil";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
-import SlidersHorizontalIcon from "lucide-react/dist/esm/icons/sliders-horizontal";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import XCircle from "lucide-react/dist/esm/icons/x-circle";
 import { toast } from "sonner";
@@ -28,14 +27,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -44,7 +38,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
@@ -69,37 +62,31 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectLabel,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
 // Services
 import {
-  createSalaryComponent,
-  deleteSalaryComponent,
-  fetchSalaryComponents,
-  updateSalaryComponent,
-  updateSalaryComponentStatus,
-} from "@/services/salaryComponentsApi";
+  createAllowancePolicy,
+  deleteAllowancePolicy,
+  fetchAllowancePolicies,
+  updateAllowancePolicy,
+  updateAllowancePolicyStatus,
+} from "@/services/allowancePoliciesApi";
+
+import { fetchAllowanceComponentsList } from "@/services/allowanceComponentsApi";
 
 // Utils
-import {
-  formatDate,
-  formatTimeToAMPM,
-  calculateShiftHours,
-  formatWorkingDaysInitials,
-} from "@/utils/dateUtils";
+import { formatDate } from "@/utils/dateUtils";
 
 // Styles
-import styles from "./SalaryComponents.module.css";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Textarea } from "@/components/ui/textarea";
+import styles from "./AllowancePolicies.module.css";
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const SalaryComponents = () => {
+const AllowancePolicies = () => {
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -127,17 +114,15 @@ const SalaryComponents = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingSalaryComponent, setEditingSalaryComponent] = useState(null);
+  const [editingAllowancePolicy, setEditingAllowancePolicy] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingSalaryComponent, setDeletingSalaryComponent] = useState(null);
+  const [deletingAllowancePolicy, setDeletingAllowancePolicy] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [approvingSalaryComponentId, setApprovingSalaryComponentId] =
-    useState(null);
-  const [rejectingSalaryComponentId, setRejectingSalaryComponentId] =
-    useState(null);
+  const [approvingPolicyId, setApprovingPolicyId] = useState(null);
+  const [rejectingPolicyId, setRejectingPolicyId] = useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -190,109 +175,122 @@ const SalaryComponents = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Shifts Query
+  // Fetch Allowance Policies Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["salary-components", { limit, page, search: debouncedSearch }],
+    queryKey: ["allowancePolicies", { limit, page, search: debouncedSearch }],
     queryFn: () =>
-      fetchSalaryComponents({ limit, page, search: debouncedSearch }),
+      fetchAllowancePolicies({ limit, page, search: debouncedSearch }),
   });
 
   // ---------------------------------------------------------------------------
-  // Create Salary Component Mutation
+  // Fetch Allowance Components List Query (lazy loading)
+  // ---------------------------------------------------------------------------
+  const {
+    data: allowanceComponentsList,
+    isLoading: isCheckingAllowanceComponents,
+    refetch: fetchAllowanceComponents,
+  } = useQuery({
+    queryKey: ["allowanceComponentsList"],
+    queryFn: fetchAllowanceComponentsList,
+    enabled: false,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Create Allowance Policy Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createSalaryComponent,
+    mutationFn: createAllowancePolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
+      queryClient.invalidateQueries({ queryKey: ["allowancePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingSalaryComponent(null);
-      toast.success("Salary component created successfully");
+      setEditingAllowancePolicy(null);
+      toast.success("Allowance policy created successfully");
     },
     onError: (error) => {
-      console.error("Error creating salary component:", error);
+      console.error("Error creating allowance policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create salary component";
+        error.response?.data?.message || "Failed to create allowance policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Salary Component Mutation
+  // Update Allowance Policy Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateSalaryComponent(id, payload),
+    mutationFn: ({ id, payload }) => updateAllowancePolicy(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
+      queryClient.invalidateQueries({ queryKey: ["allowancePolicies"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingSalaryComponent(null);
-      toast.success("Salary component updated successfully");
+      setEditingAllowancePolicy(null);
+      toast.success("Allowance policy updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating salary component:", error);
+      console.error("Error updating allowance policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update salary component";
+        error.response?.data?.message || "Failed to update allowance policy";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Salary Component Mutation
+  // Delete Allowance Policy Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteSalaryComponent,
+    mutationFn: deleteAllowancePolicy,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
+      queryClient.invalidateQueries({ queryKey: ["allowancePolicies"] });
       setDeleteDialogOpen(false);
-      setDeletingSalaryComponent(null);
-      toast.success("Salary component deleted successfully");
+      setDeletingAllowancePolicy(null);
+      toast.success("Allowance policy deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting salary component:", error);
+      console.error("Error deleting allowance policy:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete salary component";
+        error.response?.data?.message || "Failed to delete allowance policy";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Approve Salary Component Mutation
+  // Approve Policy Mutation
   // ---------------------------------------------------------------------------
   const approveMutation = useMutation({
-    mutationFn: ({ id }) => updateSalaryComponentStatus(id, "Approved"),
+    mutationFn: ({ id }) => updateAllowancePolicyStatus(id, "Approved"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
-      setApprovingSalaryComponentId(null);
-      toast.success("Salary component approved successfully");
+      queryClient.invalidateQueries({ queryKey: ["allowancePolicies"] });
+      setApprovingPolicyId(null);
+      toast.success("Allowance policy approved successfully");
     },
     onError: (error) => {
-      console.error("Error approving salary component:", error);
-      setApprovingSalaryComponentId(null);
+      console.error("Error approving allowance policy:", error);
+      setApprovingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve salary component";
+        error.response?.data?.message || "Failed to approve allowance policy";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Reject Salary Component Mutation
+  // Reject Policy Mutation
   // ---------------------------------------------------------------------------
   const rejectMutation = useMutation({
-    mutationFn: ({ id }) => updateSalaryComponentStatus(id, "Rejected"),
+    mutationFn: ({ id }) => updateAllowancePolicyStatus(id, "Rejected"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salary-components"] });
-      setRejectingSalaryComponentId(null);
-      toast.success("Salary component rejected successfully");
+      queryClient.invalidateQueries({ queryKey: ["allowancePolicies"] });
+      setRejectingPolicyId(null);
+      toast.success("Allowance policy rejected successfully");
     },
     onError: (error) => {
-      console.error("Error rejecting salary component:", error);
-      setRejectingSalaryComponentId(null);
+      console.error("Error rejecting allowance policy:", error);
+      setRejectingPolicyId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to reject salary component";
+        error.response?.data?.message || "Failed to reject allowance policy";
       toast.error(errorMessage);
     },
   });
@@ -303,7 +301,7 @@ const SalaryComponents = () => {
   const columns = [
     {
       key: "name",
-      label: "Component Name",
+      label: "Policy Name",
     },
     {
       key: "createdBy",
@@ -313,7 +311,18 @@ const SalaryComponents = () => {
     {
       key: "createdAt",
       label: "Creation Date",
-      render: (row) => (row.createdAt ? formatDate(row.createdAt) : "-"),
+      render: (row) => formatDate(row.createdAt),
+    },
+    {
+      key: "totalAmount",
+      label: "Gross Pay",
+      render: (row) => {
+        const totalAmount = row.components?.reduce(
+          (sum, component) => sum + (component.amount || 0),
+          0,
+        );
+        return totalAmount ? `Rs. ${totalAmount.toLocaleString()}` : "Rs. 0";
+      },
     },
     {
       key: "status",
@@ -350,14 +359,14 @@ const SalaryComponents = () => {
       renderDelete: () => <TrashIcon size={18} />,
       renderApprove: (row) => {
         if (row.status !== "Pending" && row.status !== "Rejected") return null;
-        if (approvingSalaryComponentId === row._id) {
+        if (approvingPolicyId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <CheckCircle2 size={18} />;
       },
       renderReject: (row) => {
         if (row.status !== "Pending") return null;
-        if (rejectingSalaryComponentId === row._id) {
+        if (rejectingPolicyId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <XCircle size={18} />;
@@ -372,20 +381,36 @@ const SalaryComponents = () => {
   // ---------------------------------------------------------------------------
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
-  const handleEdit = (row) => {
-    // Set all the editing states
-    setEditingSalaryComponent(row);
+  const handleEdit = async (row) => {
+    // Fetch allowance components first
+    const result = await fetchAllowanceComponents();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message ||
+        "Failed to fetch allowance components";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add allowance component first");
+      return;
+    }
+
+    // Set editing state
+    setEditingAllowancePolicy(row);
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingSalaryComponent(row);
+    setDeletingAllowancePolicy(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingSalaryComponent) {
-      deleteMutation.mutate(deletingSalaryComponent._id);
+    if (deletingAllowancePolicy) {
+      deleteMutation.mutate(deletingAllowancePolicy._id);
     }
   };
 
@@ -394,24 +419,40 @@ const SalaryComponents = () => {
   // ---------------------------------------------------------------------------
   const handleApprove = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingSalaryComponentId || rejectingSalaryComponentId) return;
+    if (approvingPolicyId || rejectingPolicyId) return;
 
-    setApprovingSalaryComponentId(row._id);
+    setApprovingPolicyId(row._id);
     approveMutation.mutate({ id: row._id });
   };
 
   const handleReject = (row) => {
     // Prevent multiple clicks while pending
-    if (approvingSalaryComponentId || rejectingSalaryComponentId) return;
+    if (approvingPolicyId || rejectingPolicyId) return;
 
-    setRejectingSalaryComponentId(row._id);
+    setRejectingPolicyId(row._id);
     rejectMutation.mutate({ id: row._id });
   };
 
   // ---------------------------------------------------------------------------
-  // Add Salary Component Handler
+  // Add Allowance Policy Handler
   // ---------------------------------------------------------------------------
-  const handleAddSalaryComponentClick = () => {
+  const handleAddAllowancePolicyClick = async () => {
+    const result = await fetchAllowanceComponents();
+
+    if (result.isError) {
+      const errorMessage =
+        result.error?.response?.data?.message ||
+        "Failed to fetch allowance components";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!result.data || result.data.length === 0) {
+      toast.error("Add allowance component first");
+      return;
+    }
+
+    // If allowance components exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -455,34 +496,76 @@ const SalaryComponents = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateSalaryComponent = (e) => {
+  const handleCreateAllowancePolicy = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
-    const salaryComponentName = formData.get("salary-component-name");
 
-    // Validate
+    // Collect allowance policy name
+    const policyName = formData.get("allowance-policy-name");
+
+    // Collect allowance component amounts dynamically
+    const components = [];
     const newErrors = {};
 
-    // Validate salary component name
-    if (!salaryComponentName?.trim()) {
-      newErrors.name = "Salary component name is required";
+    // Validate policy name
+    if (!policyName?.trim()) {
+      newErrors.name = "Allowance policy name is required";
     }
 
+    // Process each allowance component
+    if (allowanceComponentsList && allowanceComponentsList.length > 0) {
+      allowanceComponentsList.forEach((component) => {
+        const amountValue = formData.get(`component-amount-${component._id}`);
+
+        // Skip empty values - they are allowed
+        if (
+          amountValue === null ||
+          amountValue === "" ||
+          amountValue === undefined
+        ) {
+          // Empty values are allowed, just skip this component
+          return;
+        }
+
+        const amount = Number(amountValue);
+
+        // Check if it's a valid number
+        if (isNaN(amount)) {
+          newErrors[`component-${component._id}`] =
+            `Amount must be a valid number`;
+        }
+        // Check if it's negative
+        else if (amount < 0) {
+          newErrors[`component-${component._id}`] = `Amount cannot be negative`;
+        }
+        // Valid: add to components (0 is allowed)
+        else {
+          components.push({
+            allowanceComponent: component._id,
+            amount: amount,
+          });
+        }
+      });
+    }
+
+    // If there are validation errors, show them and stop
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    // Build the payload
     const payload = {
-      name: salaryComponentName,
+      name: policyName,
+      components: components,
     };
 
-    if (editingSalaryComponent) {
-      // Update existing salary component
+    if (editingAllowancePolicy) {
+      // Update existing allowance policy
       updateMutation.mutate(
-        { id: editingSalaryComponent._id, payload },
+        { id: editingAllowancePolicy._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -490,7 +573,7 @@ const SalaryComponents = () => {
         },
       );
     } else {
-      // Create new salary component
+      // Create new allowance policy
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -507,7 +590,7 @@ const SalaryComponents = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Salary Components</h1>
+        <h1 className={styles.title}>Allowance Policies Setup</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -515,7 +598,7 @@ const SalaryComponents = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingSalaryComponent(null);
+                setEditingAllowancePolicy(null);
               }, 200);
             }
           }}
@@ -523,49 +606,88 @@ const SalaryComponents = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddSalaryComponentClick}
+            onClick={handleAddAllowancePolicyClick}
+            disabled={isCheckingAllowanceComponents}
           >
-            <PlusIcon size={16} />
-            Add Salary Component
+            {isCheckingAllowanceComponents ? <Spinner /> : <PlusIcon size={16} />}
+            Add Allowance Policy
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingSalaryComponent
-                  ? "Edit Salary Component"
-                  : "Add Salary Component"}
+                {editingAllowancePolicy
+                  ? "Edit Allowance Policy"
+                  : "Add Allowance Policy"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingSalaryComponent
-                  ? "Edit the salary component information below"
-                  : "Create a new salary component by entering the name and employee limits"}
+                {editingAllowancePolicy
+                  ? "Edit the allowance policy information below"
+                  : "Create a new allowance policy by entering the name and component amounts"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateSalaryComponent}>
+            <form onSubmit={handleCreateAllowancePolicy}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
                 </div>
               )}
               <div className="grid gap-4">
-                {/* Salary Component Name */}
                 <div className="grid gap-3">
                   <Label
-                    htmlFor="salary-component-name"
+                    htmlFor="allowance-policy-name"
                     className="text-[#344054]"
                   >
-                    Salary Component Name
+                    Allowance Policy Name
                   </Label>
                   <Input
-                    id="salary-component-name"
-                    name="salary-component-name"
-                    placeholder="Enter salary component name"
-                    defaultValue={editingSalaryComponent?.name || ""}
+                    id="allowance-policy-name"
+                    name="allowance-policy-name"
+                    placeholder="Enter allowance policy name"
+                    defaultValue={editingAllowancePolicy?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
+
+                {/* Dynamic Amount Inputs for Each Allowance Component */}
+                {allowanceComponentsList && allowanceComponentsList.length > 0 && (
+                  <div className="grid gap-3">
+                    {allowanceComponentsList.map((component) => {
+                      // Find existing component amount for edit mode
+                      const existingComponent =
+                        editingAllowancePolicy?.components?.find(
+                          (comp) =>
+                            comp.allowanceComponent?._id === component._id ||
+                            comp.allowanceComponent === component._id,
+                        );
+                      const defaultAmount = existingComponent?.amount ?? "";
+
+                      return (
+                        <div key={component._id} className="grid gap-2">
+                          <Label
+                            htmlFor={`component-amount-${component._id}`}
+                            className="text-[#344054] text-sm"
+                          >
+                            {component.name}
+                          </Label>
+                          <Input
+                            id={`component-amount-${component._id}`}
+                            name={`component-amount-${component._id}`}
+                            placeholder={`Enter amount for ${component.name}`}
+                            defaultValue={defaultAmount}
+                            type="number"
+                          />
+                          {errors[`component-${component._id}`] && (
+                            <p className="text-sm text-red-500 mt-1">
+                              {errors[`component-${component._id}`]}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <DialogFooter className="mt-4">
                 <DialogClose asChild>
@@ -586,9 +708,9 @@ const SalaryComponents = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingSalaryComponent ? "Updating" : "Creating"}
+                      {editingAllowancePolicy ? "Updating" : "Creating"}
                     </>
-                  ) : editingSalaryComponent ? (
+                  ) : editingAllowancePolicy ? (
                     "Update"
                   ) : (
                     "Create"
@@ -605,7 +727,7 @@ const SalaryComponents = () => {
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search Salary Components..."
+            placeholder="Search Allowance Policies..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -640,112 +762,18 @@ const SalaryComponents = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
-
-        {/* Filters */}
-        {/* <Popover open={filterPopoverOpen} onOpenChange={setFilterPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Filters"
-              className="cursor-pointer"
-              disabled={isCheckingFilters}
-              onClick={async (e) => {
-                e.preventDefault();
-                const result = await fetchFilters();
-                if (result.data) {
-                  setFilterPopoverOpen(true);
-                }
-              }}
-            >
-              {isCheckingFilters ? <Spinner /> : <SlidersHorizontalIcon />}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <h4 className="leading-none font-medium">Filters</h4>
-                <p className="text-muted-foreground text-sm">
-                  Apply the filters for the positions.
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="reportsTo">Reports To</Label>
-                  <Select
-                    value={selectedFilterReportsTo}
-                    onValueChange={(value) => {
-                      setSelectedFilterReportsTo(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select reports to" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniqueReportsTo.map((reportsTo) => (
-                          <SelectItem key={reportsTo} value={reportsTo}>
-                            {reportsTo}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="department">Department</Label>
-                  <Select
-                    value={selectedFilterDepartment}
-                    onValueChange={(value) => {
-                      setSelectedFilterDepartment(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniqueDepartments.map((deptName) => (
-                          <SelectItem key={deptName} value={deptName}>
-                            {deptName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="green"
-                  aria-label="Submit"
-                  className="cursor-pointer flex-1"
-                >
-                  Apply
-                </Button>
-                <Button
-                  variant="outline"
-                  aria-label="Submit"
-                  className="cursor-pointer flex-1"
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover> */}
       </div>
 
       <DataTable
         columns={columns}
-        data={data?.salaryComponents || []}
+        data={data?.allowancePolicies || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleApprove}
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
-        loadingText="Loading salary components..."
+        loadingText="Loading allowance policies..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -786,7 +814,7 @@ const SalaryComponents = () => {
                 </PaginationItem>,
               );
 
-              // Show ellipsis if needed
+              // Show ellipsis if there are pages between 1 and current-1
               if (currentPage > 3) {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
@@ -795,29 +823,59 @@ const SalaryComponents = () => {
                 );
               }
 
-              // Show pages around current page
-              for (
-                let i = Math.max(2, currentPage - 1);
-                i <= Math.min(totalPages - 1, currentPage + 1);
-                i++
-              ) {
+              // Show page before current (if not already shown)
+              if (currentPage > 2) {
                 pages.push(
-                  <PaginationItem key={i}>
+                  <PaginationItem key={currentPage - 1}>
                     <PaginationLink
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(i);
+                        handlePageChange(currentPage - 1);
                       }}
-                      isActive={currentPage === i}
                       className="cursor-pointer"
                     >
-                      {i}
+                      {currentPage - 1}
                     </PaginationLink>
                   </PaginationItem>,
                 );
               }
 
-              // Show ellipsis if needed
+              // Show current page (if not first or last)
+              if (currentPage !== 1 && currentPage !== totalPages) {
+                pages.push(
+                  <PaginationItem key={currentPage}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage);
+                      }}
+                      isActive={true}
+                      className="cursor-pointer"
+                    >
+                      {currentPage}
+                    </PaginationLink>
+                  </PaginationItem>,
+                );
+              }
+
+              // Show page after current (if not already shown)
+              if (currentPage < totalPages - 1) {
+                pages.push(
+                  <PaginationItem key={currentPage + 1}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage + 1);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      {currentPage + 1}
+                    </PaginationLink>
+                  </PaginationItem>,
+                );
+              }
+
+              // Show ellipsis if there are pages between current+1 and last
               if (currentPage < totalPages - 2) {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
@@ -826,7 +884,7 @@ const SalaryComponents = () => {
                 );
               }
 
-              // Always show last page if there's more than one page
+              // Always show last page (if more than 1 page total)
               if (totalPages > 1) {
                 pages.push(
                   <PaginationItem key={totalPages}>
@@ -854,7 +912,7 @@ const SalaryComponents = () => {
                   handleNextPage();
                 }}
                 className={
-                  page === data.pagination.totalPages
+                  data.pagination.currentPage === data.pagination.totalPages
                     ? "pointer-events-none opacity-50"
                     : "cursor-pointer"
                 }
@@ -864,50 +922,23 @@ const SalaryComponents = () => {
         </Pagination>
       )}
 
-      <AlertDialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) {
-            setTimeout(() => {
-              setDeletingSalaryComponent(null);
-            }, 200);
-          }
-        }}
-      >
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
-              Delete Salary Component
-            </AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the salary component{" "}
-              <span className="font-semibold text-[#02542D]">
-                "{deletingSalaryComponent?.name}"
-              </span>
-              ? This action cannot be undone.
+              This will permanently delete the allowance policy "
+              {deletingAllowancePolicy?.name}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleteMutation.isPending}
-              className="cursor-pointer"
-            >
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
-              className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer"
+              className="bg-red-600 hover:bg-red-700"
             >
-              {deleteMutation.isPending ? (
-                <>
-                  <Spinner />
-                  Deleting
-                </>
-              ) : (
-                "Delete"
-              )}
+              {deleteMutation.isPending ? <Spinner /> : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -916,4 +947,4 @@ const SalaryComponents = () => {
   );
 };
 
-export default SalaryComponents;
+export default AllowancePolicies;

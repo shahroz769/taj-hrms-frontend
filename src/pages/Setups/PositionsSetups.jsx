@@ -82,6 +82,7 @@ import {
 // Services
 import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchLeavePoliciesList } from "@/services/leavePoliciesApi";
+import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -132,6 +133,7 @@ const PositionsSetups = () => {
   const [page, setPage] = useState(getInitialPage);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLeavePolicy, setSelectedLeavePolicy] = useState("");
+  const [selectedAllowancePolicy, setSelectedAllowancePolicy] = useState("");
   const [selectedFilterPosition, setSelectedFilterPosition] = useState("");
   const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
   const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
@@ -268,6 +270,19 @@ const PositionsSetups = () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Fetch Allowance Policies List Query (lazy loading)
+  // ---------------------------------------------------------------------------
+  const {
+    data: allowancePoliciesList,
+    isLoading: isCheckingAllowancePolicies,
+    refetch: fetchAllowancePoliciesListQuery,
+  } = useQuery({
+    queryKey: ["allowancePoliciesList"],
+    queryFn: fetchAllowancePoliciesList,
+    enabled: false,
+  });
+
+  // ---------------------------------------------------------------------------
   // Create Position Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
@@ -278,6 +293,7 @@ const PositionsSetups = () => {
       setNoneChecked(false);
       setSelectedDepartment("");
       setSelectedLeavePolicy("");
+      setSelectedAllowancePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -303,6 +319,7 @@ const PositionsSetups = () => {
       setNoneChecked(false);
       setSelectedDepartment("");
       setSelectedLeavePolicy("");
+      setSelectedAllowancePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -360,6 +377,11 @@ const PositionsSetups = () => {
       render: (row) => row.leavePolicy?.name || "-",
     },
     {
+      key: "allowancePolicy",
+      label: "Allowance Policy",
+      render: (row) => row.allowancePolicy?.name || "-",
+    },
+    {
       key: "employeeLimit",
       label: "Employees Limit",
     },
@@ -389,10 +411,11 @@ const PositionsSetups = () => {
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
   const handleEdit = async (row) => {
-    // Fetch departments and leave policies first
-    const [deptResult, leavePolicyResult] = await Promise.all([
+    // Fetch departments, leave policies, and allowance policies first
+    const [deptResult, leavePolicyResult, allowancePolicyResult] = await Promise.all([
       fetchDepartments(),
       fetchLeavePolicies(),
+      fetchAllowancePoliciesListQuery(),
     ]);
 
     if (deptResult.isError) {
@@ -421,10 +444,24 @@ const PositionsSetups = () => {
       return;
     }
 
+    if (allowancePolicyResult.isError) {
+      const errorMessage =
+        allowancePolicyResult.error?.response?.data?.message ||
+        "Failed to fetch allowance policies";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!allowancePolicyResult.data || allowancePolicyResult.data.length === 0) {
+      toast.error("Add allowance policy first");
+      return;
+    }
+
     // Set all the editing states
     setEditingPosition(row);
     setSelectedDepartment(row.department?._id || "");
     setSelectedLeavePolicy(row.leavePolicy?._id || "");
+    setSelectedAllowancePolicy(row.allowancePolicy?._id || "");
     setUnlimitedChecked(row.employeeLimit === "Unlimited");
     setNoneChecked(row.reportsTo === "None" || !row.reportsTo);
     setDialogOpen(true);
@@ -445,9 +482,10 @@ const PositionsSetups = () => {
   // Add Position Handler
   // ---------------------------------------------------------------------------
   const handleAddPositionClick = async () => {
-    const [deptResult, leavePolicyResult] = await Promise.all([
+    const [deptResult, leavePolicyResult, allowancePolicyResult] = await Promise.all([
       fetchDepartments(),
       fetchLeavePolicies(),
+      fetchAllowancePoliciesListQuery(),
     ]);
 
     if (deptResult.isError) {
@@ -476,7 +514,20 @@ const PositionsSetups = () => {
       return;
     }
 
-    // If departments and leave policies exist, open the dialog
+    if (allowancePolicyResult.isError) {
+      const errorMessage =
+        allowancePolicyResult.error?.response?.data?.message ||
+        "Failed to fetch allowance policies";
+      toast.error(errorMessage);
+      return;
+    }
+
+    if (!allowancePolicyResult.data || allowancePolicyResult.data.length === 0) {
+      toast.error("Add allowance policy first");
+      return;
+    }
+
+    // If departments, leave policies, and allowance policies exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -529,6 +580,7 @@ const PositionsSetups = () => {
       name: formData.get("position-name"),
       department: selectedDepartment,
       leavePolicy: selectedLeavePolicy,
+      allowancePolicy: selectedAllowancePolicy,
       reportsTo: noneChecked ? "None" : formData.get("reports-to"),
       employeeLimit: unlimitedChecked
         ? "Unlimited"
@@ -548,6 +600,10 @@ const PositionsSetups = () => {
 
     if (!payload.leavePolicy) {
       newErrors.leavePolicy = "Leave policy is required";
+    }
+
+    if (!payload.allowancePolicy) {
+      newErrors.allowancePolicy = "Allowance policy is required";
     }
 
     if (!noneChecked && !payload.reportsTo?.trim()) {
@@ -618,6 +674,7 @@ const PositionsSetups = () => {
                 setUnlimitedChecked(false);
                 setSelectedDepartment("");
                 setSelectedLeavePolicy("");
+                setSelectedAllowancePolicy("");
                 setNoneChecked(false);
               }, 200);
             }
@@ -627,9 +684,9 @@ const PositionsSetups = () => {
             variant="green"
             className="cursor-pointer"
             onClick={handleAddPositionClick}
-            disabled={isCheckingDepartments || isCheckingLeavePolicies}
+            disabled={isCheckingDepartments || isCheckingLeavePolicies || isCheckingAllowancePolicies}
           >
-            {isCheckingDepartments || isCheckingLeavePolicies ? (
+            {isCheckingDepartments || isCheckingLeavePolicies || isCheckingAllowancePolicies ? (
               <Spinner />
             ) : (
               <PlusIcon size={16} />
@@ -731,6 +788,39 @@ const PositionsSetups = () => {
                   {errors.leavePolicy && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.leavePolicy}
+                    </p>
+                  )}
+                </div>
+                {/* Select Allowance Policy */}
+                <div className="grid gap-3">
+                  <Label htmlFor="allowancePolicy" className="text-[#344054]">
+                    Allowance Policy
+                  </Label>
+                  <Select
+                    value={selectedAllowancePolicy}
+                    onValueChange={(value) => {
+                      setSelectedAllowancePolicy(value);
+                      if (errors.allowancePolicy) {
+                        setErrors({ ...errors, allowancePolicy: undefined });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select an allowance policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {allowancePoliciesList?.map((policy) => (
+                          <SelectItem key={policy._id} value={policy._id}>
+                            {policy.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {errors.allowancePolicy && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.allowancePolicy}
                     </p>
                   )}
                 </div>

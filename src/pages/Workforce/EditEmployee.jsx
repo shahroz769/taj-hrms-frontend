@@ -44,7 +44,6 @@ import {
   fetchPositionsByDepartment,
 } from "@/services/employeesApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
-import { fetchSalaryPoliciesList } from "@/services/salaryPoliciesApi";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -99,7 +98,7 @@ const EditEmployee = () => {
       gender: "",
       department: "",
       position: "",
-      salaryPolicy: "",
+      basicSalary: "",
       employmentType: "Permanent",
       fatherName: "",
       husbandName: "",
@@ -204,11 +203,6 @@ const EditEmployee = () => {
     enabled: !!selectedDepartment,
   });
 
-  const { data: salaryPoliciesData } = useQuery({
-    queryKey: ["salaryPoliciesList"],
-    queryFn: fetchSalaryPoliciesList,
-  });
-
   // ===========================================================================
   // EFFECTS
   // ===========================================================================
@@ -229,7 +223,6 @@ const EditEmployee = () => {
       employeeData?.employee &&
       !isDataLoaded &&
       departmentsData &&
-      salaryPoliciesData &&
       (!selectedDepartment || positionsData)
     ) {
       const emp = employeeData.employee;
@@ -246,7 +239,7 @@ const EditEmployee = () => {
         gender: emp.gender || "",
         department: emp.position?.department?._id || "",
         position: emp.position?._id || "",
-        salaryPolicy: emp.salaryPolicy?._id || "",
+        basicSalary: emp.basicSalary ?? "",
         employmentType: emp.employmentType || "Permanent",
         fatherName: emp.fatherName || "",
         husbandName: emp.husbandName || "",
@@ -318,7 +311,6 @@ const EditEmployee = () => {
     selectedDepartment,
     departmentsData,
     positionsData,
-    salaryPoliciesData,
   ]);
 
   // ===========================================================================
@@ -327,9 +319,11 @@ const EditEmployee = () => {
 
   const mutation = useMutation({
     mutationFn: (formData) => updateEmployee(id, formData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      queryClient.invalidateQueries({ queryKey: ["employee", id] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["employees"] }),
+        queryClient.invalidateQueries({ queryKey: ["employee", id] }),
+      ]);
       toast.success("Employee updated successfully");
       navigate("/workforce/employees");
     },
@@ -405,7 +399,6 @@ const EditEmployee = () => {
   const isLoadingData =
     isLoadingEmployee ||
     !departmentsData ||
-    !salaryPoliciesData ||
     (selectedDepartment && isLoadingPositions);
 
   if (isLoadingData) {
@@ -657,25 +650,16 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Salary Policy</Label>
-              <Select
-                value={watch("salaryPolicy")}
-                onValueChange={(value) => setValue("salaryPolicy", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select salary policy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {salaryPoliciesData?.map((policy) => (
-                    <SelectItem key={policy._id} value={policy._id}>
-                      {policy.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.salaryPolicy && (
+              <Label className={styles.label}>Basic Salary</Label>
+              <Input
+                {...register("basicSalary")}
+                type="number"
+                min="0"
+                placeholder="Enter basic salary"
+              />
+              {errors.basicSalary && (
                 <span className={styles.error}>
-                  {errors.salaryPolicy.message}
+                  {errors.basicSalary.message}
                 </span>
               )}
             </div>

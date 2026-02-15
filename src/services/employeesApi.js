@@ -48,6 +48,11 @@ export const updateEmployee = async (id, formData) => {
   return res.data;
 };
 
+export const fetchEmployeesList = async () => {
+  const res = await API.get(`/api/employees/list`);
+  return res.data;
+};
+
 export const fetchPositionsByDepartment = async (departmentId) => {
   const res = await API.get(`/api/positions/by-department/${departmentId}`);
   return res.data;

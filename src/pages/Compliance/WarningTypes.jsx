@@ -27,7 +27,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,26 +66,24 @@ import { Spinner } from "@/components/ui/spinner";
 
 // Services
 import {
-  createSalaryPolicy,
-  deleteSalaryPolicy,
-  fetchSalaryPolicies,
-  updateSalaryPolicy,
-  updateSalaryPolicyStatus,
-} from "@/services/salaryPoliciesApi";
-
-import { fetchSalaryComponentsList } from "@/services/salaryComponentsApi";
+  createWarningType,
+  deleteWarningType,
+  fetchWarningTypes,
+  updateWarningType,
+  updateWarningTypeStatus,
+} from "@/services/warningTypesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
 
 // Styles
-import styles from "./SalaryPolicies.module.css";
+import styles from "./WarningTypes.module.css";
 
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const SalaryPolicies = () => {
+const WarningTypes = () => {
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -114,15 +111,16 @@ const SalaryPolicies = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingSalaryPolicy, setEditingSalaryPolicy] = useState(null);
+  const [editingWarningType, setEditingWarningType] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingSalaryPolicy, setDeletingSalaryPolicy] = useState(null);
+  const [deletingWarningType, setDeletingWarningType] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [approvingPolicyId, setApprovingPolicyId] = useState(null);
-  const [rejectingPolicyId, setRejectingPolicyId] = useState(null);
+  const [selectedSeverity, setSelectedSeverity] = useState("");
+  const [approvingWarningTypeId, setApprovingWarningTypeId] = useState(null);
+  const [rejectingWarningTypeId, setRejectingWarningTypeId] = useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -140,7 +138,7 @@ const SalaryPolicies = () => {
   }, [searchValue]);
 
   // ---------------------------------------------------------------------------
-  // Reset to page 1 when debounced search changes (after user stops typing)
+  // Reset to page 1 when debounced search changes
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (searchValue !== "") {
@@ -175,122 +173,110 @@ const SalaryPolicies = () => {
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
-  // Fetch Salary Policies Query
+  // Fetch Warning Types Query
   // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["salaryPolicies", { limit, page, search: debouncedSearch }],
-    queryFn: () =>
-      fetchSalaryPolicies({ limit, page, search: debouncedSearch }),
+    queryKey: ["warning-types", { limit, page, search: debouncedSearch }],
+    queryFn: () => fetchWarningTypes({ limit, page, search: debouncedSearch }),
   });
 
   // ---------------------------------------------------------------------------
-  // Fetch Salary Components List Query (lazy loading)
-  // ---------------------------------------------------------------------------
-  const {
-    data: salaryComponentsList,
-    isLoading: isCheckingSalaryComponents,
-    refetch: fetchSalaryComponents,
-  } = useQuery({
-    queryKey: ["salaryComponentsList"],
-    queryFn: fetchSalaryComponentsList,
-    enabled: false,
-  });
-
-  // ---------------------------------------------------------------------------
-  // Create Salary Policy Mutation
+  // Create Warning Type Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
-    mutationFn: createSalaryPolicy,
+    mutationFn: createWarningType,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["warning-types"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingSalaryPolicy(null);
-      toast.success("Salary policy created successfully");
+      setEditingWarningType(null);
+      setSelectedSeverity("");
+      toast.success("Warning type created successfully");
     },
     onError: (error) => {
-      console.error("Error creating salary policy:", error);
+      console.error("Error creating warning type:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to create salary policy";
+        error.response?.data?.message || "Failed to create warning type";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Update Salary Policy Mutation
+  // Update Warning Type Mutation
   // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateSalaryPolicy(id, payload),
+    mutationFn: ({ id, payload }) => updateWarningType(id, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["warning-types"] });
       setDialogOpen(false);
       setErrors({});
-      setEditingSalaryPolicy(null);
-      toast.success("Salary policy updated successfully");
+      setEditingWarningType(null);
+      setSelectedSeverity("");
+      toast.success("Warning type updated successfully");
     },
     onError: (error) => {
-      console.error("Error updating salary policy:", error);
+      console.error("Error updating warning type:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to update salary policy";
+        error.response?.data?.message || "Failed to update warning type";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Delete Salary Policy Mutation
+  // Delete Warning Type Mutation
   // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteSalaryPolicy,
+    mutationFn: deleteWarningType,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
+      queryClient.invalidateQueries({ queryKey: ["warning-types"] });
       setDeleteDialogOpen(false);
-      setDeletingSalaryPolicy(null);
-      toast.success("Salary policy deleted successfully");
+      setDeletingWarningType(null);
+      toast.success("Warning type deleted successfully");
     },
     onError: (error) => {
-      console.error("Error deleting salary policy:", error);
+      console.error("Error deleting warning type:", error);
       const errorMessage =
-        error.response?.data?.message || "Failed to delete salary policy";
+        error.response?.data?.message || "Failed to delete warning type";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Approve Policy Mutation
+  // Approve Warning Type Mutation
   // ---------------------------------------------------------------------------
   const approveMutation = useMutation({
-    mutationFn: ({ id }) => updateSalaryPolicyStatus(id, "Approved"),
+    mutationFn: ({ id }) => updateWarningTypeStatus(id, "Approved"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
-      setApprovingPolicyId(null);
-      toast.success("Salary policy approved successfully");
+      queryClient.invalidateQueries({ queryKey: ["warning-types"] });
+      setApprovingWarningTypeId(null);
+      toast.success("Warning type approved successfully");
     },
     onError: (error) => {
-      console.error("Error approving salary policy:", error);
-      setApprovingPolicyId(null);
+      console.error("Error approving warning type:", error);
+      setApprovingWarningTypeId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve salary policy";
+        error.response?.data?.message || "Failed to approve warning type";
       toast.error(errorMessage);
     },
   });
 
   // ---------------------------------------------------------------------------
-  // Reject Policy Mutation
+  // Reject Warning Type Mutation
   // ---------------------------------------------------------------------------
   const rejectMutation = useMutation({
-    mutationFn: ({ id }) => updateSalaryPolicyStatus(id, "Rejected"),
+    mutationFn: ({ id }) => updateWarningTypeStatus(id, "Rejected"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaryPolicies"] });
-      setRejectingPolicyId(null);
-      toast.success("Salary policy rejected successfully");
+      queryClient.invalidateQueries({ queryKey: ["warning-types"] });
+      setRejectingWarningTypeId(null);
+      toast.success("Warning type rejected successfully");
     },
     onError: (error) => {
-      console.error("Error rejecting salary policy:", error);
-      setRejectingPolicyId(null);
+      console.error("Error rejecting warning type:", error);
+      setRejectingWarningTypeId(null);
       const errorMessage =
-        error.response?.data?.message || "Failed to reject salary policy";
+        error.response?.data?.message || "Failed to reject warning type";
       toast.error(errorMessage);
     },
   });
@@ -301,7 +287,33 @@ const SalaryPolicies = () => {
   const columns = [
     {
       key: "name",
-      label: "Policy Name",
+      label: "Warning Name",
+    },
+    {
+      key: "severity",
+      label: "Severity",
+      render: (row) => {
+        const severity = row.severity;
+        if (severity === "High") {
+          return (
+            <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+              High
+            </Badge>
+          );
+        }
+        if (severity === "Medium") {
+          return (
+            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+              Medium
+            </Badge>
+          );
+        }
+        return (
+          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+            Low
+          </Badge>
+        );
+      },
     },
     {
       key: "createdBy",
@@ -311,18 +323,7 @@ const SalaryPolicies = () => {
     {
       key: "createdAt",
       label: "Creation Date",
-      render: (row) => formatDate(row.createdAt),
-    },
-    {
-      key: "totalAmount",
-      label: "Gross Pay",
-      render: (row) => {
-        const totalAmount = row.components?.reduce(
-          (sum, component) => sum + (component.amount || 0),
-          0,
-        );
-        return totalAmount ? `Rs. ${totalAmount.toLocaleString()}` : "Rs. 0";
-      },
+      render: (row) => (row.createdAt ? formatDate(row.createdAt) : "-"),
     },
     {
       key: "status",
@@ -343,7 +344,6 @@ const SalaryPolicies = () => {
             </Badge>
           );
         }
-        // Default: Pending
         return (
           <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
             Pending
@@ -359,14 +359,14 @@ const SalaryPolicies = () => {
       renderDelete: () => <TrashIcon size={18} />,
       renderApprove: (row) => {
         if (row.status !== "Pending" && row.status !== "Rejected") return null;
-        if (approvingPolicyId === row._id) {
+        if (approvingWarningTypeId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <CheckCircle2 size={18} />;
       },
       renderReject: (row) => {
         if (row.status !== "Pending") return null;
-        if (rejectingPolicyId === row._id) {
+        if (rejectingWarningTypeId === row._id) {
           return <Spinner className="h-4 w-4" />;
         }
         return <XCircle size={18} />;
@@ -381,36 +381,20 @@ const SalaryPolicies = () => {
   // ---------------------------------------------------------------------------
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
-  const handleEdit = async (row) => {
-    // Fetch salary components first
-    const result = await fetchSalaryComponents();
-
-    if (result.isError) {
-      const errorMessage =
-        result.error?.response?.data?.message ||
-        "Failed to fetch salary components";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!result.data || result.data.length === 0) {
-      toast.error("Add salary component first");
-      return;
-    }
-
-    // Set editing state
-    setEditingSalaryPolicy(row);
+  const handleEdit = (row) => {
+    setEditingWarningType(row);
+    setSelectedSeverity(row.severity || "Low");
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingSalaryPolicy(row);
+    setDeletingWarningType(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingSalaryPolicy) {
-      deleteMutation.mutate(deletingSalaryPolicy._id);
+    if (deletingWarningType) {
+      deleteMutation.mutate(deletingWarningType._id);
     }
   };
 
@@ -418,41 +402,21 @@ const SalaryPolicies = () => {
   // Approve & Reject Handlers
   // ---------------------------------------------------------------------------
   const handleApprove = (row) => {
-    // Prevent multiple clicks while pending
-    if (approvingPolicyId || rejectingPolicyId) return;
-
-    setApprovingPolicyId(row._id);
+    if (approvingWarningTypeId || rejectingWarningTypeId) return;
+    setApprovingWarningTypeId(row._id);
     approveMutation.mutate({ id: row._id });
   };
 
   const handleReject = (row) => {
-    // Prevent multiple clicks while pending
-    if (approvingPolicyId || rejectingPolicyId) return;
-
-    setRejectingPolicyId(row._id);
+    if (approvingWarningTypeId || rejectingWarningTypeId) return;
+    setRejectingWarningTypeId(row._id);
     rejectMutation.mutate({ id: row._id });
   };
 
   // ---------------------------------------------------------------------------
-  // Add Salary Policy Handler
+  // Add Warning Type Handler
   // ---------------------------------------------------------------------------
-  const handleAddSalaryPolicyClick = async () => {
-    const result = await fetchSalaryComponents();
-
-    if (result.isError) {
-      const errorMessage =
-        result.error?.response?.data?.message ||
-        "Failed to fetch salary components";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!result.data || result.data.length === 0) {
-      toast.error("Add salary component first");
-      return;
-    }
-
-    // If salary components exist, open the dialog
+  const handleAddWarningTypeClick = () => {
     setDialogOpen(true);
   };
 
@@ -496,76 +460,37 @@ const SalaryPolicies = () => {
   // ---------------------------------------------------------------------------
   // Form Submit Handler
   // ---------------------------------------------------------------------------
-  const handleCreateSalaryPolicy = (e) => {
+  const handleCreateWarningType = (e) => {
     e.preventDefault();
     setErrors({});
 
     const formData = new FormData(e.target);
+    const warningTypeName = formData.get("warning-type-name");
 
-    // Collect salary policy name
-    const policyName = formData.get("salary-policy-name");
-
-    // Collect salary component amounts dynamically
-    const components = [];
+    // Validate
     const newErrors = {};
 
-    // Validate policy name
-    if (!policyName?.trim()) {
-      newErrors.name = "Salary policy name is required";
+    if (!warningTypeName?.trim()) {
+      newErrors.name = "Warning type name is required";
     }
 
-    // Process each salary component
-    if (salaryComponentsList && salaryComponentsList.length > 0) {
-      salaryComponentsList.forEach((component) => {
-        const amountValue = formData.get(`component-amount-${component._id}`);
-
-        // Skip empty values - they are allowed
-        if (
-          amountValue === null ||
-          amountValue === "" ||
-          amountValue === undefined
-        ) {
-          // Empty values are allowed, just skip this component
-          return;
-        }
-
-        const amount = Number(amountValue);
-
-        // Check if it's a valid number
-        if (isNaN(amount)) {
-          newErrors[`component-${component._id}`] =
-            `Amount must be a valid number`;
-        }
-        // Check if it's negative
-        else if (amount < 0) {
-          newErrors[`component-${component._id}`] = `Amount cannot be negative`;
-        }
-        // Valid: add to components (0 is allowed)
-        else {
-          components.push({
-            salaryComponent: component._id,
-            amount: amount,
-          });
-        }
-      });
+    if (!selectedSeverity) {
+      newErrors.severity = "Please select a severity level";
     }
 
-    // If there are validation errors, show them and stop
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // Build the payload
     const payload = {
-      name: policyName,
-      components: components,
+      name: warningTypeName,
+      severity: selectedSeverity,
     };
 
-    if (editingSalaryPolicy) {
-      // Update existing salary policy
+    if (editingWarningType) {
       updateMutation.mutate(
-        { id: editingSalaryPolicy._id, payload },
+        { id: editingWarningType._id, payload },
         {
           onSuccess: () => {
             e.target.reset();
@@ -573,7 +498,6 @@ const SalaryPolicies = () => {
         },
       );
     } else {
-      // Create new salary policy
       mutation.mutate(payload, {
         onSuccess: () => {
           e.target.reset();
@@ -590,7 +514,7 @@ const SalaryPolicies = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Salary Policies Setup</h1>
+        <h1 className={styles.title}>Warning Types</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -598,7 +522,8 @@ const SalaryPolicies = () => {
             if (!open) {
               setErrors({});
               setTimeout(() => {
-                setEditingSalaryPolicy(null);
+                setEditingWarningType(null);
+                setSelectedSeverity("");
               }, 200);
             }
           }}
@@ -606,88 +531,75 @@ const SalaryPolicies = () => {
           <Button
             variant="green"
             className="cursor-pointer"
-            onClick={handleAddSalaryPolicyClick}
-            disabled={isCheckingSalaryComponents}
+            onClick={handleAddWarningTypeClick}
           >
-            {isCheckingSalaryComponents ? <Spinner /> : <PlusIcon size={16} />}
-            Add Salary Policy
+            <PlusIcon size={16} />
+            Add Warning Type
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingSalaryPolicy
-                  ? "Edit Salary Policy"
-                  : "Add Salary Policy"}
+                {editingWarningType
+                  ? "Edit Warning Type"
+                  : "Add Warning Type"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingSalaryPolicy
-                  ? "Edit the salary policy information below"
-                  : "Create a new salary policy by entering the name and component amounts"}
+                {editingWarningType
+                  ? "Edit the warning type information below"
+                  : "Create a new warning type by entering the name and severity"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCreateSalaryPolicy}>
+            <form onSubmit={handleCreateWarningType}>
               {errors.server && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-sm text-red-600">{errors.server}</p>
                 </div>
               )}
               <div className="grid gap-4">
+                {/* Warning Type Name */}
                 <div className="grid gap-3">
                   <Label
-                    htmlFor="salary-policy-name"
+                    htmlFor="warning-type-name"
                     className="text-[#344054]"
                   >
-                    Salary Policy Name
+                    Warning Type Name
                   </Label>
                   <Input
-                    id="salary-policy-name"
-                    name="salary-policy-name"
-                    placeholder="Enter salary policy name"
-                    defaultValue={editingSalaryPolicy?.name || ""}
+                    id="warning-type-name"
+                    name="warning-type-name"
+                    placeholder="Enter warning type name"
+                    defaultValue={editingWarningType?.name || ""}
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
-
-                {/* Dynamic Amount Inputs for Each Salary Component */}
-                {salaryComponentsList && salaryComponentsList.length > 0 && (
-                  <div className="grid gap-3">
-                    {salaryComponentsList.map((component) => {
-                      // Find existing component amount for edit mode
-                      const existingComponent =
-                        editingSalaryPolicy?.components?.find(
-                          (comp) =>
-                            comp.salaryComponent?._id === component._id ||
-                            comp.salaryComponent === component._id,
-                        );
-                      const defaultAmount = existingComponent?.amount ?? "";
-
-                      return (
-                        <div key={component._id} className="grid gap-2">
-                          <Label
-                            htmlFor={`component-amount-${component._id}`}
-                            className="text-[#344054] text-sm"
-                          >
-                            {component.name}
-                          </Label>
-                          <Input
-                            id={`component-amount-${component._id}`}
-                            name={`component-amount-${component._id}`}
-                            placeholder={`Enter amount for ${component.name}`}
-                            defaultValue={defaultAmount}
-                            type="number"
-                          />
-                          {errors[`component-${component._id}`] && (
-                            <p className="text-sm text-red-500 mt-1">
-                              {errors[`component-${component._id}`]}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* Severity Level */}
+                <div className="grid gap-3">
+                  <Label htmlFor="severity" className="text-[#344054]">
+                    Severity Level
+                  </Label>
+                  <Select
+                    value={selectedSeverity}
+                    onValueChange={(value) => setSelectedSeverity(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select severity level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {errors.severity && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {errors.severity}
+                    </p>
+                  )}
+                </div>
               </div>
               <DialogFooter className="mt-4">
                 <DialogClose asChild>
@@ -708,9 +620,9 @@ const SalaryPolicies = () => {
                   {mutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingSalaryPolicy ? "Updating" : "Creating"}
+                      {editingWarningType ? "Updating" : "Creating"}
                     </>
-                  ) : editingSalaryPolicy ? (
+                  ) : editingWarningType ? (
                     "Update"
                   ) : (
                     "Create"
@@ -727,7 +639,7 @@ const SalaryPolicies = () => {
         {/* Search */}
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search Salary Policies..."
+            placeholder="Search Warning Types..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -766,14 +678,14 @@ const SalaryPolicies = () => {
 
       <DataTable
         columns={columns}
-        data={data?.salaryPolicies || []}
+        data={data?.warningTypes || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleApprove}
         onReject={handleReject}
         isLoading={isLoading}
         isError={isError}
-        loadingText="Loading salary policies..."
+        loadingText="Loading warning types..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -793,12 +705,10 @@ const SalaryPolicies = () => {
               />
             </PaginationItem>
 
-            {/* Render page numbers */}
             {(() => {
               const { currentPage, totalPages } = data.pagination;
               const pages = [];
 
-              // Always show first page
               pages.push(
                 <PaginationItem key={1}>
                   <PaginationLink
@@ -814,7 +724,6 @@ const SalaryPolicies = () => {
                 </PaginationItem>,
               );
 
-              // Show ellipsis if there are pages between 1 and current-1
               if (currentPage > 3) {
                 pages.push(
                   <PaginationItem key="ellipsis-start">
@@ -823,59 +732,27 @@ const SalaryPolicies = () => {
                 );
               }
 
-              // Show page before current (if not already shown)
-              if (currentPage > 2) {
+              for (
+                let i = Math.max(2, currentPage - 1);
+                i <= Math.min(totalPages - 1, currentPage + 1);
+                i++
+              ) {
                 pages.push(
-                  <PaginationItem key={currentPage - 1}>
+                  <PaginationItem key={i}>
                     <PaginationLink
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(currentPage - 1);
+                        handlePageChange(i);
                       }}
+                      isActive={currentPage === i}
                       className="cursor-pointer"
                     >
-                      {currentPage - 1}
+                      {i}
                     </PaginationLink>
                   </PaginationItem>,
                 );
               }
 
-              // Show current page (if not first or last)
-              if (currentPage !== 1 && currentPage !== totalPages) {
-                pages.push(
-                  <PaginationItem key={currentPage}>
-                    <PaginationLink
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(currentPage);
-                      }}
-                      isActive={true}
-                      className="cursor-pointer"
-                    >
-                      {currentPage}
-                    </PaginationLink>
-                  </PaginationItem>,
-                );
-              }
-
-              // Show page after current (if not already shown)
-              if (currentPage < totalPages - 1) {
-                pages.push(
-                  <PaginationItem key={currentPage + 1}>
-                    <PaginationLink
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(currentPage + 1);
-                      }}
-                      className="cursor-pointer"
-                    >
-                      {currentPage + 1}
-                    </PaginationLink>
-                  </PaginationItem>,
-                );
-              }
-
-              // Show ellipsis if there are pages between current+1 and last
               if (currentPage < totalPages - 2) {
                 pages.push(
                   <PaginationItem key="ellipsis-end">
@@ -884,7 +761,6 @@ const SalaryPolicies = () => {
                 );
               }
 
-              // Always show last page (if more than 1 page total)
               if (totalPages > 1) {
                 pages.push(
                   <PaginationItem key={totalPages}>
@@ -912,7 +788,7 @@ const SalaryPolicies = () => {
                   handleNextPage();
                 }}
                 className={
-                  data.pagination.currentPage === data.pagination.totalPages
+                  page === data.pagination.totalPages
                     ? "pointer-events-none opacity-50"
                     : "cursor-pointer"
                 }
@@ -922,23 +798,50 @@ const SalaryPolicies = () => {
         </Pagination>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setTimeout(() => {
+              setDeletingWarningType(null);
+            }, 200);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="text-[#02542D]">
+              Delete Warning Type
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the salary policy "
-              {deletingSalaryPolicy?.name}". This action cannot be undone.
+              Are you sure you want to delete the warning type{" "}
+              <span className="font-semibold text-[#02542D]">
+                "{deletingWarningType?.name}"
+              </span>
+              ? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="cursor-pointer"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-white hover:bg-destructive/70 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60 cursor-pointer"
             >
-              {deleteMutation.isPending ? <Spinner /> : "Delete"}
+              {deleteMutation.isPending ? (
+                <>
+                  <Spinner />
+                  Deleting
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -947,4 +850,4 @@ const SalaryPolicies = () => {
   );
 };
 
-export default SalaryPolicies;
+export default WarningTypes;

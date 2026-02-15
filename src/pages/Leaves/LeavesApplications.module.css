@@ -1,0 +1,109 @@
+.container {
+  background-color: #ffffff;
+  margin: 16px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.title {
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #02542d;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controls {
+  display: flex;
+  margin-top: 16px;
+  gap: 12px;
+}
+
+.tableSearchInput {
+  width: 100%;
+}
+
+.pageLimitSelect {
+  max-width: 180px;
+  width: 100%;
+}
+
+.daysCell {
+  cursor: default;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.balanceSection {
+  margin-top: 8px;
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.balanceItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.balanceItemName {
+  font-size: 13px;
+  color: #344054;
+  font-weight: 500;
+}
+
+.balanceItemDays {
+  font-size: 13px;
+  font-weight: 600;
+  color: #02542d;
+}
+
+.dateRangeRow {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.dateRangeFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: 1;
+}
+
+.liveBalance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.liveBalanceOk {
+  composes: liveBalance;
+  background-color: #ecfdf5;
+  color: #065f46;
+}
+
+.liveBalanceWarn {
+  composes: liveBalance;
+  background-color: #fef2f2;
+  color: #991b1b;
+}
