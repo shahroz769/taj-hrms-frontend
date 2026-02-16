@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import DataTable from "@/components/DataTable/data-table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   InputGroup,
@@ -409,9 +411,14 @@ const AllEmployees = () => {
     setSelectedEmployeeIds(newSelection);
   };
 
-  const handleAssignShiftClick = async () => {
-    setAssignShiftModalOpen(true);
-    await refetchShiftsList();
+  const handleAssignShiftOpenChange = async (open) => {
+    setAssignShiftModalOpen(open);
+    if (open) {
+      await refetchShiftsList();
+    } else {
+      setSelectedShiftId("");
+      setEffectiveDate(new Date());
+    }
   };
 
   const handleAssignConfirm = () => {
@@ -528,26 +535,26 @@ const AllEmployees = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>All Employees</h1>
-        {selectedEmployeeIds.length > 0 ? (
+        <div className="flex items-center gap-3">
           <Dialog
             open={assignShiftModalOpen}
-            onOpenChange={(open) => {
-              if (!open) {
-                setAssignShiftModalOpen(false);
-                setSelectedShiftId("");
-                setEffectiveDate(new Date());
-              }
-            }}
+            onOpenChange={handleAssignShiftOpenChange}
           >
-            <Button
-              variant="green"
-              className="cursor-pointer"
-              onClick={handleAssignShiftClick}
-              disabled={isLoadingShifts}
-            >
-              {isLoadingShifts ? <Spinner /> : <CalendarIcon size={16} />}
-              Assign Shift
-            </Button>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="cursor-pointer relative"
+                disabled={selectedEmployeeIds.length === 0}
+              >
+                <CalendarIcon size={16} />
+                Assign Shift
+                {selectedEmployeeIds.length > 0 && (
+                  <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
+                    {selectedEmployeeIds.length}
+                  </Badge>
+                )}
+              </Button>
+            </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Assign Shift</DialogTitle>
@@ -556,55 +563,61 @@ const AllEmployees = () => {
                   employee(s).
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex flex-col gap-4 py-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="shift">Shift</Label>
-                  <Select
-                    value={selectedShiftId}
-                    onValueChange={setSelectedShiftId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a shift" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {shiftsList?.map((shift) => (
-                          <SelectItem key={shift._id} value={shift._id}>
-                            {shift.name} ({formatTimeToAMPM(shift.startTime)} -{" "}
-                            {formatTimeToAMPM(shift.endTime)})
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+              {isLoadingShifts ? (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Label>Effective From</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={`w-full justify-start text-left font-normal ${!effectiveDate && "text-muted-foreground"}`}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {effectiveDate ? (
-                          format(effectiveDate, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={effectiveDate}
-                        onSelect={setEffectiveDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+              ) : (
+                <div className="flex flex-col gap-4 py-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="shift">Shift</Label>
+                    <Select
+                      value={selectedShiftId}
+                      onValueChange={setSelectedShiftId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a shift" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {shiftsList?.map((shift) => (
+                            <SelectItem key={shift._id} value={shift._id}>
+                              {shift.name} ({formatTimeToAMPM(shift.startTime)} -{" "}
+                              {formatTimeToAMPM(shift.endTime)})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>Effective From</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={`w-full justify-start text-left font-normal ${!effectiveDate && "text-muted-foreground"}`}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {effectiveDate ? (
+                            format(effectiveDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={effectiveDate}
+                          onSelect={setEffectiveDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
-              </div>
+              )}
               <DialogFooter>
                 <Button
                   variant="outline"
@@ -615,7 +628,7 @@ const AllEmployees = () => {
                 <Button
                   variant="green"
                   onClick={handleAssignConfirm}
-                  disabled={assignShiftMutation.isPending}
+                  disabled={assignShiftMutation.isPending || isLoadingShifts}
                 >
                   {assignShiftMutation.isPending ? (
                     <>
@@ -628,14 +641,14 @@ const AllEmployees = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        ) : (
+
           <Link to="/workforce/employees/add">
             <Button variant="green" className="cursor-pointer">
               <PlusIcon size={16} />
               Add New Employee
             </Button>
           </Link>
-        )}
+        </div>
       </div>
 
       <div className={styles.controls}>
