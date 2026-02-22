@@ -1,6 +1,7 @@
 .sidebarParent {
   background-color: #fff;
-  width: 290px;
+  width: 100%;
+  max-width: 290px;
   height: 100vh;
   display: flex;
   flex-direction: column;
