@@ -1,0 +1,27 @@
+{
+  "name": "backend-taj-hrms",
+  "version": "1.0.0",
+  "description": "Backend API for Taj HRMS Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "chalk": "^5.6.2",
+    "cloudinary": "^2.8.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "jose": "^6.1.3",
+    "mongoose": "^9.0.2",
+    "multer": "^2.0.2"
+  }
+}

@@ -18,6 +18,12 @@
   align-items: center;
 }
 
+.periodFilters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .controls {
   display: flex;
   margin-top: 16px;
@@ -31,19 +37,4 @@
 .pageLimitSelect {
   max-width: 180px;
   width: 100%;
-}
-
-.descriptionCell {
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: default;
-}
-
-.hoverTooltipCell {
-  cursor: default;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
 }

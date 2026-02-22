@@ -83,3 +83,48 @@ export const formatWorkingDaysInitials = (workingDays) => {
 
   return workingDays.map((day) => dayInitials[day] || day[0]).join(",");
 };
+
+/**
+ * Formats a UTC date to GMT+5 (Asia/Karachi) date string
+ * @param {string|Date} date - UTC date
+ * @returns {string} Formatted date in GMT+5 (e.g., "21 Feb 2026")
+ */
+export const formatDateGMT5 = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Karachi",
+  });
+};
+
+/**
+ * Formats a UTC date to GMT+5 (Asia/Karachi) date and time string
+ * @param {string|Date} date - UTC date
+ * @returns {string} Formatted date+time in GMT+5 (e.g., "21 Feb 2026 at 03:45 PM")
+ */
+export const formatDateTimeGMT5 = (date) => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+
+  const datePart = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Karachi",
+  });
+
+  const timePart = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Karachi",
+  });
+
+  return `${datePart} at ${timePart}`;
+};

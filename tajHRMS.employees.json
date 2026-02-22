@@ -1,0 +1,309 @@
+[{
+  "_id": {
+    "$oid": "6991ae8cf73b59524fc5ebf5"
+  },
+  "position": {
+    "$oid": "6991acb96f482fbc16f0f3c2"
+  },
+  "basicSalary": 38000,
+  "status": "Active",
+  "employmentType": "Permanent",
+  "fullName": "Shahroz Ahmed",
+  "employeeID": "TAJ-0001",
+  "gender": "Male",
+  "fatherName": "Rooney Mayer",
+  "husbandName": "Karina Delacruz",
+  "joiningDate": {
+    "$date": "2026-02-15T11:30:48.000Z"
+  },
+  "cnic": "Et amet in dolor pa",
+  "cnicImages": {
+    "front": "https://res.cloudinary.com/dke5jqhus/image/upload/v1771155084/taj-hrms/employees/TAJ-0001/cnic/front.jpg",
+    "back": "https://res.cloudinary.com/dke5jqhus/image/upload/v1771155086/taj-hrms/employees/TAJ-0001/cnic/back.jpg"
+  },
+  "dob": {
+    "$date": "2026-01-31T19:00:00.000Z"
+  },
+  "contactNumber": "897",
+  "province": "Laborum Quos neque",
+  "city": "Sed rerum earum aspe",
+  "maritalStatus": "Single",
+  "currentStreetAddress": "Et at ullam sit exce",
+  "permanentStreetAddress": "Et et maiores explic",
+  "emergencyContact": [
+    {
+      "name": "Hadley Riddle",
+      "number": "308",
+      "relation": "Sit libero aut dicta",
+      "_id": {
+        "$oid": "6991afb6f73b59524fc5ece0"
+      }
+    }
+  ],
+  "medical": {
+    "bloodGroup": "O+",
+    "hasHealthIssues": false,
+    "healthIssueDetails": "",
+    "disability": false,
+    "disabilityDetails": ""
+  },
+  "education": [
+    {
+      "qualification": "Ut minus odio hic se",
+      "institute": "Illo ipsam corporis ",
+      "grades": "Elit sunt dolor id",
+      "status": "Completed",
+      "_id": {
+        "$oid": "6991afb6f73b59524fc5ece1"
+      }
+    }
+  ],
+  "previousExperience": [
+    {
+      "company": "Franklin and Moss Trading",
+      "position": "Totam architecto odi",
+      "from": {
+        "$date": "2026-02-02T19:00:00.000Z"
+      },
+      "to": {
+        "$date": "2026-02-04T19:00:00.000Z"
+      },
+      "lastSalary": 100,
+      "_id": {
+        "$oid": "6991afb6f73b59524fc5ece2"
+      }
+    }
+  ],
+  "guarantor": [
+    {
+      "name": "Sophia Keller",
+      "contactNumber": "665",
+      "cnic": "Neque culpa anim of",
+      "address": "Laboriosam mollit u",
+      "_id": {
+        "$oid": "6991afb6f73b59524fc5ece3"
+      }
+    }
+  ],
+  "legal": {
+    "involvedInIllegalActivity": false,
+    "illegalActivityDetails": "",
+    "convictedBefore": false,
+    "convictedBeforeDetails": "",
+    "restrictedPlaces": false,
+    "restrictedPlacesDetails": ""
+  },
+  "createdAt": {
+    "$date": "2026-02-15T11:31:24.801Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-15T11:36:22.163Z"
+  },
+  "__v": 1
+},
+{
+  "_id": {
+    "$oid": "6991af21f73b59524fc5ec36"
+  },
+  "position": {
+    "$oid": "6991acb96f482fbc16f0f3c2"
+  },
+  "basicSalary": 31000,
+  "status": "Active",
+  "employmentType": "Permanent",
+  "fullName": "Tate Sullivan",
+  "employeeID": "TAJ-0002",
+  "gender": "Female",
+  "fatherName": "Yeo Ortiz",
+  "husbandName": "Mara Ellison",
+  "joiningDate": {
+    "$date": "2026-02-15T11:33:33.000Z"
+  },
+  "cnic": "Dolore rerum incidid",
+  "cnicImages": {
+    "front": null,
+    "back": null
+  },
+  "dob": {
+    "$date": "2026-02-01T19:00:00.000Z"
+  },
+  "contactNumber": "682",
+  "province": "Dolores qui proident",
+  "city": "Vero ea ad omnis dol",
+  "maritalStatus": "Divorced",
+  "currentStreetAddress": "Ea reprehenderit en",
+  "permanentStreetAddress": "Saepe enim molestiae",
+  "emergencyContact": [
+    {
+      "name": "Amos Watkins",
+      "number": "938",
+      "relation": "Odio sint reiciendis",
+      "_id": {
+        "$oid": "6991af21f73b59524fc5ec37"
+      }
+    }
+  ],
+  "medical": {
+    "bloodGroup": "AB+",
+    "hasHealthIssues": false,
+    "healthIssueDetails": "",
+    "disability": false,
+    "disabilityDetails": ""
+  },
+  "education": [
+    {
+      "qualification": "Porro irure exercita",
+      "institute": "Perspiciatis ut rep",
+      "grades": "Qui iure ut unde con",
+      "status": "Completed",
+      "_id": {
+        "$oid": "6991af21f73b59524fc5ec38"
+      }
+    }
+  ],
+  "previousExperience": [
+    {
+      "company": "Hopkins Floyd LLC",
+      "position": "Autem doloremque nih",
+      "from": {
+        "$date": "2026-02-02T19:00:00.000Z"
+      },
+      "to": {
+        "$date": "2026-02-02T19:00:00.000Z"
+      },
+      "lastSalary": 43,
+      "_id": {
+        "$oid": "6991af21f73b59524fc5ec39"
+      }
+    }
+  ],
+  "guarantor": [
+    {
+      "name": "Azalia Potts",
+      "contactNumber": "307",
+      "cnic": "Amet officiis aut a",
+      "address": "Et et doloremque ea ",
+      "_id": {
+        "$oid": "6991af21f73b59524fc5ec3a"
+      }
+    }
+  ],
+  "legal": {
+    "involvedInIllegalActivity": false,
+    "illegalActivityDetails": "",
+    "convictedBefore": false,
+    "convictedBeforeDetails": "",
+    "restrictedPlaces": false,
+    "restrictedPlacesDetails": ""
+  },
+  "createdAt": {
+    "$date": "2026-02-15T11:33:53.202Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-15T11:33:53.202Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6991af9ef73b59524fc5ec7f"
+  },
+  "position": {
+    "$oid": "6991acb96f482fbc16f0f3c2"
+  },
+  "basicSalary": 21000,
+  "status": "Active",
+  "employmentType": "Permanent",
+  "fullName": "Darryl Pena",
+  "employeeID": "TAJ-0003",
+  "gender": "Female",
+  "fatherName": "Thomas Rollins",
+  "husbandName": "Shoshana Hogan",
+  "joiningDate": {
+    "$date": "2026-02-15T11:35:42.000Z"
+  },
+  "cnic": "Aliquam esse archit",
+  "cnicImages": {
+    "front": null,
+    "back": null
+  },
+  "dob": {
+    "$date": "2026-02-01T19:00:00.000Z"
+  },
+  "contactNumber": "112",
+  "province": "Omnis molestiae reic",
+  "city": "Dolorum voluptatem",
+  "maritalStatus": "Married",
+  "currentStreetAddress": "Quia est eum hic nul",
+  "permanentStreetAddress": "Maiores autem dolor",
+  "emergencyContact": [
+    {
+      "name": "Cheryl Sosa",
+      "number": "903",
+      "relation": "Laboriosam ipsa ea",
+      "_id": {
+        "$oid": "6991af9ef73b59524fc5ec80"
+      }
+    }
+  ],
+  "medical": {
+    "bloodGroup": "O+",
+    "hasHealthIssues": false,
+    "healthIssueDetails": "",
+    "disability": false,
+    "disabilityDetails": ""
+  },
+  "education": [
+    {
+      "qualification": "Ullam facere dolorem",
+      "institute": "Enim et sed dolorum ",
+      "grades": "Quia nisi sunt ad q",
+      "status": "In Progress",
+      "_id": {
+        "$oid": "6991af9ef73b59524fc5ec81"
+      }
+    }
+  ],
+  "previousExperience": [
+    {
+      "company": "Horton Hogan Inc",
+      "position": "Voluptatem quos ut ",
+      "from": {
+        "$date": "2026-02-02T19:00:00.000Z"
+      },
+      "to": {
+        "$date": "2026-02-02T19:00:00.000Z"
+      },
+      "lastSalary": 16,
+      "_id": {
+        "$oid": "6991af9ef73b59524fc5ec82"
+      }
+    }
+  ],
+  "guarantor": [
+    {
+      "name": "Jonas Mccarty",
+      "contactNumber": "817",
+      "cnic": "Aspernatur non aliqu",
+      "address": "In ratione doloremqu",
+      "_id": {
+        "$oid": "6991af9ef73b59524fc5ec83"
+      }
+    }
+  ],
+  "legal": {
+    "involvedInIllegalActivity": false,
+    "illegalActivityDetails": "",
+    "convictedBefore": false,
+    "convictedBeforeDetails": "",
+    "restrictedPlaces": false,
+    "restrictedPlacesDetails": ""
+  },
+  "createdAt": {
+    "$date": "2026-02-15T11:35:58.163Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-15T11:35:58.163Z"
+  },
+  "__v": 0
+}]
