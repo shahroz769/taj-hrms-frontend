@@ -187,7 +187,14 @@ const AttendanceRecords = () => {
     if (page !== 1) params.page = page.toString();
     if (debouncedSearch) params.search = debouncedSearch;
     setSearchParams(params, { replace: true });
-  }, [selectedMonth, selectedYear, limit, page, debouncedSearch, setSearchParams]);
+  }, [
+    selectedMonth,
+    selectedYear,
+    limit,
+    page,
+    debouncedSearch,
+    setSearchParams,
+  ]);
 
   // ===========================================================================
   // EVENT HANDLERS
@@ -380,10 +387,18 @@ const AttendanceRecords = () => {
                   );
                 })}
                 {/* Summary columns */}
-                <th className={styles.summaryHeader}>P</th>
-                <th className={styles.summaryHeader}>A</th>
-                <th className={styles.summaryHeader}>L</th>
-                <th className={styles.summaryHeader}>Off</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryP}`}>
+                  P
+                </th>
+                <th className={`${styles.summaryHeader} ${styles.summaryA}`}>
+                  A
+                </th>
+                <th className={`${styles.summaryHeader} ${styles.summaryL}`}>
+                  L
+                </th>
+                <th className={`${styles.summaryHeader} ${styles.summaryOff}`}>
+                  Off
+                </th>
               </tr>
             </thead>
 

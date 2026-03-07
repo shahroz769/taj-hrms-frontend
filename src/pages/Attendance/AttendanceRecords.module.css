@@ -7,6 +7,7 @@
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
+  overflow: hidden;
 }
 
 .header {
@@ -134,14 +135,19 @@
   background-color: #f3f4f6;
 }
 
-/* Summary header */
+/* Summary header (sticky right) */
 .summaryHeader {
-  padding: 8px 10px;
+  position: sticky;
+  z-index: 10;
+  background-color: #f9fafb;
+  padding: 8px 6px;
   font-size: 11px;
   font-weight: 600;
   color: #667085;
   text-align: center;
-  min-width: 36px;
+  min-width: 50px;
+  width: 50px;
+  box-sizing: border-box;
   white-space: nowrap;
   border-left: 2px solid #e5e7eb;
 }
@@ -160,6 +166,10 @@
 }
 
 .tableBody tr:hover .attendanceCell {
+  background-color: #f9fafb;
+}
+
+.tableBody tr:hover .summaryCell {
   background-color: #f9fafb;
 }
 
@@ -201,29 +211,54 @@
   background-color: #f9fafb;
 }
 
-/* Summary cells */
+/* Summary cells (sticky right) */
 .summaryCell {
+  position: sticky;
+  z-index: 5;
+  background-color: #ffffff;
   padding: 8px 6px;
   text-align: center;
   vertical-align: middle;
   font-size: 12px;
   font-weight: 600;
+  min-width: 50px;
+  width: 50px;
+  box-sizing: border-box;
   border-left: 2px solid #e5e7eb;
+  transition: background-color 0.15s;
 }
 
+/* Right offsets for summary columns */
 .summaryP {
-  color: #059669;
+  right: 150px;
 }
 
 .summaryA {
-  color: #dc2626;
+  right: 100px;
 }
 
 .summaryL {
-  color: #d97706;
+  right: 50px;
 }
 
 .summaryOff {
+  right: 0;
+}
+
+/* Cell-specific colors (compound selectors keep header text neutral) */
+.summaryCell.summaryP {
+  color: #059669;
+}
+
+.summaryCell.summaryA {
+  color: #dc2626;
+}
+
+.summaryCell.summaryL {
+  color: #d97706;
+}
+
+.summaryCell.summaryOff {
   color: #9ca3af;
 }
 
