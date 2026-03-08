@@ -289,7 +289,7 @@ export const getEmployeesByShift = async (req, res, next) => {
 export const getShiftsList = async (req, res, next) => {
   try {
     const shifts = await Shift.find({ status: "Approved" })
-      .select("name startTime endTime")
+      .select("name startTime endTime workingDays")
       .sort({ name: 1 });
 
     res.json({ shifts });

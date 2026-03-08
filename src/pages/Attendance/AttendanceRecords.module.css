@@ -294,6 +294,17 @@
   color: #d1d5db;
 }
 
+.badgeNA {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #d1d5db;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
 /* --------------------------------------------------------------------------
    States
    -------------------------------------------------------------------------- */

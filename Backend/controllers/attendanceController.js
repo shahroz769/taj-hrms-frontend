@@ -47,12 +47,26 @@ const getDayName = (date) => {
 
 /**
  * Build a Date from a date + "HH:MM" time string (UTC).
+ * Returns null if timeStr is missing or invalid.
  */
 const buildDateTimeFromShiftTime = (date, timeStr) => {
-  const [hours, minutes] = timeStr.split(":").map(Number);
+  if (!timeStr || typeof timeStr !== "string") return null;
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return null;
+  const hours = Number(parts[0]);
+  const minutes = Number(parts[1]);
+  if (isNaN(hours) || isNaN(minutes)) return null;
   const dt = new Date(date);
+  if (isNaN(dt.getTime())) return null;
   dt.setUTCHours(hours, minutes, 0, 0);
   return dt;
+};
+
+/** Safely parse a date string; returns null if the result is Invalid Date. */
+const safeDateParse = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
 };
 
 /**
@@ -186,12 +200,22 @@ export const bulkMarkAttendance = async (req, res, next) => {
     }
 
     // --- Check all employees exist ---
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employees = await Employee.find({ _id: { $in: employeeIds } }).select("_id fullName employeeID joiningDate");
     if (employees.length !== employeeIds.length) {
       const foundIds = employees.map((e) => e._id.toString());
       const notFoundIds = employeeIds.filter((id) => !foundIds.includes(id));
       res.status(404);
       throw new Error(`Employee(s) not found: ${notFoundIds.join(", ")}`);
+    }
+
+    // Build joining date map
+    const joiningDateMap = {};
+    for (const emp of employees) {
+      if (emp.joiningDate) {
+        const jd = new Date(emp.joiningDate);
+        jd.setUTCHours(0, 0, 0, 0);
+        joiningDateMap[emp._id.toString()] = jd;
+      }
     }
 
     // --- Expand date ranges into individual dates ---
@@ -246,6 +270,18 @@ export const bulkMarkAttendance = async (req, res, next) => {
       }
 
       for (const date of allDates) {
+        // Skip dates before joining date
+        const joiningDate = joiningDateMap[employeeId];
+        if (joiningDate && date < joiningDate) {
+          const emp = employees.find((e) => e._id.toString() === employeeId);
+          const label = emp ? `${emp.fullName} (${emp.employeeID})` : employeeId;
+          errors.push({
+            employeeId,
+            date: date.toISOString().split("T")[0],
+            error: `Date is before ${label}'s joining date (${joiningDate.toISOString().split("T")[0]})`,
+          });
+          continue;
+        }
         try {
           // Determine status
           let status;
@@ -257,9 +293,9 @@ export const bulkMarkAttendance = async (req, res, next) => {
             status = isWorkingDay ? "Present" : "Off";
           }
 
-          // Build checkIn / checkOut from shift times
-          const checkIn = buildDateTimeFromShiftTime(date, shiftToUse.startTime);
-          const checkOut = buildDateTimeFromShiftTime(date, shiftToUse.endTime);
+          // Build checkIn / checkOut from shift times (null if status is Off or times are missing)
+          const checkIn = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.startTime) : null;
+          const checkOut = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.endTime) : null;
 
           // Handle overwrite logic
           if (overwrite) {
@@ -381,7 +417,7 @@ export const getMonthlyAttendance = async (req, res, next) => {
 
     // Get employees (paginated)
     let employeeQuery = Employee.find(employeeFilter)
-      .select("_id fullName employeeID")
+      .select("_id fullName employeeID joiningDate")
       .sort({ fullName: 1 });
 
     const totalItems = await Employee.countDocuments(employeeFilter);
@@ -455,10 +491,17 @@ export const getMonthlyAttendance = async (req, res, next) => {
         Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()),
       );
 
+      // Joining date normalised to UTC midnight
+      const joiningDate = emp.joiningDate
+        ? (() => { const jd = new Date(emp.joiningDate); jd.setUTCHours(0,0,0,0); return jd; })()
+        : null;
+
       const records = {};
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
-        if (empRecords[d]) {
+        if (joiningDate && dateUTC < joiningDate) {
+          records[d] = "before_joining"; // before employee joined
+        } else if (empRecords[d]) {
           records[d] = empRecords[d]; // Always show existing record, even for future dates
         } else if (dateUTC > todayUTC) {
           records[d] = null; // Future date with no record
@@ -467,7 +510,8 @@ export const getMonthlyAttendance = async (req, res, next) => {
         }
       }
 
-      // Summary counts
+      // Summary counts — iterate all non-future days so shift-based off days are counted
+      // even when no attendance record exists for that day
       const summary = {
         present: 0,
         absent: 0,
@@ -477,27 +521,30 @@ export const getMonthlyAttendance = async (req, res, next) => {
         leave: 0,
       };
 
-      for (const rec of Object.values(empRecords)) {
-        if (!rec) continue;
-        switch (rec.status) {
-          case "Present":
-            summary.present++;
-            break;
-          case "Absent":
-            summary.absent++;
-            break;
-          case "Late":
-            summary.late++;
-            break;
-          case "Half Day":
-            summary.halfDay++;
-            break;
-          case "Off":
+      const shiftWorkingDays = employeeShiftWorkingDaysMap[emp._id.toString()] || null;
+      const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateUTC = new Date(Date.UTC(y, m, d));
+        if (dateUTC > todayUTC) continue; // skip future days
+        if (joiningDate && dateUTC < joiningDate) continue; // skip before joining
+
+        const rec = empRecords[d];
+        if (rec) {
+          switch (rec.status) {
+            case "Present":   summary.present++;  break;
+            case "Absent":    summary.absent++;   break;
+            case "Late":      summary.late++;     break;
+            case "Half Day":  summary.halfDay++;  break;
+            case "Off":       summary.off++;      break;
+            case "Leave":     summary.leave++;    break;
+          }
+        } else if (shiftWorkingDays) {
+          // No record for this day — infer off day from shift
+          const dayName = DAY_NAMES[dateUTC.getUTCDay()];
+          if (!shiftWorkingDays.includes(dayName)) {
             summary.off++;
-            break;
-          case "Leave":
-            summary.leave++;
-            break;
+          }
         }
       }
 
@@ -600,12 +647,18 @@ export const updateAttendance = async (req, res, next) => {
       throw new Error("Invalid shift ID");
     }
 
+    // shiftId explicitly set to null/empty means caller tried to clear the shift — reject
+    if (shiftId !== undefined && !shiftId) {
+      res.status(400);
+      throw new Error("shiftId is required and cannot be cleared");
+    }
+
     if (status) attendance.status = status;
-    if (shiftId !== undefined) attendance.shift = shiftId || null;
+    if (shiftId) attendance.shift = shiftId;
     if (checkIn !== undefined)
-      attendance.checkIn = checkIn ? new Date(checkIn) : null;
+      attendance.checkIn = checkIn ? safeDateParse(checkIn) : null;
     if (checkOut !== undefined)
-      attendance.checkOut = checkOut ? new Date(checkOut) : null;
+      attendance.checkOut = checkOut ? safeDateParse(checkOut) : null;
     if (lateDurationMinutes !== undefined)
       attendance.lateDurationMinutes = lateDurationMinutes;
     attendance.markedBy = req.user._id;
@@ -646,6 +699,11 @@ export const markSingleAttendance = async (req, res, next) => {
     if (!employeeId || !date || !status) {
       res.status(400);
       throw new Error("employeeId, date, and status are required");
+    }
+
+    if (!shiftId) {
+      res.status(400);
+      throw new Error("shiftId is required");
     }
 
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
@@ -706,14 +764,14 @@ export const markSingleAttendance = async (req, res, next) => {
 
       // Auto-fill checkIn/checkOut from shift if not provided
       resolvedCheckIn = checkIn
-        ? new Date(checkIn)
+        ? safeDateParse(checkIn)
         : buildDateTimeFromShiftTime(parsedDate, shift.startTime);
       resolvedCheckOut = checkOut
-        ? new Date(checkOut)
+        ? safeDateParse(checkOut)
         : buildDateTimeFromShiftTime(parsedDate, shift.endTime);
     } else {
-      if (checkIn) resolvedCheckIn = new Date(checkIn);
-      if (checkOut) resolvedCheckOut = new Date(checkOut);
+      if (checkIn) resolvedCheckIn = safeDateParse(checkIn);
+      if (checkOut) resolvedCheckOut = safeDateParse(checkOut);
     }
 
     const attendance = await Attendance.create({

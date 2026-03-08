@@ -322,6 +322,9 @@ const AttendanceRecords = () => {
   // ===========================================================================
 
   const renderBadge = useCallback((record) => {
+    if (record === "before_joining") {
+      return <span className={styles.badgeNA}>NA</span>;
+    }
     if (record === null || record === undefined) {
       return <span className={styles.badgeFuture}>—</span>;
     }
@@ -555,18 +558,21 @@ const AttendanceRecords = () => {
                         ? !workingDays.includes(dayName)
                         : false;
                       const isFutureDate = record === null;
+                      const isBeforeJoining = record === "before_joining";
                       const cellKey = `${row.employee._id}-${day}`;
                       const isCellLoading = loadingCellKey === cellKey;
                       return (
                         <td
                           key={day}
                           className={
-                            isOffDay
-                              ? `${styles.attendanceCellOff}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
-                              : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                            isBeforeJoining
+                              ? styles.attendanceCell
+                              : isOffDay
+                                ? `${styles.attendanceCellOff}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                                : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
                           }
                           onClick={
-                            !isFutureDate && !isCellLoading
+                            !isFutureDate && !isBeforeJoining && !isCellLoading
                               ? () => handleCellClick(row.employee, day, record)
                               : undefined
                           }

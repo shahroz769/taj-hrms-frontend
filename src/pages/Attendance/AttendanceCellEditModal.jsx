@@ -57,6 +57,7 @@ import { formatDate, formatTimeToAMPM } from "@/utils/dateUtils";
 const toTimeStr = (date) => {
   if (!date) return "";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
   const h = d.getUTCHours().toString().padStart(2, "0");
   const m = d.getUTCMinutes().toString().padStart(2, "0");
   return `${h}:${m}`;
@@ -213,6 +214,11 @@ const AttendanceCellEditModal = ({
       return;
     }
 
+    if (!shiftId) {
+      toast.error("Please select a shift");
+      return;
+    }
+
     const checkInISO = combineDateAndTime(dateStr, checkInTime);
     const checkOutISO = combineDateAndTime(dateStr, checkOutTime);
 
@@ -251,6 +257,10 @@ const AttendanceCellEditModal = ({
 
   const selectedShiftObj = shiftsList.find((s) => s._id === shiftId);
 
+  const DAY_ABBR = { Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };
+  const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const dayName = date ? date.toLocaleString("en-GB", { weekday: "long", timeZone: "UTC" }) : "";
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -262,7 +272,7 @@ const AttendanceCellEditModal = ({
             <DialogDescription>
               <span className="font-medium text-foreground">{employeeName}</span>
               {" — "}
-              {date ? formatDate(date) : ""}
+              {date ? `${dayName}, ${formatDate(date)}` : ""}
             </DialogDescription>
           </DialogHeader>
 
@@ -307,12 +317,7 @@ const AttendanceCellEditModal = ({
             {/* Shift */}
             <div className="grid gap-2">
               <Label>
-                Shift{" "}
-                <span className="text-muted-foreground font-normal text-xs">
-                  {record?.shift && !shiftId
-                    ? "(assigned shift)"
-                    : "(optional)"}
-                </span>
+                Shift
               </Label>
               {isLoadingShifts ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -341,10 +346,16 @@ const AttendanceCellEditModal = ({
                 </Select>
               )}
               {selectedShiftObj && (
-                <p className="text-xs text-muted-foreground">
-                  Working days:{" "}
-                  {selectedShiftObj.workingDays?.join(", ") || "—"}
-                </p>
+                <div className="grid gap-0.5">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">Working:</span>{" "}
+                    {selectedShiftObj.workingDays?.map((d) => DAY_ABBR[d] || d).join(" · ") || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">Off:</span>{" "}
+                    {ALL_DAYS.filter((d) => !selectedShiftObj.workingDays?.includes(d)).map((d) => DAY_ABBR[d]).join(" · ") || "—"}
+                  </p>
+                </div>
               )}
             </div>
 
