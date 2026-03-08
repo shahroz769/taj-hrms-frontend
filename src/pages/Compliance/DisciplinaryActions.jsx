@@ -1,5 +1,5 @@
 // React
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 // React Router
 import { useSearchParams } from "react-router";
@@ -7,8 +7,6 @@ import { useSearchParams } from "react-router";
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CalendarIcon from "lucide-react/dist/esm/icons/calendar";
-import CheckIcon from "lucide-react/dist/esm/icons/check";
-import ChevronsUpDownIcon from "lucide-react/dist/esm/icons/chevrons-up-down";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import PencilIcon from "lucide-react/dist/esm/icons/pencil";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
@@ -16,6 +14,7 @@ import SearchIcon from "lucide-react/dist/esm/icons/search";
 import ToggleLeftIcon from "lucide-react/dist/esm/icons/toggle-left";
 import ToggleRightIcon from "lucide-react/dist/esm/icons/toggle-right";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
+import XIcon from "lucide-react/dist/esm/icons/x";
 import { toast } from "sonner";
 
 // Components
@@ -33,14 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogClose,
@@ -91,11 +83,11 @@ import {
   createDisciplinaryAction,
   deleteDisciplinaryAction,
   fetchDisciplinaryActions,
+  searchEmployeesForDA,
   toggleDisciplinaryActionStatus,
   updateDisciplinaryAction,
 } from "@/services/disciplinaryActionsApi";
 import { fetchWarningTypesList } from "@/services/warningTypesApi";
-import { fetchEmployeesList } from "@/services/employeesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -156,11 +148,12 @@ const DisciplinaryActions = () => {
   const [page, setPage] = useState(getInitialPage);
 
   // Form state
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [debouncedEmployeeQuery, setDebouncedEmployeeQuery] = useState("");
   const [selectedWarningTypeId, setSelectedWarningTypeId] = useState("");
   const [actionDate, setActionDate] = useState(undefined);
   const [description, setDescription] = useState("");
-  const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   // Toggle state
@@ -191,6 +184,14 @@ const DisciplinaryActions = () => {
     setSearchParams(params, { replace: true });
   }, [limit, page, debouncedSearch, setSearchParams]);
 
+  // Employee search debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmployeeQuery(employeeSearchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [employeeSearchQuery]);
+
   // ===========================================================================
   // REACT QUERY
   // ===========================================================================
@@ -209,13 +210,23 @@ const DisciplinaryActions = () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Fetch Employees List (for combobox)
+  // Employee search query
   // ---------------------------------------------------------------------------
-  const { data: employeesData } = useQuery({
-    queryKey: ["employees-list"],
-    queryFn: fetchEmployeesList,
-    enabled: dialogOpen,
-  });
+  const { data: employeeSearchResults, isFetching: isSearchingEmployees } =
+    useQuery({
+      queryKey: ["da-employee-search", debouncedEmployeeQuery],
+      queryFn: () => searchEmployeesForDA(debouncedEmployeeQuery),
+      enabled: debouncedEmployeeQuery.length >= 1,
+    });
+
+  const filteredEmployeeResults = useMemo(() => {
+    if (!employeeSearchResults) return [];
+    const selectedIds = new Set(selectedEmployees.map((e) => e._id));
+    return employeeSearchResults.map((emp) => ({
+      ...emp,
+      alreadyAdded: selectedIds.has(emp._id),
+    }));
+  }, [employeeSearchResults, selectedEmployees]);
 
   // ---------------------------------------------------------------------------
   // Fetch Warning Types List (for dropdown)
@@ -226,10 +237,6 @@ const DisciplinaryActions = () => {
     enabled: dialogOpen,
   });
 
-  const employeesList = useMemo(
-    () => employeesData?.employees || [],
-    [employeesData],
-  );
   const warningTypesList = useMemo(
     () => warningTypesData || [],
     [warningTypesData],
@@ -446,9 +453,9 @@ const DisciplinaryActions = () => {
           return <Spinner className="h-4 w-4" />;
         }
         return row.status === "Active" ? (
-          <ToggleRightIcon size={18} className="text-green-600" />
+          <ToggleRightIcon size={18} />
         ) : (
-          <ToggleLeftIcon size={18} className="text-gray-400" />
+          <ToggleLeftIcon size={18} />
         );
       },
     },
@@ -461,7 +468,9 @@ const DisciplinaryActions = () => {
   const resetForm = () => {
     setErrors({});
     setEditingAction(null);
-    setSelectedEmployeeId("");
+    setSelectedEmployees([]);
+    setEmployeeSearchQuery("");
+    setDebouncedEmployeeQuery("");
     setSelectedWarningTypeId("");
     setActionDate(undefined);
     setDescription("");
@@ -469,7 +478,17 @@ const DisciplinaryActions = () => {
 
   const handleEdit = (row) => {
     setEditingAction(row);
-    setSelectedEmployeeId(row.employee?._id || "");
+    setSelectedEmployees(
+      row.employee
+        ? [{
+            _id: row.employee._id,
+            fullName: row.employee.fullName,
+            employeeID: row.employee.employeeID,
+          }]
+        : [],
+    );
+    setEmployeeSearchQuery("");
+    setDebouncedEmployeeQuery("");
     setSelectedWarningTypeId(row.warningType?._id || "");
     setActionDate(row.actionDate ? new Date(row.actionDate) : undefined);
     setDescription(row.description || "");
@@ -529,14 +548,35 @@ const DisciplinaryActions = () => {
   };
 
   // Form submit
+  const handleAddEmployee = useCallback(
+    (emp) => {
+      const alreadyExists = selectedEmployees.some((e) => e._id === emp._id);
+      if (alreadyExists) {
+        toast.error(`${emp.fullName} is already added`);
+        return;
+      }
+      setSelectedEmployees((prev) => [
+        ...prev,
+        { _id: emp._id, fullName: emp.fullName, employeeID: emp.employeeID },
+      ]);
+      setEmployeeSearchQuery("");
+      setDebouncedEmployeeQuery("");
+    },
+    [selectedEmployees],
+  );
+
+  const handleRemoveEmployee = useCallback((empId) => {
+    setSelectedEmployees((prev) => prev.filter((e) => e._id !== empId));
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrors({});
 
     const newErrors = {};
 
-    if (!selectedEmployeeId) {
-      newErrors.employee = "Please select an employee";
+    if (selectedEmployees.length === 0) {
+      newErrors.employee = "Please select at least one employee";
     }
 
     if (!selectedWarningTypeId) {
@@ -556,16 +596,21 @@ const DisciplinaryActions = () => {
       return;
     }
 
-    const payload = {
-      employee: selectedEmployeeId,
-      warningType: selectedWarningTypeId,
-      actionDate: actionDate.toISOString(),
-      description: description.trim(),
-    };
-
     if (editingAction) {
+      const payload = {
+        employee: selectedEmployees[0]._id,
+        warningType: selectedWarningTypeId,
+        actionDate: actionDate.toISOString(),
+        description: description.trim(),
+      };
       updateMutation.mutate({ id: editingAction._id, payload });
     } else {
+      const payload = {
+        employees: selectedEmployees.map((e) => e._id),
+        warningType: selectedWarningTypeId,
+        actionDate: actionDate.toISOString(),
+        description: description.trim(),
+      };
       createMutation.mutate(payload);
     }
   };
@@ -573,13 +618,6 @@ const DisciplinaryActions = () => {
   // ===========================================================================
   // RENDER
   // ===========================================================================
-
-  // Find selected employee label for combobox display
-  const selectedEmployeeLabel = useMemo(() => {
-    if (!selectedEmployeeId) return "";
-    const emp = employeesList.find((e) => e._id === selectedEmployeeId);
-    return emp ? `${emp.fullName} (${emp.employeeID})` : "";
-  }, [selectedEmployeeId, employeesList]);
 
   return (
     <div className={styles.container}>
@@ -625,67 +663,89 @@ const DisciplinaryActions = () => {
                 </div>
               )}
               <div className="grid gap-4">
-                {/* Employee Selection (Combobox) */}
+                {/* Employee Search */}
                 <div className="grid gap-3">
                   <Label className="text-[#344054]">Employee</Label>
-                  <Popover
-                    open={employeeComboboxOpen}
-                    onOpenChange={setEmployeeComboboxOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={employeeComboboxOpen}
-                        className="w-full justify-between font-normal cursor-pointer"
-                      >
-                        {selectedEmployeeLabel || "Search employee..."}
-                        <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search by name or ID..." />
-                        <CommandList>
-                          <CommandEmpty>No employee found.</CommandEmpty>
-                          <CommandGroup>
-                            {employeesList.map((emp) => (
-                              <CommandItem
+                  <div className="relative">
+                    <div className="flex items-center">
+                      <SearchIcon
+                        size={16}
+                        className="absolute left-3 text-gray-400 pointer-events-none"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="Search by employee name or ID..."
+                        value={employeeSearchQuery}
+                        onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                      {isSearchingEmployees && (
+                        <div className="absolute right-3">
+                          <Spinner className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Search Results dropdown */}
+                    {debouncedEmployeeQuery.length >= 1 &&
+                      employeeSearchResults && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {filteredEmployeeResults.length === 0 ? (
+                            <div className="p-3 text-sm text-gray-500 text-center">
+                              No employees found
+                            </div>
+                          ) : (
+                            filteredEmployeeResults.map((emp) => (
+                              <div
                                 key={emp._id}
-                                value={`${emp.fullName} ${emp.employeeID}`}
-                                onSelect={() => {
-                                  setSelectedEmployeeId(
-                                    emp._id === selectedEmployeeId
-                                      ? ""
-                                      : emp._id,
-                                  );
-                                  setEmployeeComboboxOpen(false);
-                                }}
-                                className="cursor-pointer"
+                                className={cn(
+                                  "flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50",
+                                  emp.alreadyAdded
+                                    ? "opacity-50 cursor-default"
+                                    : "cursor-pointer",
+                                )}
+                                onClick={() =>
+                                  !emp.alreadyAdded && handleAddEmployee(emp)
+                                }
                               >
-                                <CheckIcon
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedEmployeeId === emp._id
-                                      ? "opacity-100"
-                                      : "opacity-0",
-                                  )}
-                                />
-                                <div className="flex flex-col">
+                                <div>
                                   <span className="font-medium">
                                     {emp.fullName}
                                   </span>
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-muted-foreground ml-2">
                                     {emp.employeeID}
                                   </span>
                                 </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                                {emp.alreadyAdded && (
+                                  <span className="text-xs text-muted-foreground italic">
+                                    Already added
+                                  </span>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                  </div>
+                  {/* Selected Employees Pills */}
+                  {selectedEmployees.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedEmployees.map((emp) => (
+                        <Badge
+                          key={emp._id}
+                          className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 gap-1 pr-1"
+                        >
+                          {emp.fullName} ({emp.employeeID})
+                          <button
+                            type="button"
+                            className="ml-0.5 rounded-full hover:bg-green-200 p-0.5 cursor-pointer"
+                            onClick={() => handleRemoveEmployee(emp._id)}
+                          >
+                            <XIcon size={12} />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   {errors.employee && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.employee}
@@ -855,6 +915,7 @@ const DisciplinaryActions = () => {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onApprove={handleToggleStatus}
+        approveLabel="Toggle Status"
         isLoading={isLoading}
         isError={isError}
         loadingText="Loading disciplinary actions..."

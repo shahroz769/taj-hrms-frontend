@@ -5,9 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 // External Libraries
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ChevronLeftIcon from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
+import ClipboardListIcon from "lucide-react/dist/esm/icons/clipboard-list";
+import LoaderCircleIcon from "lucide-react/dist/esm/icons/loader-circle";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
 
 // Components
@@ -36,8 +39,13 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
-// Data
-import { getAttendanceData, getMonthSummary } from "./attendanceDummyData";
+// Pages / Modals
+import AttendanceCellEditModal from "./AttendanceCellEditModal";
+import MarkAttendanceModal from "../Workforce/MarkAttendanceModal";
+
+// Services
+import { fetchMonthlyAttendance } from "@/services/attendancesApi";
+import { fetchEmployeeShiftOnDate } from "@/services/employeeShiftsApi";
 
 // Styles
 import styles from "./AttendanceRecords.module.css";
@@ -62,6 +70,9 @@ const MONTH_NAMES = [
 ];
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Full day name as used in shift workingDays (e.g. "Monday") */
+const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /** Get array of day numbers for a month (1-indexed) */
 const getDaysInMonth = (year, month) => {
@@ -89,6 +100,8 @@ const getDayOfWeek = (year, month, day) => {
 // =============================================================================
 
 const AttendanceRecords = () => {
+  const queryClient = useQueryClient();
+
   // ===========================================================================
   // URL STATE
   // ===========================================================================
@@ -130,7 +143,14 @@ const AttendanceRecords = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [isLoading, setIsLoading] = useState(false);
+
+  // Cell edit modal state
+  const [cellEditOpen, setCellEditOpen] = useState(false);
+  const [cellEditData, setCellEditData] = useState(null);
+  const [loadingCellKey, setLoadingCellKey] = useState(null);
+
+  // Mark Attendance modal state
+  const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
 
   // ===========================================================================
   // DERIVED DATA
@@ -140,17 +160,33 @@ const AttendanceRecords = () => {
     [selectedYear, selectedMonth],
   );
 
-  const attendanceResult = useMemo(() => {
-    return getAttendanceData({
-      year: selectedYear,
-      month: selectedMonth,
-      search: debouncedSearch,
-      page,
-      limit,
-    });
-  }, [selectedYear, selectedMonth, debouncedSearch, page, limit]);
+  // ===========================================================================
+  // TANSTACK QUERY
+  // ===========================================================================
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      "attendance-monthly",
+      { year: selectedYear, month: selectedMonth, page, limit, search: debouncedSearch },
+    ],
+    queryFn: () =>
+      fetchMonthlyAttendance({
+        year: selectedYear,
+        month: selectedMonth,
+        page,
+        limit,
+        search: debouncedSearch,
+      }),
+    placeholderData: (prev) => prev,
+  });
 
-  const { data: attendanceData, pagination } = attendanceResult;
+  const attendanceData = data?.employees || [];
+  const pagination = data?.pagination;
 
   // ===========================================================================
   // EFFECTS
@@ -168,13 +204,6 @@ const AttendanceRecords = () => {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);
-
-  // Simulate loading on month/year change
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
-  }, [selectedMonth, selectedYear]);
 
   // Sync URL params
   useEffect(() => {
@@ -249,21 +278,72 @@ const AttendanceRecords = () => {
     if (pagination && page < pagination.totalPages) setPage(page + 1);
   };
 
+  // Cell click: open edit modal
+  const handleCellClick = useCallback(async (emp, day, record) => {
+    const date = new Date(Date.UTC(selectedYear, selectedMonth, day));
+    const mo = String(selectedMonth + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    const dateStr = `${selectedYear}-${mo}-${dd}`;
+
+    const recordHasShift = !!(
+      record?.shift?._id || (typeof record?.shift === "string" && record.shift)
+    );
+
+    let preloadedShift = null;
+    if (!recordHasShift) {
+      const cellKey = `${emp._id}-${day}`;
+      setLoadingCellKey(cellKey);
+      try {
+        preloadedShift = await queryClient.fetchQuery({
+          queryKey: ["employee-shift-on-date", emp._id, dateStr],
+          queryFn: () => fetchEmployeeShiftOnDate({ employeeId: emp._id, date: dateStr }),
+          staleTime: 60_000,
+        });
+      } catch {
+        // ignore — modal will open without a pre-selected shift
+      } finally {
+        setLoadingCellKey(null);
+      }
+    }
+
+    setCellEditData({
+      employeeId: emp._id,
+      employeeName: emp.fullName,
+      date,
+      dateStr,
+      record: record || null,
+      preloadedShift,
+    });
+    setCellEditOpen(true);
+  }, [selectedYear, selectedMonth, queryClient]);
+
   // ===========================================================================
   // RENDER HELPERS
   // ===========================================================================
 
-  const renderBadge = useCallback((status) => {
-    if (status === null) {
+  const renderBadge = useCallback((record) => {
+    if (record === null || record === undefined) {
       return <span className={styles.badgeFuture}>—</span>;
     }
-    const classMap = {
-      P: styles.badgeP,
-      A: styles.badgeA,
-      L: styles.badgeL,
-      Off: styles.badgeOff,
+    const status = record.status;
+    const statusConfig = {
+      Present: { cls: styles.badgeP, label: "P" },
+      Absent: { cls: styles.badgeA, label: "A" },
+      Late: { cls: styles.badgeP, label: "P", cornerLabel: "L", cornerCls: styles.cornerBadgeLate },
+      "Half Day": { cls: styles.badgeP, label: "P", cornerLabel: "HD", cornerCls: styles.cornerBadgeHalfDay },
+      Off: { cls: styles.badgeOff, label: "Off" },
+      Leave: { cls: styles.badgeL, label: "L" },
     };
-    return <span className={classMap[status] || styles.badge}>{status}</span>;
+    const config = statusConfig[status];
+    if (!config) return <span className={styles.badgeFuture}>—</span>;
+    return (
+      <span className={styles.cellBadgeWrapper}>
+        <span className={config.cls}>{config.label}</span>
+        {config.cornerLabel && (
+          <span className={config.cornerCls}>{config.cornerLabel}</span>
+        )}
+      </span>
+    );
   }, []);
 
   // ===========================================================================
@@ -275,23 +355,33 @@ const AttendanceRecords = () => {
       {/* Header */}
       <div className={styles.header}>
         <h1 className={styles.title}>Attendance Records</h1>
-        <div className={styles.legend}>
-          <div className={styles.legendItem}>
-            <span className={styles.legendDotP} />
-            Present
+        <div className="flex items-center gap-3">
+          <div className={styles.legend}>
+            <div className={styles.legendItem}>
+              <span className={styles.legendDotP} />
+              Present
+            </div>
+            <div className={styles.legendItem}>
+              <span className={styles.legendDotA} />
+              Absent
+            </div>
+            <div className={styles.legendItem}>
+              <span className={styles.legendDotL} />
+              Leave
+            </div>
+            <div className={styles.legendItem}>
+              <span className={styles.legendDotOff} />
+              Off Day
+            </div>
           </div>
-          <div className={styles.legendItem}>
-            <span className={styles.legendDotA} />
-            Absent
-          </div>
-          <div className={styles.legendItem}>
-            <span className={styles.legendDotL} />
-            Leave
-          </div>
-          <div className={styles.legendItem}>
-            <span className={styles.legendDotOff} />
-            Off Day
-          </div>
+          <Button
+            variant="green"
+            className="cursor-pointer shrink-0"
+            onClick={() => setMarkAttendanceOpen(true)}
+          >
+            <ClipboardListIcon size={16} />
+            Mark Attendance
+          </Button>
         </div>
       </div>
 
@@ -312,7 +402,11 @@ const AttendanceRecords = () => {
             className="cursor-pointer hover:text-[#02542D]"
             onClick={handleClearSearch}
           >
-            {debouncedSearch ? <CircleXIcon /> : null}
+            {isFetching && debouncedSearch ? (
+              <Spinner />
+            ) : debouncedSearch ? (
+              <CircleXIcon />
+            ) : null}
           </InputGroupAddon>
         </InputGroup>
 
@@ -370,13 +464,10 @@ const AttendanceRecords = () => {
                 <th className={styles.stickyHeader}>Employee</th>
                 {days.map((day) => {
                   const dow = getDayOfWeek(selectedYear, selectedMonth, day);
-                  const isFriday = dow === 5;
                   const todayFlag = isToday(selectedYear, selectedMonth, day);
                   const headerClass = todayFlag
                     ? styles.dateHeaderToday
-                    : isFriday
-                      ? styles.dateHeaderOff
-                      : styles.dateHeader;
+                    : styles.dateHeader;
                   return (
                     <th key={day} className={headerClass}>
                       <div>{day}</div>
@@ -415,6 +506,22 @@ const AttendanceRecords = () => {
                     </div>
                   </td>
                 </tr>
+              ) : isError ? (
+                <tr>
+                  <td colSpan={days.length + 5}>
+                    <div className={styles.stateContainer}>
+                      <p className={styles.stateText}>
+                        Failed to load attendance data.{" "}
+                        <button
+                          onClick={() => refetch()}
+                          className="text-[#02542D] underline"
+                        >
+                          Retry
+                        </button>
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               ) : attendanceData.length === 0 ? (
                 <tr>
                   <td colSpan={days.length + 5}>
@@ -426,63 +533,79 @@ const AttendanceRecords = () => {
                   </td>
                 </tr>
               ) : (
-                attendanceData.map((row) => {
-                  const summary = getMonthSummary(row.records);
-                  return (
-                    <tr key={row.employee.id}>
-                      {/* Sticky employee column */}
-                      <td className={styles.stickyCell}>
-                        <div className={styles.employeeName}>
-                          {row.employee.name}
-                        </div>
-                        <div className={styles.employeeId}>
-                          {row.employee.id}
-                        </div>
-                      </td>
+                attendanceData.map((row) => (
+                  <tr key={row.employee._id}>
+                    {/* Sticky employee column */}
+                    <td className={styles.stickyCell}>
+                      <div className={styles.employeeName}>
+                        {row.employee.fullName}
+                      </div>
+                      <div className={styles.employeeId}>
+                        {row.employee.employeeID}
+                      </div>
+                    </td>
 
-                      {/* Day cells */}
-                      {days.map((day) => {
-                        const status = row.records[day];
-                        const isFriday =
-                          getDayOfWeek(selectedYear, selectedMonth, day) === 5;
-                        return (
-                          <td
-                            key={day}
-                            className={
-                              isFriday
-                                ? styles.attendanceCellOff
-                                : styles.attendanceCell
-                            }
-                          >
-                            {renderBadge(status)}
-                          </td>
-                        );
-                      })}
+                    {/* Day cells */}
+                    {days.map((day) => {
+                      const record = row.records[day];
+                      const dow = getDayOfWeek(selectedYear, selectedMonth, day);
+                      const dayName = DAY_FULL[dow];
+                      const workingDays = row.shiftWorkingDays;
+                      const isOffDay = workingDays
+                        ? !workingDays.includes(dayName)
+                        : false;
+                      const isFutureDate = record === null;
+                      const cellKey = `${row.employee._id}-${day}`;
+                      const isCellLoading = loadingCellKey === cellKey;
+                      return (
+                        <td
+                          key={day}
+                          className={
+                            isOffDay
+                              ? `${styles.attendanceCellOff}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                              : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                          }
+                          onClick={
+                            !isFutureDate && !isCellLoading
+                              ? () => handleCellClick(row.employee, day, record)
+                              : undefined
+                          }
+                        >
+                          {isCellLoading ? (
+                            <LoaderCircleIcon
+                              size={16}
+                              className="mx-auto text-[#02542D] animate-spin"
+                            />
+                          ) : (
+                            renderBadge(record)
+                          )}
+                        </td>
+                      );
+                    })}
 
-                      {/* Summary cells */}
-                      <td
-                        className={`${styles.summaryCell} ${styles.summaryP}`}
-                      >
-                        {summary.P}
-                      </td>
-                      <td
-                        className={`${styles.summaryCell} ${styles.summaryA}`}
-                      >
-                        {summary.A}
-                      </td>
-                      <td
-                        className={`${styles.summaryCell} ${styles.summaryL}`}
-                      >
-                        {summary.L}
-                      </td>
-                      <td
-                        className={`${styles.summaryCell} ${styles.summaryOff}`}
-                      >
-                        {summary.Off}
-                      </td>
-                    </tr>
-                  );
-                })
+                    {/* Summary cells */}
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryP}`}
+                    >
+                      {(row.summary?.present || 0) + (row.summary?.late || 0) + (row.summary?.halfDay || 0)}
+                    </td>
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryA}`}
+                    >
+                      {row.summary?.absent || 0}
+                    </td>
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryL}`}
+                    >
+                      {row.summary?.leave || 0}
+                    </td>
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryOff}`}
+                    >
+                      {row.summary?.off || 0}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -599,6 +722,28 @@ const AttendanceRecords = () => {
           </PaginationContent>
         </Pagination>
       )}
+
+      {/* Cell Edit Modal — key forces remount so lazy state initializers reflect new cell data */}
+      {cellEditData && (
+        <AttendanceCellEditModal
+          key={`${cellEditData.employeeId}-${cellEditData.date?.toISOString()}`}
+          open={cellEditOpen}
+          onOpenChange={setCellEditOpen}
+          employeeId={cellEditData.employeeId}
+          employeeName={cellEditData.employeeName}
+          date={cellEditData.date}
+          dateStr={cellEditData.dateStr}
+          record={cellEditData.record}
+          preloadedShift={cellEditData.preloadedShift}
+        />
+      )}
+
+      {/* Mark Attendance Modal */}
+      <MarkAttendanceModal
+        open={markAttendanceOpen}
+        onOpenChange={setMarkAttendanceOpen}
+        preSelectedEmployeeIds={null}
+      />
     </div>
   );
 };

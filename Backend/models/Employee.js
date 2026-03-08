@@ -7,6 +7,11 @@ const employeeSchema = new mongoose.Schema(
       ref: "Position",
       required: true,
     },
+    allowancePolicy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AllowancePolicy",
+      default: null,
+    },
     basicSalary: {
       type: Number,
       default: 0,

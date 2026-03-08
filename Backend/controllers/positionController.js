@@ -1,7 +1,5 @@
 import Position from "../models/Position.js";
 import Department from "../models/Department.js";
-import AllowancePolicy from "../models/AllowancePolicy.js";
-import AllowancePolicyHistory from "../models/AllowancePolicyHistory.js";
 import mongoose from "mongoose";
 
 // @description     Get all positions
@@ -43,7 +41,6 @@ export const getAllPositions = async (req, res, next) => {
     const positions = await Position.find(query)
       .populate("leavePolicy", "name")
       .populate("department", "name")
-      .populate("allowancePolicy", "name")
       .populate("reportsTo", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -72,8 +69,7 @@ export const getAllPositionsFiltersList = async (req, res, next) => {
     const positionsFiltersList = await Position.find()
       .populate("department", "name")
       .populate("leavePolicy", "name")
-      .populate("allowancePolicy", "name")
-      .select("name reportsTo department leavePolicy allowancePolicy");
+      .select("name reportsTo department leavePolicy");
     res.json({
       positionsFiltersList,
     });
@@ -97,8 +93,7 @@ export const getPositionsByDepartment = async (req, res, next) => {
 
     const positions = await Position.find({ department: departmentId })
       .populate("leavePolicy", "name")
-      .populate("allowancePolicy", "name")
-      .select("name leavePolicy allowancePolicy employeeLimit hiredEmployees");
+      .select("name leavePolicy employeeLimit hiredEmployees");
 
     res.json({ positions });
   } catch (err) {
@@ -120,7 +115,13 @@ export const getPositionById = async (req, res, next) => {
     }
 
     const position = await Position.findById(id)
-      .populate("allowancePolicy", "name");
+      .populate("leavePolicy", "name")
+      .populate("department", "name");
+    if (!position) {
+      res.status(404);
+      throw new Error("Position not found");
+    }
+    res.json(position);
   } catch (err) {
     console.log(err);
     next(err);
@@ -132,7 +133,7 @@ export const getPositionById = async (req, res, next) => {
 // @access          Admin
 export const createPosition = async (req, res, next) => {
   try {
-    const { name, reportsTo, employeeLimit, department, leavePolicy, allowancePolicy } =
+    const { name, reportsTo, employeeLimit, department, leavePolicy } =
       req.body || {};
 
     if (
@@ -158,19 +159,6 @@ export const createPosition = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(leavePolicy)) {
       res.status(400);
       throw new Error("Invalid leave policy ID");
-    }
-
-    // Validate allowance policy ID if provided
-    if (allowancePolicy && allowancePolicy.trim()) {
-      if (!mongoose.Types.ObjectId.isValid(allowancePolicy)) {
-        res.status(400);
-        throw new Error("Invalid allowance policy ID");
-      }
-      const allowancePolicyDoc = await AllowancePolicy.findById(allowancePolicy);
-      if (!allowancePolicyDoc) {
-        res.status(404);
-        throw new Error("Allowance policy not found");
-      }
     }
 
     // Check if department exists
@@ -226,29 +214,15 @@ export const createPosition = async (req, res, next) => {
       department: department,
       reportsTo: reportsTo,
       leavePolicy: leavePolicy,
-      allowancePolicy: allowancePolicy && allowancePolicy.trim() ? allowancePolicy : null,
       employeeLimit: employeeLimit,
       createdBy: req.user._id,
     });
 
     const savedPosition = await newPosition.save();
 
-    // Create initial allowance policy history if assigned
-    if (allowancePolicy && allowancePolicy.trim()) {
-      await AllowancePolicyHistory.create({
-        position: savedPosition._id,
-        fromAllowancePolicy: null,
-        toAllowancePolicy: allowancePolicy,
-        changedBy: req.user._id,
-        effectiveDate: new Date(),
-        reason: "Initial assignment on position creation",
-      });
-    }
-
     const populatedPosition = await Position.findById(savedPosition._id)
       .populate("leavePolicy", "name")
-      .populate("department", "name")
-      .populate("allowancePolicy", "name");
+      .populate("department", "name");
 
     res.status(201).json(populatedPosition);
   } catch (err) {
@@ -276,7 +250,7 @@ export const updatePosition = async (req, res, next) => {
       throw new Error("Position not found");
     }
 
-    const { name, reportsTo, employeeLimit, department, leavePolicy, allowancePolicy } =
+    const { name, reportsTo, employeeLimit, department, leavePolicy } =
       req.body || {};
 
     if (
@@ -302,19 +276,6 @@ export const updatePosition = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(leavePolicy)) {
       res.status(400);
       throw new Error("Invalid leave policy ID");
-    }
-
-    // Validate allowance policy ID if provided
-    if (allowancePolicy && allowancePolicy.trim()) {
-      if (!mongoose.Types.ObjectId.isValid(allowancePolicy)) {
-        res.status(400);
-        throw new Error("Invalid allowance policy ID");
-      }
-      const allowancePolicyDoc = await AllowancePolicy.findById(allowancePolicy);
-      if (!allowancePolicyDoc) {
-        res.status(404);
-        throw new Error("Allowance policy not found");
-      }
     }
 
     // Check if department exists
@@ -380,32 +341,11 @@ export const updatePosition = async (req, res, next) => {
     position.leavePolicy = leavePolicy;
     position.employeeLimit = employeeLimit;
 
-    // Handle allowance policy change
-    const oldAllowancePolicyId = position.allowancePolicy?.toString() || null;
-    const newAllowancePolicyId = allowancePolicy && allowancePolicy.trim() ? allowancePolicy : null;
-
-    if (oldAllowancePolicyId !== newAllowancePolicyId) {
-      position.allowancePolicy = newAllowancePolicyId;
-
-      // Create allowance policy history record
-      if (newAllowancePolicyId) {
-        await AllowancePolicyHistory.create({
-          position: id,
-          fromAllowancePolicy: oldAllowancePolicyId,
-          toAllowancePolicy: newAllowancePolicyId,
-          changedBy: req.user._id,
-          effectiveDate: new Date(),
-          reason: "Updated via position edit form",
-        });
-      }
-    }
-
     const updatedPosition = await position.save();
 
     const populatedPosition = await Position.findById(updatedPosition._id)
       .populate("leavePolicy", "name")
-      .populate("department", "name")
-      .populate("allowancePolicy", "name");
+      .populate("department", "name");
 
     res.json(populatedPosition);
   } catch (err) {

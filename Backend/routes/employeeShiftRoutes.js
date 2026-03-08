@@ -6,6 +6,7 @@ import {
   getEmployeeShiftHistory,
   getEmployeesByShift,
   getShiftsList,
+  getEmployeeShiftOnDate,
 } from "../controllers/employeeShiftController.js";
 import { authorize } from "../middleware/rbacMiddleware.js";
 import { ROLES } from "../utils/roles.js";
@@ -45,6 +46,16 @@ router.get(
   protect,
   authorize(ROLES.admin, ROLES.supervisor),
   getEmployeeShiftHistory,
+);
+
+// @route           GET /api/employee-shifts/employee/:id/on-date
+// @description     Get shift active for an employee on a specific date
+// @access          Admin, Supervisor
+router.get(
+  "/employee/:id/on-date",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getEmployeeShiftOnDate,
 );
 
 // @route           GET /api/employee-shifts/shift/:id/employees

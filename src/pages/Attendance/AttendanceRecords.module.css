@@ -161,18 +161,6 @@
   border-bottom: none;
 }
 
-.tableBody tr:hover .stickyCell {
-  background-color: #f9fafb;
-}
-
-.tableBody tr:hover .attendanceCell {
-  background-color: #f9fafb;
-}
-
-.tableBody tr:hover .summaryCell {
-  background-color: #f9fafb;
-}
-
 /* Sticky employee column cell */
 .stickyCell {
   position: sticky;
@@ -389,4 +377,59 @@
   composes: legendDot;
   background-color: #f3f4f6;
   border: 1px solid #9ca3af;
+}
+
+/* --------------------------------------------------------------------------
+   Clickable Cells
+   -------------------------------------------------------------------------- */
+
+.clickableCell {
+  cursor: pointer;
+}
+
+.clickableCell:hover {
+  background-color: #f0fdf4 !important;
+}
+
+/* --------------------------------------------------------------------------
+   Cell Badge Wrapper (for corner badges)
+   -------------------------------------------------------------------------- */
+
+.cellBadgeWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Late corner badge — top-right of badge */
+.cornerBadgeLate {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  background-color: #f97316;
+  color: #ffffff;
+  font-size: 7px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 2px;
+  line-height: 13px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Half Day corner badge — top-right of badge */
+.cornerBadgeHalfDay {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  background-color: #8b5cf6;
+  color: #ffffff;
+  font-size: 7px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 2px;
+  line-height: 13px;
+  pointer-events: none;
+  z-index: 1;
 }

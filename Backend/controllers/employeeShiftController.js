@@ -298,3 +298,43 @@ export const getShiftsList = async (req, res, next) => {
     next(err);
   }
 };
+
+// @description     Get the shift active for an employee on a specific date
+// @route           GET /api/employee-shifts/employee/:id/on-date?date=YYYY-MM-DD
+// @access          Admin, Supervisor
+export const getEmployeeShiftOnDate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { date } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400);
+      throw new Error("Invalid employee ID");
+    }
+
+    if (!date) {
+      res.status(400);
+      throw new Error("date query param is required (YYYY-MM-DD)");
+    }
+
+    const targetDate = new Date(date);
+    targetDate.setUTCHours(23, 59, 59, 999);
+
+    // Find the most recent shift assignment that started on or before the target date
+    // and either has no end date (still active) or ended on/after the target date
+    const assignment = await EmployeeShift.findOne({
+      employee: id,
+      effectiveDate: { $lte: targetDate },
+      $or: [{ endDate: null }, { endDate: { $gte: new Date(date) } }],
+    })
+      .populate("shift", "name startTime endTime workingDays")
+      .sort({ effectiveDate: -1 });
+
+    res.json({
+      shift: assignment?.shift || null,
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};

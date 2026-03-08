@@ -43,6 +43,7 @@ import {
   fetchPositionsByDepartment,
 } from "@/services/employeesApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -85,6 +86,7 @@ const AddEmployee = () => {
       department: "",
       position: "",
       basicSalary: "",
+      allowancePolicy: "",
       employmentType: "Permanent",
       fatherName: "",
       husbandName: "",
@@ -181,6 +183,11 @@ const AddEmployee = () => {
     queryKey: ["positionsByDepartment", selectedDepartment],
     queryFn: () => fetchPositionsByDepartment(selectedDepartment),
     enabled: !!selectedDepartment,
+  });
+
+  const { data: allowancePoliciesData } = useQuery({
+    queryKey: ["allowancePoliciesList"],
+    queryFn: fetchAllowancePoliciesList,
   });
 
   // ===========================================================================
@@ -503,6 +510,28 @@ const AddEmployee = () => {
               {errors.basicSalary && (
                 <span className={styles.error}>
                   {errors.basicSalary.message}
+                </span>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <Label className={styles.label}>Allowance Policy</Label>
+              <Select
+                onValueChange={(value) => setValue("allowancePolicy", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select allowance policy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allowancePoliciesData?.map((ap) => (
+                    <SelectItem key={ap._id} value={ap._id}>
+                      {ap.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.allowancePolicy && (
+                <span className={styles.error}>
+                  {errors.allowancePolicy.message}
                 </span>
               )}
             </div>

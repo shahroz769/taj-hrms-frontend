@@ -44,6 +44,7 @@ import {
   fetchPositionsByDepartment,
 } from "@/services/employeesApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -99,6 +100,7 @@ const EditEmployee = () => {
       department: "",
       position: "",
       basicSalary: "",
+      allowancePolicy: "",
       employmentType: "Permanent",
       fatherName: "",
       husbandName: "",
@@ -203,6 +205,11 @@ const EditEmployee = () => {
     enabled: !!selectedDepartment,
   });
 
+  const { data: allowancePoliciesData } = useQuery({
+    queryKey: ["allowancePoliciesList"],
+    queryFn: fetchAllowancePoliciesList,
+  });
+
   // ===========================================================================
   // EFFECTS
   // ===========================================================================
@@ -240,6 +247,7 @@ const EditEmployee = () => {
         department: emp.position?.department?._id || "",
         position: emp.position?._id || "",
         basicSalary: emp.basicSalary ?? "",
+        allowancePolicy: emp.allowancePolicy?._id || "",
         employmentType: emp.employmentType || "Permanent",
         fatherName: emp.fatherName || "",
         husbandName: emp.husbandName || "",
@@ -660,6 +668,29 @@ const EditEmployee = () => {
               {errors.basicSalary && (
                 <span className={styles.error}>
                   {errors.basicSalary.message}
+                </span>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              <Label className={styles.label}>Allowance Policy</Label>
+              <Select
+                value={watch("allowancePolicy")}
+                onValueChange={(value) => setValue("allowancePolicy", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select allowance policy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allowancePoliciesData?.map((ap) => (
+                    <SelectItem key={ap._id} value={ap._id}>
+                      {ap.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.allowancePolicy && (
+                <span className={styles.error}>
+                  {errors.allowancePolicy.message}
                 </span>
               )}
             </div>

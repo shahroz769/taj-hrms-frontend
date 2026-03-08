@@ -194,27 +194,56 @@ export const getDisciplinaryActionById = async (req, res, next) => {
   }
 };
 
-// @description     Create new disciplinary action
+// @description     Search employees by name or ID (for disciplinary action form)
+// @route           GET /api/disciplinary-actions/search-employees?q=
+// @access          Admin, Supervisor
+export const searchEmployees = async (req, res, next) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (!q) {
+      return res.json([]);
+    }
+
+    const employees = await Employee.find({
+      status: "Active",
+      $or: [
+        { fullName: { $regex: q, $options: "i" } },
+        { employeeID: { $regex: q, $options: "i" } },
+      ],
+    })
+      .select("fullName employeeID")
+      .limit(10)
+      .lean();
+
+    res.json(employees);
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Create new disciplinary action(s)
 // @route           POST /api/disciplinary-actions
 // @access          Admin, Supervisor
 export const createDisciplinaryAction = async (req, res, next) => {
   try {
-    const { employee, warningType, description, actionDate } = req.body || {};
+    const { employees, warningType, description, actionDate } = req.body || {};
 
-    if (!employee) {
+    if (!employees || !Array.isArray(employees) || employees.length === 0) {
       res.status(400);
-      throw new Error("Employee is required");
+      throw new Error("At least one employee is required");
     }
 
-    if (!mongoose.Types.ObjectId.isValid(employee)) {
-      res.status(400);
-      throw new Error("Invalid employee ID");
-    }
-
-    const employeeDoc = await Employee.findById(employee);
-    if (!employeeDoc) {
-      res.status(404);
-      throw new Error("Employee not found");
+    for (const empId of employees) {
+      if (!mongoose.Types.ObjectId.isValid(empId)) {
+        res.status(400);
+        throw new Error(`Invalid employee ID: ${empId}`);
+      }
+      const employeeDoc = await Employee.findById(empId);
+      if (!employeeDoc) {
+        res.status(404);
+        throw new Error(`Employee not found`);
+      }
     }
 
     if (!warningType) {
@@ -243,22 +272,21 @@ export const createDisciplinaryAction = async (req, res, next) => {
       throw new Error("Action date is required");
     }
 
-    const newAction = new DisciplinaryAction({
-      employee,
-      warningType,
-      description: description.trim(),
-      actionDate: new Date(actionDate),
-      status: "Active",
-      createdBy: req.user.name || req.user._id,
-    });
+    const createdActions = [];
+    for (const empId of employees) {
+      const newAction = new DisciplinaryAction({
+        employee: empId,
+        warningType,
+        description: description.trim(),
+        actionDate: new Date(actionDate),
+        status: "Active",
+        createdBy: req.user.name || req.user._id,
+      });
+      const saved = await newAction.save();
+      createdActions.push(saved._id);
+    }
 
-    const savedAction = await newAction.save();
-
-    const populatedAction = await DisciplinaryAction.findById(savedAction._id)
-      .populate("employee", "fullName employeeID")
-      .populate("warningType", "name severity");
-
-    res.status(201).json(populatedAction);
+    res.status(201).json({ count: createdActions.length });
   } catch (err) {
     console.log(err);
     next(err);

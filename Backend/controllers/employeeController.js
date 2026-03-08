@@ -5,6 +5,8 @@ import LeavePolicy from "../models/LeavePolicy.js";
 import LeaveBalance from "../models/LeaveBalance.js";
 import PositionHistory from "../models/PositionHistory.js";
 import EmployeeShift from "../models/EmployeeShift.js";
+import AllowancePolicy from "../models/AllowancePolicy.js";
+import AllowancePolicyHistory from "../models/AllowancePolicyHistory.js";
 import { uploadToCloudinary } from "../config/cloudinaryConfig.js";
 import mongoose from "mongoose";
 
@@ -79,6 +81,7 @@ export const createEmployee = async (req, res, next) => {
     const {
       position,
       basicSalary,
+      allowancePolicy,
       fullName,
       gender,
       fatherName,
@@ -129,6 +132,22 @@ export const createEmployee = async (req, res, next) => {
       res.status(404);
       throw new Error("Position not found");
     }
+
+    // Validate allowancePolicy (required)
+    if (!allowancePolicy || !allowancePolicy.trim()) {
+      res.status(400);
+      throw new Error("Allowance policy is required");
+    }
+    if (!mongoose.Types.ObjectId.isValid(allowancePolicy)) {
+      res.status(400);
+      throw new Error("Invalid allowance policy ID");
+    }
+    const apDoc = await AllowancePolicy.findById(allowancePolicy);
+    if (!apDoc) {
+      res.status(404);
+      throw new Error("Allowance policy not found");
+    }
+    const resolvedAllowancePolicy = allowancePolicy;
 
     // Check employee limit for position
     const employeeLimitStr = positionDoc.employeeLimit?.trim().toLowerCase();
@@ -199,6 +218,7 @@ export const createEmployee = async (req, res, next) => {
       employeeID,
       position,
       basicSalary: basicSalary ? Number(basicSalary) : 0,
+      allowancePolicy: resolvedAllowancePolicy,
       status: "Active",
       fullName: fullName.trim(),
       gender,
@@ -252,16 +272,26 @@ export const createEmployee = async (req, res, next) => {
       reason: "Initial assignment on employee creation",
     });
 
+    // Create initial allowance policy history if assigned
+    if (resolvedAllowancePolicy) {
+      await AllowancePolicyHistory.create({
+        employee: savedEmployee._id,
+        fromAllowancePolicy: null,
+        toAllowancePolicy: resolvedAllowancePolicy,
+        changedBy: req.user._id,
+        effectiveDate: new Date(),
+        reason: "Initial assignment on employee creation",
+      });
+    }
+
     // Populate references for response
     const populatedEmployee = await Employee.findById(savedEmployee._id)
       .populate({
         path: "position",
-        select: "name department allowancePolicy",
-        populate: [
-          { path: "department", select: "name" },
-          { path: "allowancePolicy", select: "name" },
-        ],
-      });
+        select: "name department",
+        populate: { path: "department", select: "name" },
+      })
+      .populate("allowancePolicy", "name");
 
     res.status(201).json({
       employee: populatedEmployee,
@@ -358,12 +388,10 @@ export const getAllEmployees = async (req, res, next) => {
     let employeesQuery = Employee.find(query)
       .populate({
         path: "position",
-        select: "name department allowancePolicy",
-        populate: [
-          { path: "department", select: "name" },
-          { path: "allowancePolicy", select: "name" },
-        ],
+        select: "name department",
+        populate: { path: "department", select: "name" },
       })
+      .populate("allowancePolicy", "name")
       .sort({ createdAt: -1 });
 
     // Only apply skip and limit if limit is greater than 0
@@ -427,19 +455,19 @@ export const getEmployeeById = async (req, res, next) => {
     const employee = await Employee.findById(id)
       .populate({
         path: "position",
-        select: "name department leavePolicy allowancePolicy",
+        select: "name department leavePolicy",
         populate: [
           { path: "department", select: "name" },
           { path: "leavePolicy", select: "name" },
-          {
-            path: "allowancePolicy",
-            select: "name components",
-            populate: {
-              path: "components.allowanceComponent",
-              select: "name",
-            },
-          },
         ],
+      })
+      .populate({
+        path: "allowancePolicy",
+        select: "name components",
+        populate: {
+          path: "components.allowanceComponent",
+          select: "name",
+        },
       });
 
     if (!employee) {
@@ -504,6 +532,7 @@ export const updateEmployee = async (req, res, next) => {
       position,
       basicSalary,
       employmentType,
+      allowancePolicy,
     } = req.body;
 
     // Check for duplicate CNIC if changed
@@ -796,17 +825,48 @@ export const updateEmployee = async (req, res, next) => {
       employee.guarantor = parseIfString(guarantor) || [];
     if (legal !== undefined) employee.legal = parseIfString(legal) || {};
 
+    // Handle allowance policy change
+    if (allowancePolicy !== undefined) {
+      const newAllowancePolicyId =
+        allowancePolicy && allowancePolicy.trim() ? allowancePolicy.trim() : null;
+
+      if (newAllowancePolicyId) {
+        if (!mongoose.Types.ObjectId.isValid(newAllowancePolicyId)) {
+          res.status(400);
+          throw new Error("Invalid allowance policy ID");
+        }
+        const apDoc = await AllowancePolicy.findById(newAllowancePolicyId);
+        if (!apDoc) {
+          res.status(404);
+          throw new Error("Allowance policy not found");
+        }
+      }
+
+      const oldAllowancePolicyId = employee.allowancePolicy?.toString() || null;
+      if (oldAllowancePolicyId !== newAllowancePolicyId) {
+        if (newAllowancePolicyId) {
+          await AllowancePolicyHistory.create({
+            employee: id,
+            fromAllowancePolicy: oldAllowancePolicyId,
+            toAllowancePolicy: newAllowancePolicyId,
+            changedBy: req.user._id,
+            effectiveDate: new Date(),
+            reason: "Updated via employee edit form",
+          });
+        }
+        employee.allowancePolicy = newAllowancePolicyId;
+      }
+    }
+
     const updatedEmployee = await employee.save();
 
     const populatedEmployee = await Employee.findById(updatedEmployee._id)
       .populate({
         path: "position",
-        select: "name department allowancePolicy",
-        populate: [
-          { path: "department", select: "name" },
-          { path: "allowancePolicy", select: "name" },
-        ],
-      });
+        select: "name department",
+        populate: { path: "department", select: "name" },
+      })
+      .populate("allowancePolicy", "name");
 
     res.json({
       employee: populatedEmployee,

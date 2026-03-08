@@ -16,6 +16,13 @@ export const fetchDisciplinaryActionById = async (id) => {
   return res.data;
 };
 
+export const searchEmployeesForDA = async (query) => {
+  const res = await API.get(`/api/disciplinary-actions/search-employees`, {
+    params: { q: query },
+  });
+  return res.data;
+};
+
 export const createDisciplinaryAction = async (payload) => {
   const res = await API.post(`/api/disciplinary-actions`, payload);
   return res.data;

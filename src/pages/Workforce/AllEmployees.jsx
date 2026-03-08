@@ -59,6 +59,9 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
+// Pages
+import MarkAttendanceModal from "./MarkAttendanceModal";
+
 // Services
 import { fetchEmployees } from "@/services/employeesApi";
 import {
@@ -144,6 +147,7 @@ const AllEmployees = () => {
   const [assignShiftModalOpen, setAssignShiftModalOpen] = useState(false);
   const [selectedShiftId, setSelectedShiftId] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(new Date());
+  const [markAttendanceModalOpen, setMarkAttendanceModalOpen] = useState(false);
 
   // ===========================================================================
   // EFFECTS
@@ -536,6 +540,22 @@ const AllEmployees = () => {
       <div className={styles.header}>
         <h1 className={styles.title}>All Employees</h1>
         <div className="flex items-center gap-3">
+          {/* Mark Attendance Button */}
+          <Button
+            variant="outline"
+            className="cursor-pointer relative"
+            disabled={selectedEmployeeIds.length === 0}
+            onClick={() => setMarkAttendanceModalOpen(true)}
+          >
+            <CalendarIcon size={16} />
+            Mark Attendance
+            {selectedEmployeeIds.length > 0 && (
+              <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
+                {selectedEmployeeIds.length}
+              </Badge>
+            )}
+          </Button>
+
           <Dialog
             open={assignShiftModalOpen}
             onOpenChange={handleAssignShiftOpenChange}
@@ -982,6 +1002,14 @@ const AllEmployees = () => {
           </PaginationContent>
         </Pagination>
       )}
+
+      {/* Mark Attendance Modal */}
+      <MarkAttendanceModal
+        open={markAttendanceModalOpen}
+        onOpenChange={setMarkAttendanceModalOpen}
+        preSelectedEmployeeIds={selectedEmployeeIds}
+        onSuccess={() => setSelectedEmployeeIds([])}
+      />
     </div>
   );
 };

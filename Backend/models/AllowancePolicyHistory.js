@@ -2,9 +2,9 @@ import mongoose from "mongoose";
 
 const allowancePolicyHistorySchema = new mongoose.Schema(
   {
-    position: {
+    employee: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Position",
+      ref: "Employee",
       required: true,
     },
     fromAllowancePolicy: {

@@ -9,3 +9,10 @@ export const assignShiftToEmployees = async (payload) => {
   const res = await API.post(`/api/employee-shifts/assign`, payload);
   return res.data;
 };
+
+export const fetchEmployeeShiftOnDate = async ({ employeeId, date }) => {
+  const res = await API.get(`/api/employee-shifts/employee/${employeeId}/on-date`, {
+    params: { date },
+  });
+  return res.data.shift; // shift object or null
+};

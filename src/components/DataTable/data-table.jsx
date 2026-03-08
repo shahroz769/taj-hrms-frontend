@@ -14,6 +14,7 @@ const DataTable = ({
   onEdit,
   onDelete,
   onApprove,
+  approveLabel = "Approve",
   onReject,
   isLoading,
   isError,
@@ -204,7 +205,7 @@ const DataTable = ({
                                     </button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    <p>Approve</p>
+                                    <p>{approveLabel}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               )}

@@ -5,6 +5,7 @@ import {
   deleteDisciplinaryAction,
   getAllDisciplinaryActions,
   getDisciplinaryActionById,
+  searchEmployees,
   toggleDisciplinaryActionStatus,
   updateDisciplinaryAction,
 } from "../controllers/disciplinaryActionController.js";
@@ -19,6 +20,14 @@ router.get(
   protect,
   authorize(ROLES.admin, ROLES.supervisor),
   getAllDisciplinaryActions,
+);
+
+// @route           GET /api/disciplinary-actions/search-employees?q=
+router.get(
+  "/search-employees",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  searchEmployees,
 );
 
 // @route           GET /api/disciplinary-actions/:id
