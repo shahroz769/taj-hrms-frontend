@@ -100,7 +100,7 @@ const AttendanceCellEditModal = ({
 }) => {
   const queryClient = useQueryClient();
 
-  const isNewRecord = !record;
+  const isNewRecord = !record?._id;
 
   // ---------------------------------------------------------------------------
   // STATE — lazy initializers so remounting via key resets correctly
@@ -461,7 +461,7 @@ const AttendanceCellEditModal = ({
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
             >
               {deleteMutation.isPending ? (
                 <>

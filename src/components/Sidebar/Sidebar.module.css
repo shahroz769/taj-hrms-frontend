@@ -145,19 +145,19 @@
 
 /* Scrollbar track (background behind thumb) */
 .sidebarTop::-webkit-scrollbar-track {
-  background: #ffffff; /* <-- match to your sidebarTop background */
+  background: transparent;
   border-radius: 0;
 }
 
 /* Scrollbar thumb (moving part) */
 .sidebarTop::-webkit-scrollbar-thumb {
-  background: #ffffff; /* scrollbar color */
+  background: #c1c1c1;
   border-radius: 4px;
 }
 
 /* Hover effect (optional) */
 .sidebarTop::-webkit-scrollbar-thumb:hover {
-  background: #ffffff;
+  background: #a0a0a0;
 }
 
 /* Remove arrows (top/bottom buttons) */
@@ -174,5 +174,5 @@
 /* === FIREFOX === */
 .sidebarTop {
   scrollbar-width: thin; /* auto | thin | none */
-  scrollbar-color: #999 #ffffff; /* thumb | track */
+  scrollbar-color: #c1c1c1 transparent; /* thumb | track */
 }

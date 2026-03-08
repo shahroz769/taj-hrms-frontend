@@ -70,6 +70,27 @@ const safeDateParse = (value) => {
 };
 
 /**
+ * Given a sorted-ascending array of EmployeeShift assignment objects (populated shift),
+ * return the shift's workingDays array that was active on the given UTC-midnight Date.
+ * Returns null if no assignment covers that date.
+ */
+const getWorkingDaysForDate = (assignments, dateUTC) => {
+  let result = null;
+  for (const a of assignments) {
+    const effective = new Date(a.effectiveDate);
+    effective.setUTCHours(0, 0, 0, 0);
+    if (effective > dateUTC) continue; // assignment hadn't started yet
+    if (a.endDate) {
+      const end = new Date(a.endDate);
+      end.setUTCHours(0, 0, 0, 0);
+      if (end < dateUTC) continue; // assignment had already ended
+    }
+    result = a.shift?.workingDays || null;
+  }
+  return result;
+};
+
+/**
  * Recompute and upsert the MonthlyAttendanceSummary for a specific employee-month.
  */
 const refreshMonthlySummary = async (employeeId, year, month) => {
@@ -444,15 +465,27 @@ export const getMonthlyAttendance = async (req, res, next) => {
 
     const employeeIds = employees.map((e) => e._id);
 
-    // Fetch active shifts for all employees to determine off days
-    const activeShifts = await EmployeeShift.find({
+    // Fetch only shift assignments that overlap the viewed month:
+    //   effectiveDate <= endOfMonth  AND  (endDate is null OR endDate >= startOfMonth)
+    const allShiftAssignments = await EmployeeShift.find({
       employee: { $in: employeeIds },
-      endDate: null,
-    }).populate("shift", "workingDays name");
+      effectiveDate: { $lte: endOfMonth },
+      $or: [{ endDate: null }, { endDate: { $gte: startOfMonth } }],
+    }).populate("shift", "workingDays name").sort({ effectiveDate: 1 });
 
+    // Build history map: empId -> assignments sorted by effectiveDate ASC
+    const shiftHistoryMap = {};
+    for (const es of allShiftAssignments) {
+      const empKey = es.employee.toString();
+      if (!shiftHistoryMap[empKey]) shiftHistoryMap[empKey] = [];
+      shiftHistoryMap[empKey].push(es);
+    }
+
+    // Current active shift working days (for header/cell off-day highlighting in frontend)
     const employeeShiftWorkingDaysMap = {};
-    for (const es of activeShifts) {
-      if (es.shift?.workingDays) {
+    for (const es of allShiftAssignments) {
+      if (!es.endDate && es.shift?.workingDays) {
+        // Sorted ascending — last endDate:null assignment per employee is the current one
         employeeShiftWorkingDaysMap[es.employee.toString()] = es.shift.workingDays;
       }
     }
@@ -496,6 +529,9 @@ export const getMonthlyAttendance = async (req, res, next) => {
         ? (() => { const jd = new Date(emp.joiningDate); jd.setUTCHours(0,0,0,0); return jd; })()
         : null;
 
+      const empShiftHistory = shiftHistoryMap[emp._id.toString()] || [];
+      const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
       const records = {};
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
@@ -506,7 +542,18 @@ export const getMonthlyAttendance = async (req, res, next) => {
         } else if (dateUTC > todayUTC) {
           records[d] = null; // Future date with no record
         } else {
-          records[d] = undefined; // Past/today with no record
+          // Past/today with no record — infer from shift history on that specific date
+          const workingDays = getWorkingDaysForDate(empShiftHistory, dateUTC);
+          if (workingDays) {
+            const dayName = DAY_NAMES[dateUTC.getUTCDay()];
+            if (!workingDays.includes(dayName)) {
+              records[d] = { status: "Off", _inferred: true }; // synthetic off-day (no DB record)
+            } else {
+              records[d] = undefined; // working day with no record marked yet
+            }
+          } else {
+            records[d] = undefined; // no shift assigned on this date
+          }
         }
       }
 
@@ -520,9 +567,6 @@ export const getMonthlyAttendance = async (req, res, next) => {
         off: 0,
         leave: 0,
       };
-
-      const shiftWorkingDays = employeeShiftWorkingDaysMap[emp._id.toString()] || null;
-      const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
@@ -539,11 +583,14 @@ export const getMonthlyAttendance = async (req, res, next) => {
             case "Off":       summary.off++;      break;
             case "Leave":     summary.leave++;    break;
           }
-        } else if (shiftWorkingDays) {
-          // No record for this day — infer off day from shift
-          const dayName = DAY_NAMES[dateUTC.getUTCDay()];
-          if (!shiftWorkingDays.includes(dayName)) {
-            summary.off++;
+        } else {
+          // No DB record — infer off day from shift active on that specific date
+          const workingDays = getWorkingDaysForDate(empShiftHistory, dateUTC);
+          if (workingDays) {
+            const dayName = DAY_NAMES[dateUTC.getUTCDay()];
+            if (!workingDays.includes(dayName)) {
+              summary.off++;
+            }
           }
         }
       }
