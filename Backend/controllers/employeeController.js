@@ -7,6 +7,7 @@ import PositionHistory from "../models/PositionHistory.js";
 import EmployeeShift from "../models/EmployeeShift.js";
 import AllowancePolicy from "../models/AllowancePolicy.js";
 import AllowancePolicyHistory from "../models/AllowancePolicyHistory.js";
+import BasicSalaryHistory from "../models/BasicSalaryHistory.js";
 import { uploadToCloudinary } from "../config/cloudinaryConfig.js";
 import mongoose from "mongoose";
 
@@ -533,7 +534,45 @@ export const updateEmployee = async (req, res, next) => {
       basicSalary,
       employmentType,
       allowancePolicy,
+      compensationEffectiveDate,
+      compensationChangeReason,
     } = req.body;
+
+    const nextBasicSalaryCandidate =
+      basicSalary !== undefined ? Number(basicSalary) || 0 : Number(employee.basicSalary || 0);
+    const currentBasicSalary = Number(employee.basicSalary || 0);
+
+    const nextAllowancePolicyCandidate =
+      allowancePolicy !== undefined
+        ? allowancePolicy && allowancePolicy.trim()
+          ? allowancePolicy.trim()
+          : null
+        : employee.allowancePolicy?.toString() || null;
+    const currentAllowancePolicy = employee.allowancePolicy?.toString() || null;
+
+    const hasCompensationChangeInput =
+      nextBasicSalaryCandidate !== currentBasicSalary ||
+      nextAllowancePolicyCandidate !== currentAllowancePolicy;
+
+    if (hasCompensationChangeInput && !compensationEffectiveDate) {
+      res.status(400);
+      throw new Error(
+        "Compensation effective date is required when changing basic salary or allowance policy"
+      );
+    }
+
+    const parsedCompensationEffectiveDate = compensationEffectiveDate
+      ? new Date(compensationEffectiveDate)
+      : new Date();
+
+    if (
+      hasCompensationChangeInput &&
+      compensationEffectiveDate &&
+      Number.isNaN(parsedCompensationEffectiveDate.getTime())
+    ) {
+      res.status(400);
+      throw new Error("Invalid compensation effective date");
+    }
 
     // Check for duplicate CNIC if changed
     if (cnic && cnic.trim() !== employee.cnic) {
@@ -780,7 +819,34 @@ export const updateEmployee = async (req, res, next) => {
 
     // Handle basic salary change
     if (basicSalary !== undefined) {
-      employee.basicSalary = Number(basicSalary) || 0;
+      const nextBasicSalary = Number(basicSalary) || 0;
+      const previousBasicSalary = Number(employee.basicSalary || 0);
+
+      if (nextBasicSalary !== previousBasicSalary) {
+        const existingSalaryHistoryOnSameDate = await BasicSalaryHistory.findOne({
+          employee: id,
+          effectiveDate: parsedCompensationEffectiveDate,
+          toBasicSalary: { $ne: nextBasicSalary },
+        });
+
+        if (existingSalaryHistoryOnSameDate) {
+          res.status(400);
+          throw new Error(
+            "A different basic salary change already exists for the same effective date"
+          );
+        }
+
+        await BasicSalaryHistory.create({
+          employee: id,
+          fromBasicSalary: previousBasicSalary,
+          toBasicSalary: nextBasicSalary,
+          changedBy: req.user._id,
+          effectiveDate: parsedCompensationEffectiveDate,
+          reason: compensationChangeReason || "Updated via employee edit form",
+        });
+      }
+
+      employee.basicSalary = nextBasicSalary;
     }
 
     // Handle employment type change
@@ -845,13 +911,26 @@ export const updateEmployee = async (req, res, next) => {
       const oldAllowancePolicyId = employee.allowancePolicy?.toString() || null;
       if (oldAllowancePolicyId !== newAllowancePolicyId) {
         if (newAllowancePolicyId) {
+          const existingPolicyHistoryOnSameDate = await AllowancePolicyHistory.findOne({
+            employee: id,
+            effectiveDate: parsedCompensationEffectiveDate,
+            toAllowancePolicy: { $ne: newAllowancePolicyId },
+          });
+
+          if (existingPolicyHistoryOnSameDate) {
+            res.status(400);
+            throw new Error(
+              "A different allowance policy change already exists for the same effective date"
+            );
+          }
+
           await AllowancePolicyHistory.create({
             employee: id,
             fromAllowancePolicy: oldAllowancePolicyId,
             toAllowancePolicy: newAllowancePolicyId,
             changedBy: req.user._id,
-            effectiveDate: new Date(),
-            reason: "Updated via employee edit form",
+            effectiveDate: parsedCompensationEffectiveDate,
+            reason: compensationChangeReason || "Updated via employee edit form",
           });
         }
         employee.allowancePolicy = newAllowancePolicyId;
@@ -1213,6 +1292,50 @@ export const getEmployeePositionHistory = async (req, res, next) => {
         employeeID: employee.employeeID,
       },
       positionHistory,
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Get employee compensation history (salary + allowance policy)
+// @route           GET /api/employees/:id/compensation-history
+// @access          Admin
+export const getEmployeeCompensationHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Employee Not Found");
+    }
+
+    const employee = await Employee.findById(id).select("fullName employeeID");
+    if (!employee) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+
+    const [basicSalaryHistory, allowancePolicyHistory] = await Promise.all([
+      BasicSalaryHistory.find({ employee: id })
+        .populate("changedBy", "name")
+        .sort({ effectiveDate: -1, changedAt: -1 }),
+      AllowancePolicyHistory.find({ employee: id })
+        .populate("fromAllowancePolicy", "name")
+        .populate("toAllowancePolicy", "name")
+        .populate("changedBy", "name")
+        .sort({ effectiveDate: -1, changedAt: -1 }),
+    ]);
+
+    res.json({
+      employee: {
+        _id: employee._id,
+        fullName: employee.fullName,
+        employeeID: employee.employeeID,
+      },
+      basicSalaryHistory,
+      allowancePolicyHistory,
     });
   } catch (err) {
     console.log(err);

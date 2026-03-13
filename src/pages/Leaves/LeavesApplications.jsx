@@ -124,15 +124,24 @@ const generateDatesFromRanges = (dateRanges) => {
     if (!range.startDate || !range.endDate) continue;
     const start = new Date(range.startDate);
     const end = new Date(range.endDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
     const current = new Date(start);
     while (current <= end) {
       allDates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
   return allDates;
+};
+
+const toUTCMidnightISOString = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  return new Date(
+    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0),
+  ).toISOString();
 };
 
 // ============================================================================
@@ -140,6 +149,11 @@ const generateDatesFromRanges = (dateRanges) => {
 // ============================================================================
 
 const LeavesApplications = () => {
+  const DATE_SELECTION_MODES = {
+    single: "single",
+    range: "range",
+  };
+
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -184,6 +198,10 @@ const LeavesApplications = () => {
   const [dateRanges, setDateRanges] = useState([
     { startDate: undefined, endDate: undefined },
   ]);
+  const [dateSelectionMode, setDateSelectionMode] = useState(
+    DATE_SELECTION_MODES.range,
+  );
+  const [singleDate, setSingleDate] = useState(undefined);
   const [reason, setReason] = useState("");
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
   const [datePickerOpenIndex, setDatePickerOpenIndex] = useState(null);
@@ -266,8 +284,11 @@ const LeavesApplications = () => {
 
   // Calculate total days from all date ranges
   const totalDays = useMemo(() => {
+    if (dateSelectionMode === DATE_SELECTION_MODES.single) {
+      return singleDate ? 1 : 0;
+    }
     return generateDatesFromRanges(dateRanges).length;
-  }, [dateRanges]);
+  }, [dateRanges, dateSelectionMode, singleDate]);
 
   // Get remaining balance for the selected leave type
   const selectedLeaveBalance = useMemo(() => {
@@ -484,6 +505,8 @@ const LeavesApplications = () => {
     setSelectedEmployeeId("");
     setSelectedLeaveTypeId("");
     setDateRanges([{ startDate: undefined, endDate: undefined }]);
+    setDateSelectionMode(DATE_SELECTION_MODES.range);
+    setSingleDate(undefined);
     setReason("");
   };
 
@@ -493,6 +516,20 @@ const LeavesApplications = () => {
     setSelectedLeaveTypeId(row.leaveType?._id || "");
     // Restore date ranges
     if (row.dateRanges && row.dateRanges.length > 0) {
+      if (
+        row.dateRanges.length === 1 &&
+        row.dateRanges[0]?.startDate &&
+        row.dateRanges[0]?.endDate &&
+        new Date(row.dateRanges[0].startDate).toISOString().slice(0, 10) ===
+          new Date(row.dateRanges[0].endDate).toISOString().slice(0, 10)
+      ) {
+        setDateSelectionMode(DATE_SELECTION_MODES.single);
+        setSingleDate(new Date(row.dateRanges[0].startDate));
+      } else {
+        setDateSelectionMode(DATE_SELECTION_MODES.range);
+        setSingleDate(undefined);
+      }
+
       setDateRanges(
         row.dateRanges.map((r) => ({
           startDate: r.startDate ? new Date(r.startDate) : undefined,
@@ -500,6 +537,8 @@ const LeavesApplications = () => {
         }))
       );
     } else {
+      setDateSelectionMode(DATE_SELECTION_MODES.range);
+      setSingleDate(undefined);
       setDateRanges([{ startDate: undefined, endDate: undefined }]);
     }
     setReason(row.reason || "");
@@ -593,19 +632,24 @@ const LeavesApplications = () => {
       newErrors.leaveType = "Please select a leave type";
     }
 
-    // Validate date ranges
-    const hasValidRange = dateRanges.some(
-      (r) => r.startDate && r.endDate
-    );
-    if (!hasValidRange) {
-      newErrors.dateRanges = "At least one complete date range is required";
-    }
+    if (dateSelectionMode === DATE_SELECTION_MODES.single) {
+      if (!singleDate) {
+        newErrors.dateRanges = "Please select a leave date";
+      }
+    } else {
+      const hasValidRange = dateRanges.some(
+        (r) => r.startDate && r.endDate
+      );
+      if (!hasValidRange) {
+        newErrors.dateRanges = "At least one complete date range is required";
+      }
 
-    for (let i = 0; i < dateRanges.length; i++) {
-      const r = dateRanges[i];
-      if (r.startDate && r.endDate && r.endDate < r.startDate) {
-        newErrors.dateRanges = "End date cannot be before start date";
-        break;
+      for (let i = 0; i < dateRanges.length; i++) {
+        const r = dateRanges[i];
+        if (r.startDate && r.endDate && r.endDate < r.startDate) {
+          newErrors.dateRanges = "End date cannot be before start date";
+          break;
+        }
       }
     }
 
@@ -622,17 +666,30 @@ const LeavesApplications = () => {
       return;
     }
 
-    // Build payload — only send complete ranges
-    const validRanges = dateRanges
-      .filter((r) => r.startDate && r.endDate)
-      .map((r) => ({
-        startDate: r.startDate.toISOString(),
-        endDate: r.endDate.toISOString(),
-      }));
+    // Build payload
+    const validRanges =
+      dateSelectionMode === DATE_SELECTION_MODES.single
+        ? [
+            {
+              startDate: toUTCMidnightISOString(singleDate),
+              endDate: toUTCMidnightISOString(singleDate),
+            },
+          ]
+        : dateRanges
+            .filter((r) => r.startDate && r.endDate)
+            .map((r) => ({
+              startDate: toUTCMidnightISOString(r.startDate),
+              endDate: toUTCMidnightISOString(r.endDate),
+            }));
 
     const payload = {
       employee: selectedEmployeeId,
       leaveType: selectedLeaveTypeId,
+      selectionMode: dateSelectionMode,
+      singleDate:
+        dateSelectionMode === DATE_SELECTION_MODES.single && singleDate
+          ? toUTCMidnightISOString(singleDate)
+          : undefined,
       dateRanges: validRanges,
       reason: reason.trim(),
     };
@@ -825,8 +882,74 @@ const LeavesApplications = () => {
 
                 {/* Date Ranges */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Date Range(s)</Label>
-                  {dateRanges.map((range, index) => (
+                  <Label className="text-[#344054]">Date Selection</Label>
+
+                  <Select
+                    value={dateSelectionMode}
+                    onValueChange={(value) => {
+                      setDateSelectionMode(value);
+                      setErrors((prev) => ({ ...prev, dateRanges: undefined }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select date mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={DATE_SELECTION_MODES.single}>
+                          Single Day
+                        </SelectItem>
+                        <SelectItem value={DATE_SELECTION_MODES.range}>
+                          Date Range(s)
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+
+                  {dateSelectionMode === DATE_SELECTION_MODES.single ? (
+                    <Popover
+                      open={datePickerOpenIndex === -1 && datePickerType === "single"}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          setDatePickerOpenIndex(-1);
+                          setDatePickerType("single");
+                        } else {
+                          setDatePickerOpenIndex(null);
+                          setDatePickerType(null);
+                        }
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal cursor-pointer",
+                            !singleDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {singleDate ? formatDate(singleDate) : "Select leave date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          captionLayout="dropdown"
+                          selected={singleDate}
+                          onSelect={(date) => {
+                            setSingleDate(date);
+                            setDatePickerOpenIndex(null);
+                            setDatePickerType(null);
+                          }}
+                          startMonth={new Date(2020, 0)}
+                          endMonth={new Date(2030, 11)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <>
+                      {dateRanges.map((range, index) => (
                     <div key={index} className={styles.dateRangeRow}>
                       <div className={styles.dateRangeFields}>
                         {/* Start Date */}
@@ -939,17 +1062,19 @@ const LeavesApplications = () => {
                         </Button>
                       )}
                     </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-fit cursor-pointer"
-                    onClick={addDateRange}
-                  >
-                    <PlusIcon size={14} className="mr-1" />
-                    Add Date Range
-                  </Button>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit cursor-pointer"
+                        onClick={addDateRange}
+                      >
+                        <PlusIcon size={14} className="mr-1" />
+                        Add Date Range
+                      </Button>
+                    </>
+                  )}
                   {errors.dateRanges && (
                     <p className="text-sm text-red-500 mt-1">
                       {errors.dateRanges}

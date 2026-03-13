@@ -1,6 +1,21 @@
 import AllowancePolicy from "../models/AllowancePolicy.js";
+import AllowancePolicyAmountHistory from "../models/AllowancePolicyAmountHistory.js";
 import mongoose from "mongoose";
 import { ROLES } from "../utils/roles.js";
+
+const normalizeComponents = (components = []) =>
+  components
+    .map((item) => ({
+      allowanceComponent: item.allowanceComponent?.toString(),
+      amount: Number(item.amount || 0),
+    }))
+    .sort((a, b) => a.allowanceComponent.localeCompare(b.allowanceComponent));
+
+const componentsChanged = (oldComponents = [], newComponents = []) => {
+  const previous = normalizeComponents(oldComponents);
+  const next = normalizeComponents(newComponents);
+  return JSON.stringify(previous) !== JSON.stringify(next);
+};
 
 // @description     Get all allowance policies
 // @route           GET /api/allowance-policies
@@ -174,7 +189,24 @@ export const updateAllowancePolicy = async (req, res, next) => {
       throw new Error("Allowance policy not found");
     }
 
-    const { name, components } = req.body || {};
+    const {
+      name,
+      components,
+      compensationEffectiveDate,
+      compensationChangeReason,
+    } = req.body || {};
+
+    const parsedEffectiveDate = compensationEffectiveDate
+      ? new Date(compensationEffectiveDate)
+      : null;
+
+    if (
+      compensationEffectiveDate &&
+      (!parsedEffectiveDate || Number.isNaN(parsedEffectiveDate.getTime()))
+    ) {
+      res.status(400);
+      throw new Error("Invalid compensation effective date");
+    }
 
     // Validate name if provided
     if (name && name.trim()) {
@@ -195,6 +227,11 @@ export const updateAllowancePolicy = async (req, res, next) => {
 
     // Validate and update components if provided
     if (components) {
+      const previousComponents = allowancePolicy.components?.map((item) => ({
+        allowanceComponent: item.allowanceComponent,
+        amount: item.amount,
+      }));
+
       if (!Array.isArray(components) || components.length === 0) {
         res.status(400);
         throw new Error("At least one allowance component is required");
@@ -216,6 +253,36 @@ export const updateAllowancePolicy = async (req, res, next) => {
       }
 
       allowancePolicy.components = components;
+
+      if (componentsChanged(previousComponents, components)) {
+        if (!compensationEffectiveDate) {
+          res.status(400);
+          throw new Error(
+            "Compensation effective date is required when updating allowance component amounts"
+          );
+        }
+
+        const conflictingEntry = await AllowancePolicyAmountHistory.findOne({
+          allowancePolicy: allowancePolicy._id,
+          effectiveDate: parsedEffectiveDate,
+        });
+
+        if (conflictingEntry) {
+          res.status(400);
+          throw new Error(
+            "Allowance amount history already exists for this effective date"
+          );
+        }
+
+        await AllowancePolicyAmountHistory.create({
+          allowancePolicy: allowancePolicy._id,
+          fromComponents: previousComponents,
+          toComponents: components,
+          changedBy: req.user._id,
+          effectiveDate: parsedEffectiveDate,
+          reason: compensationChangeReason || "Updated via allowance policy edit",
+        });
+      }
     }
 
     const updatedAllowancePolicy = await allowancePolicy.save();
@@ -303,6 +370,42 @@ export const deleteAllowancePolicy = async (req, res, next) => {
         id: allowancePolicy._id,
         name: allowancePolicy.name,
       },
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Get allowance policy amount history
+// @route           GET /api/allowance-policies/:id/amount-history
+// @access          Admin, Supervisor
+export const getAllowancePolicyAmountHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Allowance Policy Not Found");
+    }
+
+    const allowancePolicy = await AllowancePolicy.findById(id).select("_id name");
+    if (!allowancePolicy) {
+      res.status(404);
+      throw new Error("Allowance policy not found");
+    }
+
+    const amountHistory = await AllowancePolicyAmountHistory.find({
+      allowancePolicy: id,
+    })
+      .populate("changedBy", "name")
+      .populate("fromComponents.allowanceComponent", "name")
+      .populate("toComponents.allowanceComponent", "name")
+      .sort({ effectiveDate: -1, changedAt: -1 });
+
+    res.json({
+      allowancePolicy,
+      amountHistory,
     });
   } catch (err) {
     console.log(err);

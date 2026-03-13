@@ -3,6 +3,8 @@ import LeaveBalance from "../models/LeaveBalance.js";
 import Employee from "../models/Employee.js";
 import LeaveType from "../models/LeaveType.js";
 import Position from "../models/Position.js";
+import Attendance from "../models/Attendance.js";
+import MonthlyAttendanceSummary from "../models/MonthlyAttendanceSummary.js";
 import mongoose from "mongoose";
 import { ROLES } from "../utils/roles.js";
 
@@ -18,12 +20,12 @@ const generateDatesFromRanges = (dateRanges) => {
   for (const range of dateRanges) {
     const start = new Date(range.startDate);
     const end = new Date(range.endDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
+    start.setUTCHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
     const current = new Date(start);
     while (current <= end) {
       allDates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
   }
   return allDates;
@@ -92,10 +94,171 @@ const ensureLeaveBalances = async (employeeId, year) => {
  */
 const formatLocalDate = (date) => {
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const normalizeToUTCMidnight = (dateLike) => {
+  const d = new Date(dateLike);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEmployeeMonthKey = (employeeId, dateLike) => {
+  const d = normalizeToUTCMidnight(dateLike);
+  return `${employeeId}__${d.getUTCFullYear()}__${d.getUTCMonth()}`;
+};
+
+const refreshMonthlySummary = async (employeeId, year, month) => {
+  const startOfMonth = new Date(Date.UTC(year, month, 1));
+  const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+
+  const records = await Attendance.find({
+    employee: employeeId,
+    date: { $gte: startOfMonth, $lte: endOfMonth },
+  });
+
+  const summary = {
+    present: 0,
+    absent: 0,
+    late: 0,
+    halfDay: 0,
+    off: 0,
+    leave: 0,
+    totalWorkingDays: 0,
+  };
+
+  for (const rec of records) {
+    switch (rec.status) {
+      case "Present":
+        summary.present++;
+        summary.totalWorkingDays++;
+        break;
+      case "Absent":
+        summary.absent++;
+        break;
+      case "Late":
+        summary.late++;
+        summary.totalWorkingDays++;
+        break;
+      case "Half Day":
+        summary.halfDay++;
+        summary.totalWorkingDays++;
+        break;
+      case "Off":
+        summary.off++;
+        break;
+      case "Leave":
+        summary.leave++;
+        break;
+    }
+  }
+
+  await MonthlyAttendanceSummary.findOneAndUpdate(
+    { employee: employeeId, year, month },
+    { ...summary },
+    { upsert: true, returnDocument: "after" }
+  );
+};
+
+const refreshSummariesByKeys = async (monthKeys) => {
+  if (!monthKeys || monthKeys.size === 0) return;
+
+  const jobs = [];
+  for (const key of monthKeys) {
+    const [employeeId, year, month] = key.split("__");
+    jobs.push(refreshMonthlySummary(employeeId, Number(year), Number(month)));
+  }
+  await Promise.all(jobs);
+};
+
+const removeApprovedLeaveAttendance = async ({
+  employeeId,
+  leaveApplicationId,
+  dates,
+}) => {
+  if (!employeeId || !leaveApplicationId) return new Set();
+
+  const monthKeys = new Set();
+  if (dates?.length) {
+    for (const date of dates) {
+      monthKeys.add(getEmployeeMonthKey(employeeId, date));
+    }
+  }
+
+  const recordsToDelete = await Attendance.find({
+    employee: employeeId,
+    linkedLeaveApplication: leaveApplicationId,
+    lockReason: "approved_leave",
+  }).select("date");
+
+  for (const rec of recordsToDelete) {
+    monthKeys.add(getEmployeeMonthKey(employeeId, rec.date));
+  }
+
+  await Attendance.deleteMany({
+    employee: employeeId,
+    linkedLeaveApplication: leaveApplicationId,
+    lockReason: "approved_leave",
+  });
+
+  return monthKeys;
+};
+
+const upsertApprovedLeaveAttendance = async ({
+  employeeId,
+  leaveApplicationId,
+  dates,
+  userId,
+}) => {
+  if (!employeeId || !leaveApplicationId || !dates?.length) {
+    return { monthKeys: new Set(), conflicts: [] };
+  }
+
+  const monthKeys = new Set();
+  const conflicts = [];
+
+  for (const date of dates) {
+    const normalizedDate = normalizeToUTCMidnight(date);
+    monthKeys.add(getEmployeeMonthKey(employeeId, normalizedDate));
+
+    const existing = await Attendance.findOne({
+      employee: employeeId,
+      date: normalizedDate,
+    });
+
+    if (
+      existing &&
+      existing.linkedLeaveApplication &&
+      existing.linkedLeaveApplication.toString() !== leaveApplicationId.toString()
+    ) {
+      conflicts.push(formatLocalDate(normalizedDate));
+      continue;
+    }
+
+    await Attendance.findOneAndUpdate(
+      { employee: employeeId, date: normalizedDate },
+      {
+        employee: employeeId,
+        date: normalizedDate,
+        status: "Leave",
+        shift: null,
+        checkIn: null,
+        checkOut: null,
+        lateDurationMinutes: 0,
+        workHours: null,
+        source: "leave_auto",
+        lockReason: "approved_leave",
+        linkedLeaveApplication: leaveApplicationId,
+        markedBy: userId || null,
+      },
+      { upsert: true, returnDocument: "after" }
+    );
+  }
+
+  return { monthKeys, conflicts };
 };
 
 /**
@@ -119,7 +282,7 @@ const checkDateOverlap = async (employeeId, dates, excludeApplicationId = null) 
   const existingDateSet = new Set();
   for (const app of existingApplications) {
     for (const existingDate of app.dates) {
-      existingDateSet.add(new Date(existingDate).setHours(0, 0, 0, 0));
+      existingDateSet.add(new Date(existingDate).setUTCHours(0, 0, 0, 0));
     }
   }
 
@@ -127,7 +290,7 @@ const checkDateOverlap = async (employeeId, dates, excludeApplicationId = null) 
   const overlappingDates = [];
 
   for (const requestedDate of dates) {
-    const reqTime = new Date(requestedDate).setHours(0, 0, 0, 0);
+    const reqTime = new Date(requestedDate).setUTCHours(0, 0, 0, 0);
     if (existingDateSet.has(reqTime)) {
       const dateStr = formatLocalDate(requestedDate);
       if (!overlappingDates.includes(dateStr)) {
@@ -145,6 +308,27 @@ const checkDateOverlap = async (employeeId, dates, excludeApplicationId = null) 
   }
 
   return { hasOverlap: false };
+};
+
+const normalizeIncomingDateRanges = (payload = {}) => {
+  const { singleDate, dateRanges } = payload;
+
+  if (singleDate) {
+    const single = new Date(singleDate);
+    if (isNaN(single.getTime())) {
+      throw new Error("Invalid singleDate");
+    }
+    return [
+      {
+        startDate: single.toISOString(),
+        endDate: single.toISOString(),
+      },
+    ];
+  }
+
+  if (!Array.isArray(dateRanges)) return [];
+
+  return dateRanges;
 };
 
 // ============================================================================
@@ -262,7 +446,15 @@ export const getAllLeaveApplications = async (req, res, next) => {
 // @access          Admin, Supervisor
 export const createLeaveApplication = async (req, res, next) => {
   try {
-    const { employee, leaveType, dateRanges, reason } = req.body || {};
+    const { employee, leaveType, reason } = req.body || {};
+    let dateRanges;
+
+    try {
+      dateRanges = normalizeIncomingDateRanges(req.body || {});
+    } catch (parseError) {
+      res.status(400);
+      throw new Error(parseError.message);
+    }
 
     // Validate employee
     if (!employee) {
@@ -334,7 +526,7 @@ export const createLeaveApplication = async (req, res, next) => {
     }
 
     // Get the year from the first date
-    const year = new Date(dateRanges[0].startDate).getFullYear();
+    const year = new Date(dateRanges[0].startDate).getUTCFullYear();
 
     // Ensure leave balances exist and check availability
     const balances = await ensureLeaveBalances(employee, year);
@@ -375,6 +567,18 @@ export const createLeaveApplication = async (req, res, next) => {
     });
 
     await newApplication.save();
+
+    if (status === "Approved") {
+      const attendanceSyncDates = generateDatesFromRanges(newApplication.dateRanges);
+      const { monthKeys } = await upsertApprovedLeaveAttendance({
+        employeeId: employee,
+        leaveApplicationId: newApplication._id,
+        dates: attendanceSyncDates,
+        userId: req.user._id,
+      });
+
+      await refreshSummariesByKeys(monthKeys);
+    }
 
     // Deduct from leave balance (on applying, both Pending and Approved)
     balance.usedDays += daysCount;
@@ -421,17 +625,35 @@ export const updateLeaveApplication = async (req, res, next) => {
       throw new Error("Only pending applications can be edited");
     }
 
-    const { employee, leaveType, dateRanges, reason } = req.body || {};
+    const { employee, leaveType, reason } = req.body || {};
+    const requestedDateRanges = (() => {
+      const body = req.body || {};
+      if (Object.prototype.hasOwnProperty.call(body, "singleDate")) return true;
+      if (Object.prototype.hasOwnProperty.call(body, "dateRanges")) return true;
+      return false;
+    })();
+
+    let normalizedDateRanges = null;
+    if (requestedDateRanges) {
+      try {
+        normalizedDateRanges = normalizeIncomingDateRanges(req.body || {});
+      } catch (parseError) {
+        res.status(400);
+        throw new Error(parseError.message);
+      }
+    }
 
     // Store old values for balance restoration
     const oldDaysCount = application.daysCount;
     const oldLeaveType = application.leaveType.toString();
     const oldEmployee = application.employee.toString();
     const oldStatus = application.status;
+    const oldAttendanceEmployeeId = application.employee.toString();
+    const oldAttendanceDates = [...application.dates];
 
     // Determine the year from existing or new date ranges
-    const effectiveDateRanges = dateRanges || application.dateRanges;
-    const year = new Date(effectiveDateRanges[0].startDate).getFullYear();
+    const effectiveDateRanges = normalizedDateRanges || application.dateRanges;
+    const year = new Date(effectiveDateRanges[0].startDate).getUTCFullYear();
 
     // Restore old balance if the application was Pending or Approved (balance was deducted)
     if (oldStatus !== "Rejected") {
@@ -476,12 +698,12 @@ export const updateLeaveApplication = async (req, res, next) => {
       application.leaveType = leaveType;
     }
 
-    if (dateRanges) {
-      if (!Array.isArray(dateRanges) || dateRanges.length === 0) {
+    if (requestedDateRanges) {
+      if (!Array.isArray(normalizedDateRanges) || normalizedDateRanges.length === 0) {
         res.status(400);
         throw new Error("At least one date range is required");
       }
-      for (const range of dateRanges) {
+      for (const range of normalizedDateRanges) {
         if (!range.startDate || !range.endDate) {
           res.status(400);
           throw new Error("Each date range must have a start and end date");
@@ -491,8 +713,8 @@ export const updateLeaveApplication = async (req, res, next) => {
           throw new Error("End date cannot be before start date");
         }
       }
-      application.dateRanges = dateRanges;
-      application.dates = generateDatesFromRanges(dateRanges);
+      application.dateRanges = normalizedDateRanges;
+      application.dates = generateDatesFromRanges(normalizedDateRanges);
       application.daysCount = application.dates.length;
 
       // Check for date overlap (excluding current application)
@@ -552,6 +774,31 @@ export const updateLeaveApplication = async (req, res, next) => {
 
     await application.save();
 
+    const summaryKeysToRefresh = new Set();
+
+    if (oldStatus === "Approved") {
+      const removedKeys = await removeApprovedLeaveAttendance({
+        employeeId: oldAttendanceEmployeeId,
+        leaveApplicationId: application._id,
+        dates: oldAttendanceDates,
+      });
+      for (const key of removedKeys) summaryKeysToRefresh.add(key);
+    }
+
+    if (application.status === "Approved") {
+      const attendanceSyncDates = generateDatesFromRanges(application.dateRanges);
+      const { monthKeys } = await upsertApprovedLeaveAttendance({
+        employeeId: application.employee.toString(),
+        leaveApplicationId: application._id,
+        dates: attendanceSyncDates,
+        userId: req.user._id,
+      });
+
+      for (const key of monthKeys) summaryKeysToRefresh.add(key);
+    }
+
+    await refreshSummariesByKeys(summaryKeysToRefresh);
+
     const populatedApplication = await LeaveApplication.findById(
       application._id
     )
@@ -588,7 +835,7 @@ export const approveLeaveApplication = async (req, res, next) => {
       throw new Error("Application is already approved");
     }
 
-    const year = new Date(application.dateRanges[0].startDate).getFullYear();
+    const year = new Date(application.dateRanges[0].startDate).getUTCFullYear();
 
     // If was Rejected, need to re-deduct balance
     if (application.status === "Rejected") {
@@ -621,6 +868,16 @@ export const approveLeaveApplication = async (req, res, next) => {
     application.status = "Approved";
     application.approvedBy = req.user._id;
     await application.save();
+
+    const attendanceSyncDates = generateDatesFromRanges(application.dateRanges);
+    const { monthKeys } = await upsertApprovedLeaveAttendance({
+      employeeId: application.employee.toString(),
+      leaveApplicationId: application._id,
+      dates: attendanceSyncDates,
+      userId: req.user._id,
+    });
+
+    await refreshSummariesByKeys(monthKeys);
 
     const populatedApplication = await LeaveApplication.findById(
       application._id
@@ -662,7 +919,7 @@ export const rejectLeaveApplication = async (req, res, next) => {
     }
 
     // Restore balance since rejection undoes the deduction
-    const year = new Date(application.dateRanges[0].startDate).getFullYear();
+    const year = new Date(application.dateRanges[0].startDate).getUTCFullYear();
     const balances = await ensureLeaveBalances(
       application.employee.toString(),
       year
@@ -684,9 +941,17 @@ export const rejectLeaveApplication = async (req, res, next) => {
       await balance.save();
     }
 
+    const removedSummaryKeys = await removeApprovedLeaveAttendance({
+      employeeId: application.employee.toString(),
+      leaveApplicationId: application._id,
+      dates: application.dates,
+    });
+
     application.status = "Rejected";
     application.approvedBy = req.user._id;
     await application.save();
+
+    await refreshSummariesByKeys(removedSummaryKeys);
 
     const populatedApplication = await LeaveApplication.findById(
       application._id
@@ -737,7 +1002,7 @@ export const deleteLeaveApplication = async (req, res, next) => {
     if (application.status !== "Rejected") {
       const year = new Date(
         application.dateRanges[0].startDate
-      ).getFullYear();
+      ).getUTCFullYear();
       const balances = await ensureLeaveBalances(
         application.employee._id.toString(),
         year
@@ -760,7 +1025,15 @@ export const deleteLeaveApplication = async (req, res, next) => {
       }
     }
 
+    const removedSummaryKeys = await removeApprovedLeaveAttendance({
+      employeeId: application.employee._id.toString(),
+      leaveApplicationId: application._id,
+      dates: application.dates,
+    });
+
     await application.deleteOne();
+
+    await refreshSummariesByKeys(removedSummaryKeys);
 
     res.json({
       message: "Leave application deleted successfully",

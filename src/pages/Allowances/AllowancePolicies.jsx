@@ -563,6 +563,20 @@ const AllowancePolicies = () => {
     };
 
     if (editingAllowancePolicy) {
+      const compensationEffectiveDate = formData.get("compensation-effective-date");
+      const compensationChangeReason = formData.get("compensation-change-reason");
+
+      if (!compensationEffectiveDate) {
+        setErrors({
+          compensationEffectiveDate:
+            "Compensation effective date is required when editing component amounts",
+        });
+        return;
+      }
+
+      payload.compensationEffectiveDate = compensationEffectiveDate;
+      payload.compensationChangeReason = compensationChangeReason;
+
       // Update existing allowance policy
       updateMutation.mutate(
         { id: editingAllowancePolicy._id, payload },
@@ -687,6 +701,44 @@ const AllowancePolicies = () => {
                       );
                     })}
                   </div>
+                )}
+
+                {editingAllowancePolicy && (
+                  <>
+                    <div className="grid gap-3">
+                      <Label
+                        htmlFor="compensation-effective-date"
+                        className="text-[#344054]"
+                      >
+                        Compensation Effective Date
+                      </Label>
+                      <Input
+                        id="compensation-effective-date"
+                        name="compensation-effective-date"
+                        type="date"
+                        defaultValue={new Date().toISOString().slice(0, 10)}
+                      />
+                      {errors.compensationEffectiveDate && (
+                        <p className="text-sm text-red-500 mt-1">
+                          {errors.compensationEffectiveDate}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3">
+                      <Label
+                        htmlFor="compensation-change-reason"
+                        className="text-[#344054]"
+                      >
+                        Compensation Change Reason
+                      </Label>
+                      <Input
+                        id="compensation-change-reason"
+                        name="compensation-change-reason"
+                        placeholder="Reason for amount update (optional)"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
               <DialogFooter className="mt-4">

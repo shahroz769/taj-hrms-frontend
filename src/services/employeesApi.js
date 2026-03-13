@@ -57,3 +57,8 @@ export const fetchPositionsByDepartment = async (departmentId) => {
   const res = await API.get(`/api/positions/by-department/${departmentId}`);
   return res.data;
 };
+
+export const fetchEmployeeCompensationHistory = async (id) => {
+  const res = await API.get(`/api/employees/${id}/compensation-history`);
+  return res.data;
+};

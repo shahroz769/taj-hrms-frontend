@@ -31,3 +31,8 @@ export const updateAllowancePolicyStatus = async (id, status) => {
   const res = await API.patch(`/api/allowance-policies/${id}/status`, { status });
   return res.data;
 };
+
+export const fetchAllowancePolicyAmountHistory = async (id) => {
+  const res = await API.get(`/api/allowance-policies/${id}/amount-history`);
+  return res.data;
+};

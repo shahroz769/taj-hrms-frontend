@@ -329,13 +329,25 @@ const AttendanceRecords = () => {
       return <span className={styles.badgeFuture}>—</span>;
     }
     const status = record.status;
+    const leaveLabel =
+      record?.leaveIsPaid === true
+        ? "Paid Leave"
+        : record?.leaveIsPaid === false
+          ? "Unpaid Leave"
+          : "Leave";
+    const leaveClass =
+      record?.leaveIsPaid === true
+        ? styles.badgeLPaid
+        : record?.leaveIsPaid === false
+          ? styles.badgeLUnpaid
+          : styles.badgeL;
     const statusConfig = {
-      Present: { cls: styles.badgeP, label: "P" },
-      Absent: { cls: styles.badgeA, label: "A" },
-      Late: { cls: styles.badgeP, label: "P", cornerLabel: "L", cornerCls: styles.cornerBadgeLate },
-      "Half Day": { cls: styles.badgeP, label: "P", cornerLabel: "HD", cornerCls: styles.cornerBadgeHalfDay },
+      Present: { cls: styles.badgeP, label: "Present" },
+      Absent: { cls: styles.badgeA, label: "Absent" },
+      Late: { cls: styles.badgeP, label: "Present", cornerLabel: "Late", cornerCls: styles.cornerBadgeLate },
+      "Half Day": { cls: styles.badgeP, label: "Present", cornerLabel: "Half Day", cornerCls: styles.cornerBadgeHalfDay },
       Off: { cls: styles.badgeOff, label: "Off" },
-      Leave: { cls: styles.badgeL, label: "L" },
+      Leave: { cls: leaveClass, label: leaveLabel },
     };
     const config = statusConfig[status];
     if (!config) return <span className={styles.badgeFuture}>—</span>;

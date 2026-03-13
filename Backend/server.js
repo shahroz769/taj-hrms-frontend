@@ -20,6 +20,7 @@ import disciplinaryActionRouter from "./routes/disciplinaryActionRoutes.js";
 import workProgressReportRouter from "./routes/workProgressReportRoutes.js";
 import leaveApplicationRouter from "./routes/leaveApplicationRoutes.js";
 import attendanceRouter from "./routes/attendanceRoutes.js";
+import payrollRouter from "./routes/payrollRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import connectDB from "./config/db.js";
 import chalk from "chalk";
@@ -71,6 +72,7 @@ app.use("/api/disciplinary-actions", disciplinaryActionRouter);
 app.use("/api/work-progress-reports", workProgressReportRouter);
 app.use("/api/leave-applications", leaveApplicationRouter);
 app.use("/api/attendances", attendanceRouter);
+app.use("/api/payrolls", payrollRouter);
 
 // 404 Fallback
 app.use((req, res, next) => {

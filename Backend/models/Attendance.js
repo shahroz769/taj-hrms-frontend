@@ -39,8 +39,18 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "device"],
+      enum: ["manual", "device", "leave_auto"],
       default: "manual",
+    },
+    lockReason: {
+      type: String,
+      enum: ["approved_leave"],
+      default: null,
+    },
+    linkedLeaveApplication: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "LeaveApplication",
+      default: null,
     },
     markedBy: {
       type: mongoose.Schema.Types.ObjectId,

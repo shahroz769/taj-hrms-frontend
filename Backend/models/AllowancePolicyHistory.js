@@ -38,8 +38,8 @@ const allowancePolicyHistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for efficient queries by position
-allowancePolicyHistorySchema.index({ position: 1, changedAt: -1 });
+// Index for efficient queries by employee
+allowancePolicyHistorySchema.index({ employee: 1, changedAt: -1 });
 
 const AllowancePolicyHistory = mongoose.model(
   "AllowancePolicyHistory",

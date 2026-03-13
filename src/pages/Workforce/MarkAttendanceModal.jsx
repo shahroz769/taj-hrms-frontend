@@ -700,7 +700,7 @@ const MarkAttendanceModal = ({
         {submissionErrors.length > 0 && (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 grid gap-2">
             <p className="text-sm font-medium text-red-700">
-              {submissionErrors.length} employee(s) could not be processed:
+                {submissionErrors.length} entries could not be processed:
             </p>
             <ul className="space-y-1">
               {submissionErrors.map((err, i) => {

@@ -4,3 +4,4 @@ When creating new pages, reference other pages for structure/ui
 I do not want framer motion animations anywhere in whole project except the sidebar
 Use bun install if any new package is to be installed. Not npm install
 Use sub agents to do tasks, if context window limit is a a problem
+Always use Shadcn components. Look for components of shadcn on web, install if not installed.

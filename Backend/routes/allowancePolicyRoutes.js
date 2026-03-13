@@ -8,6 +8,7 @@ import {
   updateAllowancePolicy,
   updateAllowancePolicyStatus,
   deleteAllowancePolicy,
+  getAllowancePolicyAmountHistory,
 } from "../controllers/allowancePolicyController.js";
 import { authorize } from "../middleware/rbacMiddleware.js";
 import { ROLES } from "../utils/roles.js";
@@ -42,6 +43,16 @@ router.get(
   protect,
   authorize(ROLES.admin, ROLES.supervisor),
   getAllowancePolicyById
+);
+
+// @route           GET /api/allowance-policies/:id/amount-history
+// @description     Get allowance policy amount history
+// @access          Admin, Supervisor
+router.get(
+  "/:id/amount-history",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getAllowancePolicyAmountHistory
 );
 
 // @route           POST /api/allowance-policies

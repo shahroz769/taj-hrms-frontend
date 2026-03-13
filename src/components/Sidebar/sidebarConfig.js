@@ -62,12 +62,13 @@ export const sidebarItems = [
     ],
   },
   {
-    label: "Allowances",
+    label: "Salary",
     icon: CircleDollarSignIcon,
     roles: [ROLES.admin, ROLES.supervisor],
     collapsible: true,
     collapseIcon: ChevronDownIcon,
     children: [
+      { label: "Payroll", path: "/salary/payroll" },
       { label: "Allowance Components", path: "/allowances/components" },
       { label: "Allowance Policies", path: "/allowances/policies" },
     ],

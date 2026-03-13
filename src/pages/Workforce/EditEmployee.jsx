@@ -101,6 +101,8 @@ const EditEmployee = () => {
       position: "",
       basicSalary: "",
       allowancePolicy: "",
+      compensationEffectiveDate: new Date(),
+      compensationChangeReason: "",
       employmentType: "Permanent",
       fatherName: "",
       husbandName: "",
@@ -248,6 +250,8 @@ const EditEmployee = () => {
         position: emp.position?._id || "",
         basicSalary: emp.basicSalary ?? "",
         allowancePolicy: emp.allowancePolicy?._id || "",
+        compensationEffectiveDate: new Date(),
+        compensationChangeReason: "",
         employmentType: emp.employmentType || "Permanent",
         fatherName: emp.fatherName || "",
         husbandName: emp.husbandName || "",
@@ -370,6 +374,18 @@ const EditEmployee = () => {
   };
 
   const onSubmit = (data) => {
+    const currentBasicSalary = Number(employeeData?.employee?.basicSalary || 0);
+    const nextBasicSalary = Number(data.basicSalary || 0);
+    const currentAllowancePolicy = employeeData?.employee?.allowancePolicy?._id || "";
+    const nextAllowancePolicy = data.allowancePolicy || "";
+    const hasCompensationChange =
+      currentBasicSalary !== nextBasicSalary || currentAllowancePolicy !== nextAllowancePolicy;
+
+    if (hasCompensationChange && !data.compensationEffectiveDate) {
+      toast.error("Compensation effective date is required for salary/policy changes");
+      return;
+    }
+
     const formData = new FormData();
 
     // Append simple fields
@@ -384,7 +400,11 @@ const EditEmployee = () => {
       ) {
         formData.append(key, JSON.stringify(data[key]));
       } else if (key !== "department") {
-        formData.append(key, data[key]);
+        if (key === "compensationEffectiveDate") {
+          formData.append(key, data[key] ? new Date(data[key]).toISOString() : "");
+        } else {
+          formData.append(key, data[key]);
+        }
       }
     });
 
@@ -728,6 +748,43 @@ const EditEmployee = () => {
                   {errors.joiningDate.message}
                 </span>
               )}
+            </div>
+            <div className={styles.formGroup}>
+              <Label className={styles.label}>Compensation Effective Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    data-empty={!watch("compensationEffectiveDate")}
+                    className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+                  >
+                    {watch("compensationEffectiveDate") ? (
+                      format(watch("compensationEffectiveDate"), "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                    <ChevronDownIcon />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={watch("compensationEffectiveDate")}
+                    onSelect={(date) => setValue("compensationEffectiveDate", date)}
+                    defaultMonth={watch("compensationEffectiveDate")}
+                    captionLayout="dropdown"
+                    fromYear={1990}
+                    toYear={new Date().getFullYear() + 1}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
+              <Label className={styles.label}>Compensation Change Reason</Label>
+              <Textarea
+                {...register("compensationChangeReason")}
+                placeholder="Reason for salary/policy change (optional)"
+              />
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               <Label className={styles.label}>Current Street Address</Label>

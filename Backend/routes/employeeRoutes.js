@@ -14,6 +14,7 @@ import {
   changeEmployeeStatus,
   changeEmployeePosition,
   getEmployeePositionHistory,
+  getEmployeeCompensationHistory,
   getEmployeesList,
   renewEmployeeLeaveBalances,
   renewAllEmployeesLeaveBalances,
@@ -99,6 +100,16 @@ router.get(
   protect,
   authorize(ROLES.admin),
   getEmployeePositionHistory
+);
+
+// @route           GET /api/employees/:id/compensation-history
+// @description     Get employee compensation history (salary + allowance policy)
+// @access          Admin
+router.get(
+  "/:id/compensation-history",
+  protect,
+  authorize(ROLES.admin),
+  getEmployeeCompensationHistory
 );
 
 // @route           GET /api/employees/:id/leave-balances

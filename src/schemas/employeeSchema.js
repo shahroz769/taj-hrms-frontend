@@ -89,6 +89,8 @@ export const employeeSchema = z.object({
     { message: "Basic salary must be a non-negative number" }
   ),
   allowancePolicy: z.string().min(1, "Allowance policy is required"),
+  compensationEffectiveDate: z.union([z.string(), z.date()]).optional().nullable(),
+  compensationChangeReason: z.string().optional(),
   joiningDate: z.union([z.string(), z.date()], {
     required_error: "Joining date is required",
   }),

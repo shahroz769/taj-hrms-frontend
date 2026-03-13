@@ -4,6 +4,7 @@ import MonthlyAttendanceSummary from "../models/MonthlyAttendanceSummary.js";
 import Employee from "../models/Employee.js";
 import EmployeeShift from "../models/EmployeeShift.js";
 import Shift from "../models/Shift.js";
+import LeaveApplication from "../models/LeaveApplication.js";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -67,6 +68,120 @@ const safeDateParse = (value) => {
   if (!value) return null;
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
+};
+
+const ATTENDANCE_RULES = {
+  graceMinutes: 15,
+  absentAfterLateMinutes: 60,
+  halfDayEarlyLeaveMinutes: 60,
+};
+
+const TIMED_STATUSES = ["Present", "Late", "Half Day"];
+
+const computeStatusFromCheckTimes = ({
+  requestedStatus,
+  shift,
+  date,
+  checkIn,
+  checkOut,
+}) => {
+  const nonTimedStatuses = ["Leave", "Off", "Absent"];
+  if (requestedStatus && nonTimedStatuses.includes(requestedStatus)) {
+    return requestedStatus;
+  }
+
+  if (!shift || !date) {
+    return requestedStatus || "Present";
+  }
+
+  const shiftStart = buildDateTimeFromShiftTime(date, shift.startTime);
+  const shiftEnd = buildDateTimeFromShiftTime(date, shift.endTime);
+
+  if (!shiftStart || !shiftEnd) {
+    return requestedStatus || "Present";
+  }
+
+  let computedStatus = "Present";
+
+  if (checkIn) {
+    const lateMinutes = Math.floor((checkIn.getTime() - shiftStart.getTime()) / 60000);
+    if (lateMinutes >= ATTENDANCE_RULES.absentAfterLateMinutes) {
+      return "Absent";
+    }
+    if (lateMinutes > ATTENDANCE_RULES.graceMinutes) {
+      computedStatus = "Late";
+    }
+  }
+
+  if (checkOut) {
+    const earlyLeaveMinutes = Math.floor((shiftEnd.getTime() - checkOut.getTime()) / 60000);
+    if (earlyLeaveMinutes >= ATTENDANCE_RULES.halfDayEarlyLeaveMinutes) {
+      if (computedStatus !== "Absent") {
+        computedStatus = "Half Day";
+      }
+    }
+  }
+
+  return computedStatus;
+};
+
+const computeLateMinutesFromCheckIn = ({ shift, date, checkIn }) => {
+  if (!shift || !date || !checkIn) return 0;
+  const shiftStart = buildDateTimeFromShiftTime(date, shift.startTime);
+  if (!shiftStart) return 0;
+  const diff = Math.floor((checkIn.getTime() - shiftStart.getTime()) / 60000);
+  return diff > 0 ? diff : 0;
+};
+
+const ensureCheckTimesForTimedStatus = ({
+  status,
+  date,
+  shift,
+  checkIn,
+  checkOut,
+}) => {
+  if (!TIMED_STATUSES.includes(status)) {
+    return { checkIn, checkOut };
+  }
+
+  const resolvedCheckIn =
+    checkIn || (shift ? buildDateTimeFromShiftTime(date, shift.startTime) : null);
+  const resolvedCheckOut =
+    checkOut || (shift ? buildDateTimeFromShiftTime(date, shift.endTime) : null);
+
+  if (!resolvedCheckIn || !resolvedCheckOut) {
+    throw new Error(
+      "Check-in and check-out are required for Present/Late/Half Day attendance.",
+    );
+  }
+
+  return {
+    checkIn: resolvedCheckIn,
+    checkOut: resolvedCheckOut,
+  };
+};
+
+const isApprovedLeaveLockedRecord = (attendanceRecord) => {
+  return (
+    attendanceRecord?.lockReason === "approved_leave" ||
+    (attendanceRecord?.source === "leave_auto" &&
+      !!attendanceRecord?.linkedLeaveApplication)
+  );
+};
+
+const hasApprovedLeaveOnDate = async (employeeId, dateUTC) => {
+  const dayStart = new Date(dateUTC);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dateUTC);
+  dayEnd.setUTCHours(23, 59, 59, 999);
+
+  const approvedLeave = await LeaveApplication.findOne({
+    employee: employeeId,
+    status: "Approved",
+    dates: { $elemMatch: { $gte: dayStart, $lte: dayEnd } },
+  }).select("_id");
+
+  return !!approvedLeave;
 };
 
 /**
@@ -141,7 +256,7 @@ const refreshMonthlySummary = async (employeeId, year, month) => {
   await MonthlyAttendanceSummary.findOneAndUpdate(
     { employee: employeeId, year, month },
     { ...summary },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 };
 
@@ -315,8 +430,34 @@ export const bulkMarkAttendance = async (req, res, next) => {
           }
 
           // Build checkIn / checkOut from shift times (null if status is Off or times are missing)
-          const checkIn = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.startTime) : null;
-          const checkOut = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.endTime) : null;
+          let checkIn = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.startTime) : null;
+          let checkOut = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.endTime) : null;
+
+          if (TIMED_STATUSES.includes(status)) {
+            ({ checkIn, checkOut } = ensureCheckTimesForTimedStatus({
+              status,
+              date,
+              shift: shiftToUse,
+              checkIn,
+              checkOut,
+            }));
+          }
+
+          const existing = await Attendance.findOne({
+            employee: employeeId,
+            date,
+          });
+
+          if (existing && isApprovedLeaveLockedRecord(existing)) {
+            skipped++;
+            errors.push({
+              employeeId,
+              date: date.toISOString().split("T")[0],
+              error:
+                "Attendance is locked by an approved leave application and cannot be overwritten.",
+            });
+            continue;
+          }
 
           // Handle overwrite logic
           if (overwrite) {
@@ -333,16 +474,14 @@ export const bulkMarkAttendance = async (req, res, next) => {
                 lateDurationMinutes: 0,
                 workHours: null,
                 source: "manual",
+                lockReason: null,
+                linkedLeaveApplication: null,
                 markedBy: req.user._id,
               },
-              { upsert: true, new: true },
+              { upsert: true, returnDocument: "after" },
             );
           } else {
             // Skip if record exists
-            const existing = await Attendance.findOne({
-              employee: employeeId,
-              date,
-            });
             if (existing) {
               skipped++;
               continue;
@@ -357,6 +496,8 @@ export const bulkMarkAttendance = async (req, res, next) => {
               lateDurationMinutes: 0,
               workHours: null,
               source: "manual",
+              lockReason: null,
+              linkedLeaveApplication: null,
               markedBy: req.user._id,
             });
           }
@@ -495,14 +636,45 @@ export const getMonthlyAttendance = async (req, res, next) => {
       employee: { $in: employeeIds },
       date: { $gte: startOfMonth, $lte: endOfMonth },
     })
-      .select("employee date status shift checkIn checkOut lateDurationMinutes")
+      .select("employee date status shift checkIn checkOut lateDurationMinutes source lockReason linkedLeaveApplication")
       .lean();
+
+    const linkedLeaveIds = [
+      ...new Set(
+        records
+          .map((r) => r.linkedLeaveApplication?.toString())
+          .filter(Boolean),
+      ),
+    ];
+
+    let leaveMetaMap = {};
+    if (linkedLeaveIds.length > 0) {
+      const linkedLeaves = await LeaveApplication.find({
+        _id: { $in: linkedLeaveIds },
+      })
+        .populate("leaveType", "name isPaid")
+        .select("_id leaveType")
+        .lean();
+
+      leaveMetaMap = linkedLeaves.reduce((acc, leave) => {
+        acc[leave._id.toString()] = {
+          leaveTypeName: leave.leaveType?.name || null,
+          leaveIsPaid:
+            typeof leave.leaveType?.isPaid === "boolean"
+              ? leave.leaveType.isPaid
+              : null,
+        };
+        return acc;
+      }, {});
+    }
 
     // Build a lookup map: employeeId -> day -> record
     const recordMap = {};
     for (const rec of records) {
       const empKey = rec.employee.toString();
       const day = new Date(rec.date).getUTCDate();
+      const linkedLeaveId = rec.linkedLeaveApplication?.toString() || null;
+      const leaveMeta = linkedLeaveId ? leaveMetaMap[linkedLeaveId] : null;
       if (!recordMap[empKey]) recordMap[empKey] = {};
       recordMap[empKey][day] = {
         _id: rec._id,
@@ -511,6 +683,12 @@ export const getMonthlyAttendance = async (req, res, next) => {
         checkIn: rec.checkIn,
         checkOut: rec.checkOut,
         lateDurationMinutes: rec.lateDurationMinutes || 0,
+        source: rec.source,
+        lockReason: rec.lockReason || null,
+        linkedLeaveApplication: rec.linkedLeaveApplication || null,
+        isLocked: isApprovedLeaveLockedRecord(rec),
+        leaveTypeName: leaveMeta?.leaveTypeName || null,
+        leaveIsPaid: leaveMeta?.leaveIsPaid ?? null,
       };
     }
 
@@ -570,7 +748,6 @@ export const getMonthlyAttendance = async (req, res, next) => {
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
-        if (dateUTC > todayUTC) continue; // skip future days
         if (joiningDate && dateUTC < joiningDate) continue; // skip before joining
 
         const rec = empRecords[d];
@@ -583,6 +760,11 @@ export const getMonthlyAttendance = async (req, res, next) => {
             case "Off":       summary.off++;      break;
             case "Leave":     summary.leave++;    break;
           }
+          continue;
+        }
+
+        if (dateUTC > todayUTC) {
+          continue; // future day with no record
         } else {
           // No DB record — infer off day from shift active on that specific date
           const workingDays = getWorkingDaysForDate(empShiftHistory, dateUTC);
@@ -673,6 +855,13 @@ export const updateAttendance = async (req, res, next) => {
       throw new Error("Attendance record not found");
     }
 
+    if (isApprovedLeaveLockedRecord(attendance)) {
+      res.status(403);
+      throw new Error(
+        "This attendance record is auto-managed by an approved leave application and cannot be edited.",
+      );
+    }
+
     const { status, shiftId, checkIn, checkOut, lateDurationMinutes } =
       req.body;
 
@@ -708,6 +897,42 @@ export const updateAttendance = async (req, res, next) => {
       attendance.checkOut = checkOut ? safeDateParse(checkOut) : null;
     if (lateDurationMinutes !== undefined)
       attendance.lateDurationMinutes = lateDurationMinutes;
+
+    let shiftForRules = null;
+    if (attendance.shift) {
+      shiftForRules = await Shift.findById(attendance.shift).select(
+        "startTime endTime",
+      );
+    }
+
+    attendance.status = computeStatusFromCheckTimes({
+      requestedStatus: attendance.status,
+      shift: shiftForRules,
+      date: attendance.date,
+      checkIn: attendance.checkIn,
+      checkOut: attendance.checkOut,
+    });
+
+    if (TIMED_STATUSES.includes(attendance.status)) {
+      const ensuredTimes = ensureCheckTimesForTimedStatus({
+        status: attendance.status,
+        date: attendance.date,
+        shift: shiftForRules,
+        checkIn: attendance.checkIn,
+        checkOut: attendance.checkOut,
+      });
+      attendance.checkIn = ensuredTimes.checkIn;
+      attendance.checkOut = ensuredTimes.checkOut;
+    }
+
+    const computedLateMinutes = computeLateMinutesFromCheckIn({
+      shift: shiftForRules,
+      date: attendance.date,
+      checkIn: attendance.checkIn,
+    });
+
+    attendance.lateDurationMinutes = computedLateMinutes;
+
     attendance.markedBy = req.user._id;
     attendance.source = "manual";
 
@@ -774,6 +999,14 @@ export const markSingleAttendance = async (req, res, next) => {
     const parsedDate = new Date(date);
     parsedDate.setUTCHours(0, 0, 0, 0);
 
+    const leaveExists = await hasApprovedLeaveOnDate(employeeId, parsedDate);
+    if (leaveExists && status !== "Leave") {
+      res.status(400);
+      throw new Error(
+        "Approved leave exists for this date. Non-leave attendance cannot be created.",
+      );
+    }
+
     // Check employee exists
     const employee = await Employee.findById(employeeId);
     if (!employee) {
@@ -794,6 +1027,7 @@ export const markSingleAttendance = async (req, res, next) => {
     }
 
     let resolvedShiftId = null;
+    let resolvedShift = null;
     let resolvedCheckIn = null;
     let resolvedCheckOut = null;
 
@@ -808,6 +1042,7 @@ export const markSingleAttendance = async (req, res, next) => {
         throw new Error("Shift not found");
       }
       resolvedShiftId = shift._id;
+      resolvedShift = shift;
 
       // Auto-fill checkIn/checkOut from shift if not provided
       resolvedCheckIn = checkIn
@@ -821,16 +1056,44 @@ export const markSingleAttendance = async (req, res, next) => {
       if (checkOut) resolvedCheckOut = safeDateParse(checkOut);
     }
 
+    const computedStatus = computeStatusFromCheckTimes({
+      requestedStatus: status,
+      shift: resolvedShift,
+      date: parsedDate,
+      checkIn: resolvedCheckIn,
+      checkOut: resolvedCheckOut,
+    });
+
+    if (TIMED_STATUSES.includes(computedStatus)) {
+      const ensuredTimes = ensureCheckTimesForTimedStatus({
+        status: computedStatus,
+        date: parsedDate,
+        shift: resolvedShift,
+        checkIn: resolvedCheckIn,
+        checkOut: resolvedCheckOut,
+      });
+      resolvedCheckIn = ensuredTimes.checkIn;
+      resolvedCheckOut = ensuredTimes.checkOut;
+    }
+
+    const computedLateMinutes = computeLateMinutesFromCheckIn({
+      shift: resolvedShift,
+      date: parsedDate,
+      checkIn: resolvedCheckIn,
+    });
+
     const attendance = await Attendance.create({
       employee: employeeId,
       date: parsedDate,
-      status,
+      status: computedStatus,
       shift: resolvedShiftId,
       checkIn: resolvedCheckIn,
       checkOut: resolvedCheckOut,
-      lateDurationMinutes: lateDurationMinutes || 0,
+      lateDurationMinutes: computedLateMinutes,
       workHours: null,
       source: "manual",
+      lockReason: null,
+      linkedLeaveApplication: null,
       markedBy: req.user._id,
     });
 
@@ -871,6 +1134,13 @@ export const deleteAttendance = async (req, res, next) => {
     if (!attendance) {
       res.status(404);
       throw new Error("Attendance record not found");
+    }
+
+    if (isApprovedLeaveLockedRecord(attendance)) {
+      res.status(403);
+      throw new Error(
+        "This attendance record is auto-managed by an approved leave application and cannot be deleted.",
+      );
     }
 
     const date = new Date(attendance.date);

@@ -1,5 +1,5 @@
 // React
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -71,6 +71,25 @@ const combineDateAndTime = (dateStr, timeStr) => {
   return `${dateStr}T${timeStr}:00.000Z`;
 };
 
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== "string") return null;
+  const [h, m] = timeStr.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+};
+
+const addMinutesToTime = (timeStr, minutesToAdd) => {
+  const base = parseTimeToMinutes(timeStr);
+  if (base === null) return "";
+  const total = ((base + Number(minutesToAdd || 0)) % 1440 + 1440) % 1440;
+  const hh = String(Math.floor(total / 60)).padStart(2, "0");
+  const mm = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
+const subtractMinutesFromTime = (timeStr, minutesToSubtract) =>
+  addMinutesToTime(timeStr, -(Number(minutesToSubtract) || 0));
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -101,6 +120,13 @@ const AttendanceCellEditModal = ({
   const queryClient = useQueryClient();
 
   const isNewRecord = !record?._id;
+  const isApprovedLeaveLocked = !!record?.isLocked;
+  const leavePaymentLabel =
+    record?.leaveIsPaid === true
+      ? "Paid"
+      : record?.leaveIsPaid === false
+        ? "Unpaid"
+        : "Not specified";
 
   // ---------------------------------------------------------------------------
   // STATE — lazy initializers so remounting via key resets correctly
@@ -209,6 +235,13 @@ const AttendanceCellEditModal = ({
   // SUBMIT
   // ---------------------------------------------------------------------------
   const handleSave = () => {
+    if (isApprovedLeaveLocked) {
+      toast.error(
+        "This attendance is managed by approved leave and cannot be edited.",
+      );
+      return;
+    }
+
     if (!mainStatus) {
       toast.error("Please select a status");
       return;
@@ -247,6 +280,13 @@ const AttendanceCellEditModal = ({
   };
 
   const handleDelete = () => {
+    if (isApprovedLeaveLocked) {
+      toast.error(
+        "This attendance is managed by approved leave and cannot be deleted.",
+      );
+      return;
+    }
+
     if (!record?._id) return;
     deleteMutation.mutate(record._id);
   };
@@ -256,6 +296,137 @@ const AttendanceCellEditModal = ({
   // ---------------------------------------------------------------------------
 
   const selectedShiftObj = shiftsList.find((s) => s._id === shiftId);
+
+  const halfDayEarlyMinutes = useMemo(() => {
+    if (!selectedShiftObj?.endTime || !checkOutTime) return 0;
+    const shiftEnd = parseTimeToMinutes(selectedShiftObj.endTime);
+    const checkout = parseTimeToMinutes(checkOutTime);
+    if (shiftEnd === null || checkout === null) return 0;
+    return Math.max(0, shiftEnd - checkout);
+  }, [selectedShiftObj, checkOutTime]);
+
+  const handleModifierChange = useCallback(
+    (nextModifier) => {
+      setModifier(nextModifier);
+      if (nextModifier === "Late") {
+        const shiftStart = selectedShiftObj?.startTime;
+        if (!shiftStart) return;
+
+        const fallbackLateMinutes = lateDurationMinutes > 0 ? lateDurationMinutes : 16;
+        setLateDurationMinutes(fallbackLateMinutes);
+
+        const currentCheckInMinutes = parseTimeToMinutes(checkInTime);
+        const shiftStartMinutes = parseTimeToMinutes(shiftStart);
+        const minLateCheckInMinutes = shiftStartMinutes !== null ? shiftStartMinutes + 16 : null;
+
+        if (
+          currentCheckInMinutes === null ||
+          minLateCheckInMinutes === null ||
+          currentCheckInMinutes < minLateCheckInMinutes
+        ) {
+          setCheckInTime(addMinutesToTime(shiftStart, fallbackLateMinutes));
+        }
+        return;
+      }
+
+      if (nextModifier === "Half Day") {
+        const shiftStart = selectedShiftObj?.startTime;
+        const shiftEnd = selectedShiftObj?.endTime;
+        if (shiftStart) {
+          setCheckInTime(shiftStart);
+        }
+        if (shiftEnd) {
+          const currentEarly = halfDayEarlyMinutes;
+          const targetEarly = currentEarly >= 60 ? currentEarly : 60;
+          setCheckOutTime(subtractMinutesFromTime(shiftEnd, targetEarly));
+        }
+        setLateDurationMinutes(0);
+        return;
+      }
+
+      setLateDurationMinutes(0);
+    },
+    [
+      selectedShiftObj,
+      lateDurationMinutes,
+      checkInTime,
+      halfDayEarlyMinutes,
+    ],
+  );
+
+  const handleCheckInChange = useCallback(
+    (value) => {
+      setCheckInTime(value);
+
+      if (!selectedShiftObj?.startTime) return;
+
+      const checkInMinutes = parseTimeToMinutes(value);
+      const shiftStartMinutes = parseTimeToMinutes(selectedShiftObj.startTime);
+      if (checkInMinutes === null || shiftStartMinutes === null) return;
+
+      const delay = checkInMinutes - shiftStartMinutes;
+      if (delay <= 15) {
+        setMainStatus("Present");
+        if (modifier === "Late") setModifier("None");
+        setLateDurationMinutes(0);
+      } else if (delay > 15 && delay < 60) {
+        setMainStatus("Present");
+        setModifier("Late");
+        setLateDurationMinutes(delay);
+      } else if (delay >= 60) {
+        setMainStatus("Absent");
+        setModifier("None");
+        setLateDurationMinutes(delay);
+      }
+    },
+    [selectedShiftObj, modifier],
+  );
+
+  const handleCheckOutChange = useCallback(
+    (value) => {
+      setCheckOutTime(value);
+
+      if (!selectedShiftObj?.endTime) return;
+
+      const checkOutMinutes = parseTimeToMinutes(value);
+      const shiftEndMinutes = parseTimeToMinutes(selectedShiftObj.endTime);
+      if (checkOutMinutes === null || shiftEndMinutes === null) return;
+
+      const earlyBy = shiftEndMinutes - checkOutMinutes;
+      if (earlyBy >= 60) {
+        setMainStatus("Present");
+        setModifier("Half Day");
+        setLateDurationMinutes(0);
+      } else if (modifier === "Half Day") {
+        setModifier("None");
+      }
+    },
+    [selectedShiftObj, modifier],
+  );
+
+  const handleLateMinutesChange = useCallback(
+    (value) => {
+      const mins = Math.max(0, Number(value) || 0);
+      const shiftStart = selectedShiftObj?.startTime;
+      if (!shiftStart) return;
+
+      setLateDurationMinutes(mins);
+
+      if (mins <= 15) {
+        setMainStatus("Present");
+        setModifier("None");
+      } else if (mins < 60) {
+        setMainStatus("Present");
+        setModifier("Late");
+      } else {
+        setMainStatus("Absent");
+        setModifier("None");
+      }
+
+      setCheckInTime(addMinutesToTime(shiftStart, mins));
+    },
+    [selectedShiftObj],
+  );
 
   const DAY_ABBR = { Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };
   const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -277,10 +448,24 @@ const AttendanceCellEditModal = ({
           </DialogHeader>
 
           <div className="grid gap-4">
+            {record?.status === "Leave" && (record?.leaveTypeName || record?.leaveIsPaid !== null) && (
+              <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                Leave Type: <span className="font-medium">{record?.leaveTypeName || "Unknown"}</span>
+                {" · "}
+                {leavePaymentLabel}
+              </p>
+            )}
+
+            {isApprovedLeaveLocked && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Edit or revoke the leave application to change it.
+              </p>
+            )}
+
             {/* Status */}
             <div className="grid gap-2">
               <Label>Status</Label>
-              <Select value={mainStatus} onValueChange={(val) => { setMainStatus(val); if (val !== "Present") setModifier("None"); }}>
+              <Select value={mainStatus} onValueChange={(val) => { setMainStatus(val); if (val !== "Present") setModifier("None"); }} disabled={isApprovedLeaveLocked}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
@@ -299,7 +484,7 @@ const AttendanceCellEditModal = ({
             {mainStatus === "Present" && (
               <div className="grid gap-2">
                 <Label>Attendance Modifier</Label>
-                <Select value={modifier} onValueChange={setModifier}>
+                <Select value={modifier} onValueChange={handleModifierChange} disabled={isApprovedLeaveLocked}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -324,7 +509,7 @@ const AttendanceCellEditModal = ({
                   <Spinner className="h-4 w-4" /> Loading shifts...
                 </div>
               ) : (
-                <Select value={shiftId || "_none_"} onValueChange={(val) => handleShiftChange(val === "_none_" ? "" : val)}>
+                <Select value={shiftId || "_none_"} onValueChange={(val) => handleShiftChange(val === "_none_" ? "" : val)} disabled={isApprovedLeaveLocked}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a shift..." />
                   </SelectTrigger>
@@ -367,7 +552,8 @@ const AttendanceCellEditModal = ({
                   id="checkIn"
                   type="time"
                   value={checkInTime}
-                  onChange={(e) => setCheckInTime(e.target.value)}
+                  onChange={(e) => handleCheckInChange(e.target.value)}
+                  disabled={isApprovedLeaveLocked}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
@@ -377,7 +563,8 @@ const AttendanceCellEditModal = ({
                   id="checkOut"
                   type="time"
                   value={checkOutTime}
-                  onChange={(e) => setCheckOutTime(e.target.value)}
+                  onChange={(e) => handleCheckOutChange(e.target.value)}
+                  disabled={isApprovedLeaveLocked}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
@@ -392,11 +579,21 @@ const AttendanceCellEditModal = ({
                   type="number"
                   min="0"
                   value={lateDurationMinutes}
-                  onChange={(e) =>
-                    setLateDurationMinutes(Number(e.target.value))
-                  }
+                  onChange={(e) => handleLateMinutesChange(e.target.value)}
+                  disabled={isApprovedLeaveLocked}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
+              </div>
+            )}
+
+            {effectiveStatus === "Half Day" && (
+              <div className="grid gap-2">
+                <Label>Minutes before shift end</Label>
+                <p className="rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                  {halfDayEarlyMinutes > 0
+                    ? `${halfDayEarlyMinutes} minute(s) early compared to shift end`
+                    : "Set check-out to calculate early minutes"}
+                </p>
               </div>
             )}
           </div>
@@ -408,7 +605,7 @@ const AttendanceCellEditModal = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => setDeleteDialogOpen(true)}
-                disabled={isPending}
+                disabled={isPending || isApprovedLeaveLocked}
                 className="mr-auto"
               >
                 Delete
@@ -426,7 +623,7 @@ const AttendanceCellEditModal = ({
               <Button
                 variant="green"
                 onClick={handleSave}
-                disabled={isPending}
+                disabled={isPending || isApprovedLeaveLocked}
               >
                 {updateMutation.isPending || createMutation.isPending ? (
                   <>
