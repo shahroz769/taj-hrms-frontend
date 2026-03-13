@@ -77,8 +77,9 @@ import {
 import styles from "./Payroll.module.css";
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2023 }, (_, index) =>
-  String(2024 + index)
+const START_YEAR = CURRENT_YEAR - 2;
+const YEARS = Array.from({ length: CURRENT_YEAR - START_YEAR + 1 }, (_, index) =>
+  String(START_YEAR + index)
 );
 const MONTHS = [
   { value: "1", label: "January" },
@@ -123,6 +124,8 @@ const Payroll = () => {
 
   const [tempFilterDepartment, setTempFilterDepartment] = useState("");
   const [tempFilterPosition, setTempFilterPosition] = useState("");
+  const [tempFilterYear, setTempFilterYear] = useState("");
+  const [tempFilterMonth, setTempFilterMonth] = useState("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [isFiltersLoading, setIsFiltersLoading] = useState(false);
 
@@ -343,6 +346,8 @@ const Payroll = () => {
       await Promise.all([fetchDepartments(), fetchPositions()]);
       setTempFilterDepartment(filterDepartment);
       setTempFilterPosition(filterPosition);
+      setTempFilterYear(filterYear);
+      setTempFilterMonth(filterMonth);
       setFilterPopoverOpen(true);
     } catch {
       toast.error("Failed to load filters");
@@ -354,6 +359,8 @@ const Payroll = () => {
   const applyFilters = () => {
     setFilterDepartment(tempFilterDepartment);
     setFilterPosition(tempFilterPosition);
+    setFilterYear(tempFilterYear);
+    setFilterMonth(tempFilterMonth);
     setPage(1);
     setFilterPopoverOpen(false);
   };
@@ -361,8 +368,12 @@ const Payroll = () => {
   const resetFilters = () => {
     setTempFilterDepartment("");
     setTempFilterPosition("");
+    setTempFilterYear("");
+    setTempFilterMonth("");
     setFilterDepartment("");
     setFilterPosition("");
+    setFilterYear("");
+    setFilterMonth("");
     setPage(1);
     setFilterPopoverOpen(false);
   };
@@ -488,6 +499,16 @@ const Payroll = () => {
     },
     { key: "leaves", label: "Leaves", render: (row) => row.workingDays?.leaves ?? 0 },
     {
+      key: "halfDay",
+      label: "Half Day",
+      render: (row) => row.workingDays?.halfDay ?? 0,
+    },
+    {
+      key: "late",
+      label: "Late",
+      render: (row) => row.workingDays?.late ?? 0,
+    },
+    {
       key: "grossSalary",
       label: "Gross Salary",
       render: (row) => currency(row.calculations?.grossSalary),
@@ -592,45 +613,22 @@ const Payroll = () => {
         </InputGroup>
 
         <Select
-          value={filterYear || "all"}
+          value={String(limit)}
           onValueChange={(value) => {
-            setFilterYear(value === "all" ? "" : value);
+            setLimit(Number(value));
             setPage(1);
           }}
         >
-          <SelectTrigger className={styles.periodSelect}>
-            <SelectValue placeholder="Year" />
+          <SelectTrigger className="w-45">
+            <SelectValue placeholder="Select page limit" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="all">All Years</SelectItem>
-              {YEARS.map((yearOption) => (
-                <SelectItem key={yearOption} value={yearOption}>
-                  {yearOption}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filterMonth || "all"}
-          onValueChange={(value) => {
-            setFilterMonth(value === "all" ? "" : value);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className={styles.periodSelect}>
-            <SelectValue placeholder="Month" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">All Months</SelectItem>
-              {MONTHS.map((monthOption) => (
-                <SelectItem key={monthOption.value} value={monthOption.value}>
-                  {monthOption.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="5">5 items</SelectItem>
+              <SelectItem value="10">10 items</SelectItem>
+              <SelectItem value="25">25 items</SelectItem>
+              <SelectItem value="50">50 items</SelectItem>
+              <SelectItem value="100">100 items</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -713,6 +711,54 @@ const Payroll = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label htmlFor="year">Year</Label>
+                    <Select
+                      value={tempFilterYear || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterYear(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All years" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Years</SelectItem>
+                          {YEARS.map((yearOption) => (
+                            <SelectItem key={yearOption} value={yearOption}>
+                              {yearOption}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label htmlFor="month">Month</Label>
+                    <Select
+                      value={tempFilterMonth || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterMonth(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All months" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Months</SelectItem>
+                          {MONTHS.map((monthOption) => (
+                            <SelectItem key={monthOption.value} value={monthOption.value}>
+                              {monthOption.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -727,27 +773,6 @@ const Payroll = () => {
             )}
           </PopoverContent>
         </Popover>
-
-        <Select
-          value={String(limit)}
-          onValueChange={(value) => {
-            setLimit(Number(value));
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-45">
-            <SelectValue placeholder="Select page limit" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="5">5 items</SelectItem>
-              <SelectItem value="10">10 items</SelectItem>
-              <SelectItem value="25">25 items</SelectItem>
-              <SelectItem value="50">50 items</SelectItem>
-              <SelectItem value="100">100 items</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
       </div>
 
       <DataTable
@@ -930,37 +955,38 @@ const Payroll = () => {
           if (!open) setSelectedPayslipId(null);
         }}
       >
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Payslip</DialogTitle>
+            <DialogDescription>
+              {monthLabel(payslipData?.payslip?.month)} {payslipData?.payslip?.year}
+            </DialogDescription>
           </DialogHeader>
 
-          {isPayslipFetching ? (
-            <div className={styles.payslipLoadingWrap}>
-              <Spinner className={styles.smallSpinner} />
-              Loading payslip...
-            </div>
-          ) : (
+          {
             <div className={styles.payslipContent}>
-              <div className={styles.payslipTopGrid}>
-                <div>
-                  <div className={styles.payslipName}>
+              <div className={styles.payslipInfoGrid}>
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Employee Name</div>
+                  <div className={styles.payslipInfoValue}>
                     {payslipData?.payslip?.employeeSnapshot?.fullName || "-"}
                   </div>
-                  <div>
-                    {payslipData?.payslip?.employeeSnapshot?.positionName || "-"}
-                  </div>
-                  <div>
-                    {payslipData?.payslip?.employeeSnapshot?.departmentName || "-"}
+                </div>
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Employee ID</div>
+                  <div className={styles.payslipInfoValue}>
+                    {payslipData?.payslip?.employeeSnapshot?.employeeID || "-"}
                   </div>
                 </div>
-                <div className={styles.payslipTopRight}>
-                  <div>
-                    {monthLabel(payslipData?.payslip?.month)} {payslipData?.payslip?.year}
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Position</div>
+                  <div className={styles.payslipInfoValue}>
+                    {payslipData?.payslip?.employeeSnapshot?.positionName || "-"}
                   </div>
-                  <div>ID: {payslipData?.payslip?.employeeSnapshot?.employeeID || "-"}</div>
-                  <div>
-                    Joining Date:{" "}
+                </div>
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Joining Date</div>
+                  <div className={styles.payslipInfoValue}>
                     {payslipData?.payslip?.employeeSnapshot?.joiningDate
                       ? new Date(
                           payslipData.payslip.employeeSnapshot.joiningDate
@@ -968,52 +994,99 @@ const Payroll = () => {
                       : "-"}
                   </div>
                 </div>
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Department</div>
+                  <div className={styles.payslipInfoValue}>
+                    {payslipData?.payslip?.employeeSnapshot?.departmentName || "-"}
+                  </div>
+                </div>
               </div>
 
               <Separator />
 
-              <div className={styles.payslipStatsGrid}>
-                <div>Gross Salary</div>
-                <div>{currency(payslipData?.payslip?.calculations?.grossSalary)}</div>
-
-                <div>Basic Salary</div>
-                <div>
-                  {currency(payslipData?.payslip?.calculations?.basicSalaryAmount)}
-                </div>
-
-                <div>Allowances</div>
-                <div>
-                  {currency(payslipData?.payslip?.calculations?.allowanceAmount)}
-                </div>
-
-                {(payslipData?.payslip?.allowanceBreakdown || []).map((item) => (
-                  <div key={item.name} className={styles.allowanceRow}>
-                    <div className={styles.allowanceItemName}>
-                      {item.name}
-                    </div>
-                    <div>{currency(item.amount)}</div>
+              <div className={styles.payslipSectionTitle}>Attendance</div>
+              <div className={styles.payslipAttendanceGrid}>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.totalScheduled ?? 0}
                   </div>
-                ))}
-
-                <div>Late Penalty</div>
-                <div>
-                  - {currency(payslipData?.payslip?.calculations?.latePenaltyAmount)}
+                  <div className={styles.payslipStatLabel}>Working Days</div>
                 </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.present ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Present</div>
+                </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.absences ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Absent</div>
+                </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.leaves ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Leaves</div>
+                </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.halfDay ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Half Day</div>
+                </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslipData?.payslip?.workingDays?.late ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Late</div>
+                </div>
+              </div>
 
-                <div>Arrears</div>
-                <div>{currency(payslipData?.payslip?.calculations?.arrearsAmount)}</div>
+              <Separator />
 
-                <div className={styles.totalSalaryLabel}>Total Salary</div>
-                <div className={styles.totalSalaryValue}>
+              <div className={styles.payslipSectionTitle}>Salary Breakdown</div>
+              <div className={styles.payslipBreakdownWrap}>
+                <div className={styles.payslipBreakdownRow}>
+                  <span className={styles.payslipBreakdownLabel}>Basic Salary</span>
+                  <span className={styles.payslipBreakdownAmount}>
+                    {currency(payslipData?.payslip?.calculations?.basicSalaryAmount)}
+                  </span>
+                </div>
+                {(payslipData?.payslip?.allowanceBreakdown || []).length > 0 && (
+                  <>
+                    <div className={styles.payslipAllowanceHeader}>Allowances</div>
+                    {(payslipData?.payslip?.allowanceBreakdown || []).map((item, index) => (
+                      <div key={`${item.name}-${index}`} className={styles.payslipAllowanceRow}>
+                        <span className={styles.payslipAllowanceName}>{item.name}</span>
+                        <span className={styles.payslipAllowanceAmount}>{currency(item.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {Number(payslipData?.payslip?.calculations?.arrearsAmount || 0) !== 0 && (
+                  <div className={styles.payslipBreakdownRow}>
+                    <span className={styles.payslipBreakdownLabel}>Arrears</span>
+                    <span className={styles.payslipBreakdownAmount}>
+                      {currency(payslipData?.payslip?.calculations?.arrearsAmount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.payslipTotalRow}>
+                <span>Total Salary</span>
+                <span className={styles.payslipTotalAmount}>
                   {currency(payslipData?.payslip?.calculations?.totalSalary)}
-                </div>
+                </span>
               </div>
 
               <div className={styles.payslipFooter}>
                 <Button variant="green" onClick={handleDownloadPayslip}>Download PDF</Button>
               </div>
             </div>
-          )}
+          }
         </DialogContent>
       </Dialog>
 

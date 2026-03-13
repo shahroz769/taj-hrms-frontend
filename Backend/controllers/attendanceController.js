@@ -380,19 +380,28 @@ export const bulkMarkAttendance = async (req, res, next) => {
     // Track which employee-months need summary refresh
     const monthsToRefresh = new Set();
 
+    // Compute earliest date from the expanded dates for EmployeeShift effectiveDate
+    const earliestDate = allDates.length > 0 ? new Date(Math.min(...allDates.map((d) => d.getTime()))) : new Date();
+
     for (const employeeId of employeeIds) {
       // Determine the shift to use for this employee
       let shiftToUse = null;
+      let usedFallbackOrForce = false;
 
       if (forceApplyShift && forceShift) {
         // Force apply: always use the modal shift
         shiftToUse = forceShift;
+        // If this employee had no assignment, flag for auto-creation
+        if (!employeeShiftMap[employeeId]) {
+          usedFallbackOrForce = true;
+        }
       } else {
         // Use employee's assigned shift first
         shiftToUse = employeeShiftMap[employeeId] || null;
         // Fall back to fallback shift if no assigned shift
         if (!shiftToUse && fallbackShift) {
           shiftToUse = fallbackShift;
+          usedFallbackOrForce = true;
         }
         // If still no shift, record error and skip this employee
         if (!shiftToUse) {
@@ -402,6 +411,31 @@ export const bulkMarkAttendance = async (req, res, next) => {
               "No assigned shift found and no fallback shift selected. Please assign a shift or select a fallback shift.",
           });
           continue;
+        }
+      }
+
+      // Auto-create EmployeeShift assignment when fallback/force shift is used
+      // and the employee has no existing shift assignment, so that payroll and
+      // other modules can correctly determine working days.
+      if (usedFallbackOrForce) {
+        try {
+          await EmployeeShift.create({
+            employee: employeeId,
+            shift: shiftToUse._id,
+            effectiveDate: earliestDate,
+            endDate: null,
+            assignedBy: req.user._id,
+          });
+          // Update the in-memory map so subsequent logic sees it
+          employeeShiftMap[employeeId] = shiftToUse;
+        } catch (shiftErr) {
+          // If duplicate or other error, log but don't block attendance marking
+          if (shiftErr.code !== 11000) {
+            errors.push({
+              employeeId,
+              error: `Shift auto-assignment failed: ${shiftErr.message}. Attendance will still be marked.`,
+            });
+          }
         }
       }
 

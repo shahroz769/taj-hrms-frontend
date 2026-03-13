@@ -53,7 +53,9 @@ const getAllowanceBreakdown = (policy, components) => {
   );
 
   return (components || []).map((component) => ({
-    name: namesById.get(component.allowanceComponent?.toString()) || "Allowance",
+    name: namesById.get(
+      component.allowanceComponent?._id?.toString() || component.allowanceComponent?.toString()
+    ) || "Allowance",
     amount: Number(component.amount || 0),
   }));
 };
@@ -154,7 +156,7 @@ const getWorkingDatesForEmployee = async ({ employeeId, monthStartUtc, nextMonth
     const shift = getShiftForDate(assignments, date);
     if (!shift?.workingDays?.length) continue;
 
-    const dayName = DAY_NAMES[new Date(date).getUTCDay()];
+    const dayName = formatInTimeZone(date, PAKISTAN_TZ, "EEEE");
     if (shift.workingDays.includes(dayName)) {
       workingDates.push(date);
     }
@@ -606,14 +608,14 @@ export const syncArrearsForEmployee = async ({
       existingLedger.$session(session);
       await existingLedger.save();
     } else {
-      await PayrollArrearsLedger.create({
+      await PayrollArrearsLedger.create([{
         employee: employee._id,
         sourceYear: payroll.year,
         sourceMonth: payroll.month,
         amount: diff,
         reason: "Backdated effective date adjustment",
         createdBy: generatedBy || null,
-      }, { session });
+      }], { session });
     }
   }
 };

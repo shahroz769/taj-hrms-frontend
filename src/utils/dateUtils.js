@@ -4,11 +4,12 @@ export const formatDate = (date) => {
   const d = new Date(date);
   if (isNaN(d.getTime())) return "N/A";
 
-  const day = d.getDate();
-  const month = d.toLocaleString("en-GB", { month: "short" });
-  const year = d.getFullYear().toString();
-
-  return `${day} ${month} ${year}`;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Karachi",
+  });
 };
 
 /**

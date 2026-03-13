@@ -482,32 +482,44 @@ export const downloadPayslipPdf = async (req, res, next) => {
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(1);
 
-    doc.text(`Total Working Days: ${payroll.workingDays.totalScheduled}`);
-    doc.text(`Present: ${payroll.workingDays.present}`);
-    doc.text(`Absences: ${payroll.workingDays.absences}`);
-    doc.text(`Leaves: ${payroll.workingDays.leaves}`);
-    doc.text(`Half Day: ${payroll.workingDays.halfDay}`);
-    doc.text(`Late: ${payroll.workingDays.late}`);
+    doc.font("Helvetica-Bold").fontSize(12).text("Attendance Summary");
+    doc.font("Helvetica").fontSize(11);
+    doc.text(`Working Days: ${payroll.workingDays.totalScheduled}    Present: ${payroll.workingDays.present}    Absent: ${payroll.workingDays.absences}`);
+    doc.text(`Leaves: ${payroll.workingDays.leaves}    Half Day: ${payroll.workingDays.halfDay}    Late: ${payroll.workingDays.late}`);
     doc.moveDown(1);
 
-    doc.text(`Gross Salary: PKR ${Number(payroll.calculations.grossSalary || 0).toFixed(2)}`);
-    doc.text(`Basic Salary: PKR ${Number(payroll.calculations.basicSalaryAmount || 0).toFixed(2)}`);
-    doc.text(`Allowances: PKR ${Number(payroll.calculations.allowanceAmount || 0).toFixed(2)}`);
-    doc.text(`Late Penalty: PKR ${Number(payroll.calculations.latePenaltyAmount || 0).toFixed(2)}`);
-    doc.text(`Arrears: PKR ${Number(payroll.calculations.arrearsAmount || 0).toFixed(2)}`);
-
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(1);
-    doc.font("Helvetica-Bold");
-    doc.text(`Total Salary: PKR ${Number(payroll.calculations.totalSalary || 0).toFixed(2)}`);
-    doc.font("Helvetica");
+
+    doc.font("Helvetica-Bold").fontSize(12).text("Earnings");
+    doc.font("Helvetica").fontSize(11);
+    doc.text(`Basic Salary: PKR ${Number(payroll.calculations.basicSalaryAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
     if (payroll.allowanceBreakdown?.length) {
-      doc.moveDown(1);
-      doc.text("Allowance Breakdown:");
+      doc.moveDown(0.3);
+      doc.font("Helvetica-Bold").fontSize(10).text("Allowances:");
+      doc.font("Helvetica").fontSize(11);
       payroll.allowanceBreakdown.forEach((item) => {
-        doc.text(`- ${item.name}: PKR ${Number(item.amount || 0).toFixed(2)}`);
+        doc.text(`  ${item.name}: PKR ${Number(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
       });
     }
+
+    if (Number(payroll.calculations.arrearsAmount || 0) !== 0) {
+      doc.text(`Arrears: PKR ${Number(payroll.calculations.arrearsAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    }
+
+    doc.moveDown(0.5);
+    doc.font("Helvetica-Bold");
+    doc.text(`Gross Salary: PKR ${Number(payroll.calculations.grossSalary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    doc.font("Helvetica");
+
+    doc.moveDown(1);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(1);
+
+    doc.font("Helvetica-Bold").fontSize(14);
+    doc.text(`Total Salary: PKR ${Number(payroll.calculations.totalSalary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    doc.font("Helvetica");
 
     doc.end();
   } catch (error) {

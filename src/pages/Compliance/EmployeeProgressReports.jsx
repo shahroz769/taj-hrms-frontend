@@ -58,7 +58,8 @@ import styles from "./EmployeeProgressReports.module.css";
 // ============================================================================
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: CURRENT_YEAR - 2023 }, (_, i) => 2024 + i);
+const START_YEAR = CURRENT_YEAR - 2;
+const YEARS = Array.from({ length: CURRENT_YEAR - START_YEAR + 1 }, (_, i) => START_YEAR + i);
 
 const MONTHS = [
   { value: "1", label: "January" },
