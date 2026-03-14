@@ -84,7 +84,7 @@ const validateYearMonth = (year, month, res) => {
   if (!isMonthClosedInPakistanTime(parsedYear, parsedMonth)) {
     res.status(400);
     throw new Error(
-      "Payroll can be generated only for months fully closed in Pakistan time (Asia/Karachi)",
+      "Payroll can be generated only for months fully closed.",
     );
   }
 

@@ -948,8 +948,7 @@ const Payroll = () => {
                   {generationPreview?.eligibleEmployeesCount || 0}
                 </div>
                 <div className={styles.previewSubtext}>
-                  Generation allowed only when selected month is fully closed in
-                  Pakistan time.
+                  Generation allowed only when selected month is fully closed.
                 </div>
               </div>
             )}
