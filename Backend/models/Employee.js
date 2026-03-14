@@ -36,6 +36,10 @@ const employeeSchema = new mongoose.Schema(
     fatherName: String,
     husbandName: String,
     joiningDate: Date,
+    resignationDate: {
+      type: Date,
+      default: null,
+    },
     cnic: { type: String, unique: true },
     cnicImages: { front: String, back: String },
     dob: Date,

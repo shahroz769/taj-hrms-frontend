@@ -28,6 +28,29 @@ const round2 = (value) =>
 
 const keyByPKDate = (date) => formatInTimeZone(date, PAKISTAN_TZ, "yyyy-MM-dd");
 
+const normalizeUtcDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+};
+
+const isOutsideEmploymentWindow = (date, employmentBounds) => {
+  if (employmentBounds.joiningDate && date < employmentBounds.joiningDate) {
+    return true;
+  }
+
+  if (
+    employmentBounds.resignationDate &&
+    date > employmentBounds.resignationDate
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 const toMonthIndex = (year, month) => Number(year) * 12 + Number(month);
 
 const isEarlierMonth = (yearA, monthA, yearB, monthB) =>
@@ -155,7 +178,7 @@ const getShiftForDate = (assignments, date) => {
   return null;
 };
 
-const getWorkingDatesForEmployee = async ({
+const getScheduledDatesForPayrollDivisor = async ({
   employeeId,
   monthStartUtc,
   nextMonthStartUtc,
@@ -169,19 +192,29 @@ const getWorkingDatesForEmployee = async ({
     .sort({ effectiveDate: 1 });
 
   const monthDates = getAllDatesInRange(monthStartUtc, nextMonthStartUtc);
-  const workingDates = [];
+  const scheduledDates = [];
+
+  const monthEndDate = new Date(nextMonthStartUtc.getTime() - 86400000);
+  const monthStartShift = getShiftForDate(assignments, monthStartUtc);
+  const monthEndShift = getShiftForDate(assignments, monthEndDate);
+  const fallbackShift =
+    monthEndShift ||
+    monthStartShift ||
+    assignments[assignments.length - 1]?.shift ||
+    assignments[0]?.shift ||
+    null;
 
   for (const date of monthDates) {
-    const shift = getShiftForDate(assignments, date);
+    const shift = getShiftForDate(assignments, date) || fallbackShift;
     if (!shift?.workingDays?.length) continue;
 
     const dayName = formatInTimeZone(date, PAKISTAN_TZ, "EEEE");
     if (shift.workingDays.includes(dayName)) {
-      workingDates.push(date);
+      scheduledDates.push(date);
     }
   }
 
-  return workingDates;
+  return scheduledDates;
 };
 
 const buildLeaveMap = async ({
@@ -275,20 +308,38 @@ const getPoliciesByIds = async (
   return new Map(policies.map((policy) => [policy._id.toString(), policy]));
 };
 
-export const calculateLatePenalty = (lateDayBasicRates) => {
-  const groups = Math.floor(lateDayBasicRates.length / 3);
-  if (!groups) return 0;
-
-  let totalPenalty = 0;
-  for (let index = 0; index < groups; index += 1) {
-    const triggerRate =
-      lateDayBasicRates[index * 3 + 2] ||
-      lateDayBasicRates[lateDayBasicRates.length - 1] ||
-      0;
-    totalPenalty += triggerRate * 0.5;
+export const calculateLatePenalty = (lateDayRates) => {
+  const groups = Math.floor(lateDayRates.length / 3);
+  if (!groups) {
+    return {
+      basicPenaltyAmount: 0,
+      allowancePenaltyAmount: 0,
+      totalPenaltyAmount: 0,
+    };
   }
 
-  return round2(totalPenalty);
+  let basicPenaltyAmount = 0;
+  let allowancePenaltyAmount = 0;
+  for (let index = 0; index < groups; index += 1) {
+    const triggerRates =
+      lateDayRates[index * 3 + 2] ||
+      lateDayRates[lateDayRates.length - 1] ||
+      { basicPerDay: 0, allowancePerDay: 0 };
+
+    basicPenaltyAmount += Number(triggerRates.basicPerDay || 0) * 0.5;
+    allowancePenaltyAmount += Number(triggerRates.allowancePerDay || 0) * 0.5;
+  }
+
+  const roundedBasicPenaltyAmount = round2(basicPenaltyAmount);
+  const roundedAllowancePenaltyAmount = round2(allowancePenaltyAmount);
+
+  return {
+    basicPenaltyAmount: roundedBasicPenaltyAmount,
+    allowancePenaltyAmount: roundedAllowancePenaltyAmount,
+    totalPenaltyAmount: round2(
+      roundedBasicPenaltyAmount + roundedAllowancePenaltyAmount,
+    ),
+  };
 };
 
 export const calculateEmployeePayroll = async ({
@@ -359,8 +410,8 @@ export const calculateEmployeePayroll = async ({
     });
   }
 
-  const [workingDates, attendanceMap, leaveMap] = await Promise.all([
-    getWorkingDatesForEmployee({
+  const [scheduledDates, attendanceMap, leaveMap] = await Promise.all([
+    getScheduledDatesForPayrollDivisor({
       employeeId: employee._id,
       monthStartUtc,
       nextMonthStartUtc,
@@ -377,7 +428,11 @@ export const calculateEmployeePayroll = async ({
     }),
   ]);
 
-  const totalScheduledDays = workingDates.length;
+  const totalScheduledDays = scheduledDates.length;
+  const employmentBounds = {
+    joiningDate: normalizeUtcDate(employee.joiningDate),
+    resignationDate: normalizeUtcDate(employee.resignationDate),
+  };
 
   let present = 0;
   let absences = 0;
@@ -388,12 +443,17 @@ export const calculateEmployeePayroll = async ({
   let late = 0;
 
   const salarySegmentsMap = new Map();
-  const lateDayBasicRates = [];
+  const lateDayRates = [];
+  let payableDayUnitsTotal = 0;
 
   let basicSalaryAmount = 0;
   let allowanceAmount = 0;
 
-  for (const date of workingDates) {
+  for (const date of scheduledDates) {
+    if (isOutsideEmploymentWindow(date, employmentBounds)) {
+      continue;
+    }
+
     const dateKey = keyByPKDate(date);
     const attendance = attendanceMap.get(dateKey);
 
@@ -442,12 +502,13 @@ export const calculateEmployeePayroll = async ({
     const allowancePerDay = Number(policyComponentsInfo.amount || 0) / divisor;
 
     const payableFactor = dayState.payableFactor;
+    payableDayUnitsTotal += payableFactor;
 
     basicSalaryAmount += basicPerDay * payableFactor;
     allowanceAmount += allowancePerDay * payableFactor;
 
     if (dayState.type === "late") {
-      lateDayBasicRates.push(basicPerDay);
+      lateDayRates.push({ basicPerDay, allowancePerDay });
     }
 
     const segmentKey = [
@@ -477,7 +538,8 @@ export const calculateEmployeePayroll = async ({
     segment.segmentAllowanceAmount += allowancePerDay * payableFactor;
   }
 
-  const latePenaltyAmount = calculateLatePenalty(lateDayBasicRates);
+  const latePenaltyInfo = calculateLatePenalty(lateDayRates);
+  const latePenaltyAmount = latePenaltyInfo.totalPenaltyAmount;
   const grossSalary = round2(basicSalaryAmount + allowanceAmount);
 
   if (!skipArrearsSync) {
@@ -589,6 +651,10 @@ export const calculateEmployeePayroll = async ({
       grossSalary,
       basicSalaryAmount: round2(basicSalaryAmount),
       allowanceAmount: round2(allowanceAmount),
+      allowanceRatio: round2(payableDayUnitsTotal / (totalScheduledDays || 1)),
+      payableDayUnits: round2(payableDayUnitsTotal),
+      latePenaltyBasicAmount: latePenaltyInfo.basicPenaltyAmount,
+      latePenaltyAllowanceAmount: latePenaltyInfo.allowancePenaltyAmount,
       latePenaltyAmount,
       manualDeductionAmount,
       arrearsAmount,

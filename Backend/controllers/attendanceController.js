@@ -70,6 +70,38 @@ const safeDateParse = (value) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+const normalizeUtcDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return null;
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+};
+
+const getEmploymentBounds = (employee) => {
+  const joiningDate = normalizeUtcDate(employee?.joiningDate);
+  const resignationDate = normalizeUtcDate(employee?.resignationDate);
+  return { joiningDate, resignationDate };
+};
+
+const getEmploymentBoundaryError = (dateUTC, employee) => {
+  const { joiningDate, resignationDate } = getEmploymentBounds(employee);
+
+  if (joiningDate && dateUTC < joiningDate) {
+    return `Attendance date is before joining date (${joiningDate
+      .toISOString()
+      .split("T")[0]}).`;
+  }
+
+  if (resignationDate && dateUTC > resignationDate) {
+    return `Attendance date is after resignation date (${resignationDate
+      .toISOString()
+      .split("T")[0]}).`;
+  }
+
+  return null;
+};
+
 const ATTENDANCE_RULES = {
   graceMinutes: 15,
   absentAfterLateMinutes: 60,
@@ -336,7 +368,9 @@ export const bulkMarkAttendance = async (req, res, next) => {
     }
 
     // --- Check all employees exist ---
-    const employees = await Employee.find({ _id: { $in: employeeIds } }).select("_id fullName employeeID joiningDate");
+    const employees = await Employee.find({ _id: { $in: employeeIds } }).select(
+      "_id fullName employeeID joiningDate resignationDate",
+    );
     if (employees.length !== employeeIds.length) {
       const foundIds = employees.map((e) => e._id.toString());
       const notFoundIds = employeeIds.filter((id) => !foundIds.includes(id));
@@ -345,13 +379,9 @@ export const bulkMarkAttendance = async (req, res, next) => {
     }
 
     // Build joining date map
-    const joiningDateMap = {};
+    const employmentBoundsMap = {};
     for (const emp of employees) {
-      if (emp.joiningDate) {
-        const jd = new Date(emp.joiningDate);
-        jd.setUTCHours(0, 0, 0, 0);
-        joiningDateMap[emp._id.toString()] = jd;
-      }
+      employmentBoundsMap[emp._id.toString()] = getEmploymentBounds(emp);
     }
 
     // --- Expand date ranges into individual dates ---
@@ -440,15 +470,25 @@ export const bulkMarkAttendance = async (req, res, next) => {
       }
 
       for (const date of allDates) {
-        // Skip dates before joining date
-        const joiningDate = joiningDateMap[employeeId];
-        if (joiningDate && date < joiningDate) {
+        const bounds = employmentBoundsMap[employeeId] || {};
+        if (bounds.joiningDate && date < bounds.joiningDate) {
           const emp = employees.find((e) => e._id.toString() === employeeId);
           const label = emp ? `${emp.fullName} (${emp.employeeID})` : employeeId;
           errors.push({
             employeeId,
             date: date.toISOString().split("T")[0],
-            error: `Date is before ${label}'s joining date (${joiningDate.toISOString().split("T")[0]})`,
+            error: `Date is before ${label}'s joining date (${bounds.joiningDate.toISOString().split("T")[0]})`,
+          });
+          continue;
+        }
+
+        if (bounds.resignationDate && date > bounds.resignationDate) {
+          const emp = employees.find((e) => e._id.toString() === employeeId);
+          const label = emp ? `${emp.fullName} (${emp.employeeID})` : employeeId;
+          errors.push({
+            employeeId,
+            date: date.toISOString().split("T")[0],
+            error: `Date is after ${label}'s resignation date (${bounds.resignationDate.toISOString().split("T")[0]})`,
           });
           continue;
         }
@@ -602,7 +642,7 @@ export const getMonthlyAttendance = async (req, res, next) => {
     const endOfMonth = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59, 999));
 
     // Build employee filter
-    const employeeFilter = { status: "Active" };
+    const employeeFilter = { status: { $in: ["Active", "Resigned"] } };
     if (search.trim()) {
       const regex = new RegExp(search.trim(), "i");
       employeeFilter.$or = [{ fullName: regex }, { employeeID: regex }];
@@ -613,7 +653,7 @@ export const getMonthlyAttendance = async (req, res, next) => {
 
     // Get employees (paginated)
     let employeeQuery = Employee.find(employeeFilter)
-      .select("_id fullName employeeID joiningDate")
+      .select("_id fullName employeeID joiningDate resignationDate")
       .sort({ fullName: 1 });
 
     const totalItems = await Employee.countDocuments(employeeFilter);
@@ -736,10 +776,7 @@ export const getMonthlyAttendance = async (req, res, next) => {
         Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()),
       );
 
-      // Joining date normalised to UTC midnight
-      const joiningDate = emp.joiningDate
-        ? (() => { const jd = new Date(emp.joiningDate); jd.setUTCHours(0,0,0,0); return jd; })()
-        : null;
+      const { joiningDate, resignationDate } = getEmploymentBounds(emp);
 
       const empShiftHistory = shiftHistoryMap[emp._id.toString()] || [];
       const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -748,7 +785,9 @@ export const getMonthlyAttendance = async (req, res, next) => {
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
         if (joiningDate && dateUTC < joiningDate) {
-          records[d] = "before_joining"; // before employee joined
+          records[d] = null;
+        } else if (resignationDate && dateUTC > resignationDate) {
+          records[d] = null;
         } else if (empRecords[d]) {
           records[d] = empRecords[d]; // Always show existing record, even for future dates
         } else if (dateUTC > todayUTC) {
@@ -782,7 +821,8 @@ export const getMonthlyAttendance = async (req, res, next) => {
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
-        if (joiningDate && dateUTC < joiningDate) continue; // skip before joining
+        if (joiningDate && dateUTC < joiningDate) continue;
+        if (resignationDate && dateUTC > resignationDate) continue;
 
         const rec = empRecords[d];
         if (rec) {
@@ -887,6 +927,18 @@ export const updateAttendance = async (req, res, next) => {
     if (!attendance) {
       res.status(404);
       throw new Error("Attendance record not found");
+    }
+
+    const employee = await Employee.findById(attendance.employee).select(
+      "joiningDate resignationDate",
+    );
+    const employmentBoundaryError = getEmploymentBoundaryError(
+      normalizeUtcDate(attendance.date),
+      employee,
+    );
+    if (employmentBoundaryError) {
+      res.status(400);
+      throw new Error(employmentBoundaryError);
     }
 
     if (isApprovedLeaveLockedRecord(attendance)) {
@@ -1046,6 +1098,15 @@ export const markSingleAttendance = async (req, res, next) => {
     if (!employee) {
       res.status(404);
       throw new Error("Employee not found");
+    }
+
+    const employmentBoundaryError = getEmploymentBoundaryError(
+      parsedDate,
+      employee,
+    );
+    if (employmentBoundaryError) {
+      res.status(400);
+      throw new Error(employmentBoundaryError);
     }
 
     // Check for existing record
