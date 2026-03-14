@@ -1,0 +1,32 @@
+{
+  "name": "backend-taj-hrms",
+  "version": "1.0.0",
+  "description": "Backend API for Taj HRMS Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "test:payroll": "node --test tests/payroll.rules.test.js",
+    "payroll:backfill-history": "node scripts/backfillCompensationHistory.js",
+    "payroll:validate-data": "node scripts/validatePayrollData.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "chalk": "^5.6.2",
+    "cloudinary": "^2.9.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "date-fns-tz": "^3.2.0",
+    "express": "^5.2.1",
+    "jose": "^6.2.1",
+    "mongoose": "^9.3.0",
+    "multer": "^2.1.1",
+    "pdfkit": "^0.17.2"
+  }
+}

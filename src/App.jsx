@@ -26,6 +26,7 @@ import DisciplinaryActions from "./pages/Compliance/DisciplinaryActions";
 import WarningTypes from "./pages/Compliance/WarningTypes";
 import EmployeeProgressReports from "./pages/Compliance/EmployeeProgressReports";
 import Payroll from "./pages/Salary/Payroll";
+import Deductions from "./pages/Salary/Deductions";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { ROLES } from "./utils/roles";
 import AuthLayout from "./layouts/AuthLayout";
@@ -144,8 +145,15 @@ function App() {
                   path="/allowances/components"
                   element={<AllowanceComponents />}
                 />
-                <Route path="/allowances/policies" element={<AllowancePolicies />} />
+                <Route
+                  path="/allowances/policies"
+                  element={<AllowancePolicies />}
+                />
                 <Route path="/salary/payroll" element={<Payroll />} />
+                <Route
+                  path="/salary/deductions"
+                  element={<Deductions />}
+                />
 
                 {/* Compliance */}
                 <Route

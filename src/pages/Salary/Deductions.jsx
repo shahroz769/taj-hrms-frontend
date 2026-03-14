@@ -1,5 +1,5 @@
 // React
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // React Router
 import { useSearchParams } from "react-router";
@@ -13,8 +13,7 @@ import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import PencilIcon from "lucide-react/dist/esm/icons/pencil";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
-import ToggleLeftIcon from "lucide-react/dist/esm/icons/toggle-left";
-import ToggleRightIcon from "lucide-react/dist/esm/icons/toggle-right";
+import SlidersHorizontalIcon from "lucide-react/dist/esm/icons/sliders-horizontal";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import XIcon from "lucide-react/dist/esm/icons/x";
 import { toast } from "sonner";
@@ -42,7 +41,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogClose,
@@ -52,6 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
@@ -90,41 +89,59 @@ import {
 
 // Services
 import {
-  createDisciplinaryAction,
-  deleteDisciplinaryAction,
-  fetchDisciplinaryActions,
-  toggleDisciplinaryActionStatus,
-  updateDisciplinaryAction,
-} from "@/services/disciplinaryActionsApi";
-import { fetchWarningTypesList } from "@/services/warningTypesApi";
+  createDeduction,
+  deleteDeduction,
+  fetchDeductions,
+  updateDeduction,
+} from "@/services/deductionsApi";
 import { fetchEmployeesList } from "@/services/employeesApi";
+import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchPositionsFilters } from "@/services/positionsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
 import { cn } from "@/lib/utils";
 
 // Styles
-import styles from "./DisciplinaryActions.module.css";
+import styles from "./Deductions.module.css";
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-/**
- * Truncate description to first 2 words + ellipsis for table display.
- */
-const truncateDescription = (text) => {
+const truncateReason = (text) => {
   if (!text) return "-";
   const words = text.trim().split(/\s+/);
   if (words.length <= 2) return text;
   return words.slice(0, 2).join(" ") + "...";
 };
 
+const CURRENT_YEAR = new Date().getFullYear();
+const START_YEAR = CURRENT_YEAR - 2;
+const YEARS = Array.from(
+  { length: CURRENT_YEAR - START_YEAR + 2 },
+  (_, index) => String(START_YEAR + index),
+);
+const MONTHS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
-const DisciplinaryActions = () => {
+const Deductions = () => {
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -149,24 +166,41 @@ const DisciplinaryActions = () => {
   // ===========================================================================
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
-  const [editingAction, setEditingAction] = useState(null);
+  const [editingDeduction, setEditingDeduction] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingAction, setDeletingAction] = useState(null);
+  const [deletingDeduction, setDeletingDeduction] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
 
+  // Filters
+  const [filterDepartment, setFilterDepartment] = useState(
+    searchParams.get("department") || "",
+  );
+  const [filterPosition, setFilterPosition] = useState(
+    searchParams.get("position") || "",
+  );
+  const [filterYear, setFilterYear] = useState(
+    searchParams.get("year") || "",
+  );
+  const [filterMonth, setFilterMonth] = useState(
+    searchParams.get("month") || "",
+  );
+  const [tempFilterDepartment, setTempFilterDepartment] = useState("");
+  const [tempFilterPosition, setTempFilterPosition] = useState("");
+  const [tempFilterYear, setTempFilterYear] = useState("");
+  const [tempFilterMonth, setTempFilterMonth] = useState("");
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [isFiltersLoading, setIsFiltersLoading] = useState(false);
+
   // Form state
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
-  const [selectedWarningTypeId, setSelectedWarningTypeId] = useState("");
-  const [actionDate, setActionDate] = useState(undefined);
-  const [description, setDescription] = useState("");
+  const [deductionAmount, setDeductionAmount] = useState("");
+  const [deductionDate, setDeductionDate] = useState(undefined);
+  const [deductionReason, setDeductionReason] = useState("");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-
-  // Toggle state
-  const [togglingActionId, setTogglingActionId] = useState(null);
 
   // ===========================================================================
   // EFFECTS
@@ -190,31 +224,53 @@ const DisciplinaryActions = () => {
     if (limit !== 10) params.limit = limit.toString();
     if (page !== 1) params.page = page.toString();
     if (debouncedSearch) params.search = debouncedSearch;
+    if (filterDepartment) params.department = filterDepartment;
+    if (filterPosition) params.position = filterPosition;
+    if (filterYear) params.year = filterYear;
+    if (filterMonth) params.month = filterMonth;
     setSearchParams(params, { replace: true });
-  }, [limit, page, debouncedSearch, setSearchParams]);
-
-
+  }, [
+    limit,
+    page,
+    debouncedSearch,
+    filterDepartment,
+    filterPosition,
+    filterYear,
+    filterMonth,
+    setSearchParams,
+  ]);
 
   // ===========================================================================
   // REACT QUERY
   // ===========================================================================
   const queryClient = useQueryClient();
 
-  // ---------------------------------------------------------------------------
-  // Fetch Disciplinary Actions
-  // ---------------------------------------------------------------------------
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: [
-      "disciplinary-actions",
-      { limit, page, search: debouncedSearch },
+      "deductions",
+      {
+        limit,
+        page,
+        search: debouncedSearch,
+        department: filterDepartment,
+        position: filterPosition,
+        year: filterYear,
+        month: filterMonth,
+      },
     ],
     queryFn: () =>
-      fetchDisciplinaryActions({ limit, page, search: debouncedSearch }),
+      fetchDeductions({
+        limit,
+        page,
+        search: debouncedSearch,
+        department: filterDepartment,
+        position: filterPosition,
+        year: filterYear,
+        month: filterMonth,
+      }),
   });
 
-  // ---------------------------------------------------------------------------
-  // Employee list for Command combobox
-  // ---------------------------------------------------------------------------
+  // Employee list for combobox
   const { data: employeesList = [], isLoading: isLoadingEmployees } = useQuery({
     queryKey: ["employees-list"],
     queryFn: fetchEmployeesList,
@@ -222,150 +278,138 @@ const DisciplinaryActions = () => {
     select: (data) => data?.employees || [],
   });
 
-  // ---------------------------------------------------------------------------
-  // Fetch Warning Types List (for dropdown) — also prefetch on page load
-  // ---------------------------------------------------------------------------
-  const { data: warningTypesData } = useQuery({
-    queryKey: ["warning-types-list"],
-    queryFn: fetchWarningTypesList,
+  // Filter data
+  const {
+    data: departmentsList,
+    refetch: fetchDepartments,
+    isLoading: isLoadingDepartments,
+  } = useQuery({
+    queryKey: ["departmentsList"],
+    queryFn: fetchDepartmentsList,
+    enabled: false,
   });
 
-  const warningTypesList = useMemo(
-    () => warningTypesData || [],
-    [warningTypesData],
-  );
+  const {
+    data: positionsFilters,
+    refetch: fetchPositions,
+    isLoading: isLoadingPositions,
+  } = useQuery({
+    queryKey: ["positionsFilters"],
+    queryFn: fetchPositionsFilters,
+    enabled: false,
+  });
+
+  const uniquePositionNames = useMemo(() => {
+    return (
+      positionsFilters?.positionsFiltersList
+        ?.map((position) => position.name)
+        .filter((value, index, self) => self.indexOf(value) === index) || []
+    );
+  }, [positionsFilters]);
 
   // ---------------------------------------------------------------------------
-  // Create Mutation
+  // Mutations
   // ---------------------------------------------------------------------------
   const createMutation = useMutation({
-    mutationFn: createDisciplinaryAction,
+    mutationFn: createDeduction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["disciplinary-actions"] });
+      queryClient.invalidateQueries({ queryKey: ["deductions"] });
       resetForm();
       setDialogOpen(false);
-      toast.success("Disciplinary action reported successfully");
+      toast.success("Deduction(s) applied successfully");
     },
     onError: (error) => {
       const errorMessage =
-        error.response?.data?.message || "Failed to report disciplinary action";
+        error.response?.data?.message || "Failed to apply deduction";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
-  // ---------------------------------------------------------------------------
-  // Update Mutation
-  // ---------------------------------------------------------------------------
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => updateDisciplinaryAction(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["disciplinary-actions"] });
+    mutationFn: ({ id, payload }) => updateDeduction(id, payload),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["deductions"] });
       resetForm();
       setDialogOpen(false);
-      toast.success("Disciplinary action updated successfully");
+      toast.success("Deduction updated successfully");
+      if (response.payrollExists) {
+        toast.warning(
+          "Payroll exists for this month. Please regenerate payroll to reflect changes.",
+          { duration: 6000 },
+        );
+      }
     },
     onError: (error) => {
       const errorMessage =
-        error.response?.data?.message ||
-        "Failed to update disciplinary action";
+        error.response?.data?.message || "Failed to update deduction";
       setErrors({ server: errorMessage });
       toast.error(errorMessage);
     },
   });
 
-  // ---------------------------------------------------------------------------
-  // Delete Mutation
-  // ---------------------------------------------------------------------------
   const deleteMutation = useMutation({
-    mutationFn: deleteDisciplinaryAction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["disciplinary-actions"] });
+    mutationFn: deleteDeduction,
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["deductions"] });
       setDeleteDialogOpen(false);
-      setDeletingAction(null);
-      toast.success("Disciplinary action deleted successfully");
+      setDeletingDeduction(null);
+      toast.success("Deduction deleted successfully");
+      if (response.payrollExists) {
+        toast.warning(
+          "Payroll exists for this month. Please regenerate payroll to reflect changes.",
+          { duration: 6000 },
+        );
+      }
     },
     onError: (error) => {
       const errorMessage =
-        error.response?.data?.message ||
-        "Failed to delete disciplinary action";
-      toast.error(errorMessage);
-    },
-  });
-
-  // ---------------------------------------------------------------------------
-  // Toggle Status Mutation
-  // ---------------------------------------------------------------------------
-  const toggleMutation = useMutation({
-    mutationFn: toggleDisciplinaryActionStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["disciplinary-actions"] });
-      setTogglingActionId(null);
-      toast.success("Status toggled successfully");
-    },
-    onError: (error) => {
-      setTogglingActionId(null);
-      const errorMessage =
-        error.response?.data?.message || "Failed to toggle status";
+        error.response?.data?.message || "Failed to delete deduction";
       toast.error(errorMessage);
     },
   });
 
   // ===========================================================================
-  // TABLE CONFIGURATION
+  // TABLE
   // ===========================================================================
   const columns = [
     {
       key: "employeeName",
-      label: "Employee Name",
+      label: "Employee",
       fontWeight: "medium",
-      render: (row) => row.employee?.fullName || "-",
-    },
-    {
-      key: "employeeID",
-      label: "Employee ID",
-      render: (row) => row.employee?.employeeID || "-",
-    },
-    {
-      key: "warningType",
-      label: "Warning Type",
-      render: (row) => row.warningType?.name || "-",
-    },
-    {
-      key: "severity",
-      label: "Severity",
       render: (row) => {
-        const severity = row.warningType?.severity;
-        if (severity === "High") {
-          return (
-            <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
-              High
-            </Badge>
-          );
-        }
-        if (severity === "Medium") {
-          return (
-            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-              Medium
-            </Badge>
-          );
-        }
-        if (severity === "Low") {
-          return (
-            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-              Low
-            </Badge>
-          );
-        }
-        return "-";
+        const name = row.employee?.fullName || "-";
+        const id = row.employee?.employeeID || "";
+        return id ? `${name} (${id})` : name;
       },
     },
     {
-      key: "description",
-      label: "Description",
+      key: "department",
+      label: "Department",
+      render: (row) => row.employeeDepartment?.name || "-",
+    },
+    {
+      key: "position",
+      label: "Position",
+      render: (row) => row.employeePosition?.name || "-",
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      render: (row) =>
+        `PKR ${Number(row.amount || 0).toLocaleString()}`,
+    },
+    {
+      key: "date",
+      label: "Date",
+      render: (row) => (row.date ? formatDate(row.date) : "-"),
+    },
+    {
+      key: "reason",
+      label: "Reason",
       render: (row) => {
-        const full = row.description || "";
-        const truncated = truncateDescription(full);
+        const full = row.reason || "";
+        const truncated = truncateReason(full);
         if (truncated === full) return full || "-";
         return (
           <Tooltip>
@@ -380,135 +424,58 @@ const DisciplinaryActions = () => {
       },
     },
     {
-      key: "actionDate",
-      label: "Action Date",
-      render: (row) => (row.actionDate ? formatDate(row.actionDate) : "-"),
-    },
-    {
-      key: "remainingDays",
-      label: "Remaining Days",
-      render: (row) => {
-        const days = row.remainingDays ?? 0;
-        if (row.status === "Inactive") {
-          return (
-            <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100">
-              Expired
-            </Badge>
-          );
-        }
-        if (days <= 7) {
-          return (
-            <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
-              {days} days
-            </Badge>
-          );
-        }
-        if (days <= 30) {
-          return (
-            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
-              {days} days
-            </Badge>
-          );
-        }
-        return (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-            {days} days
-          </Badge>
-        );
-      },
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (row) => {
-        if (row.status === "Active") {
-          return (
-            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-              Active
-            </Badge>
-          );
-        }
-        return (
-          <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100">
-            Inactive
-          </Badge>
-        );
-      },
-    },
-    {
       key: "actions",
       label: "Actions",
       align: "center",
       renderEdit: () => <PencilIcon size={18} />,
       renderDelete: () => <TrashIcon size={18} />,
-      renderApprove: (row) => {
-        if (togglingActionId === row._id) {
-          return <Spinner className="h-4 w-4" />;
-        }
-        return row.status === "Active" ? (
-          <ToggleRightIcon size={18} />
-        ) : (
-          <ToggleLeftIcon size={18} />
-        );
-      },
     },
   ];
 
   // ===========================================================================
-  // EVENT HANDLERS
+  // HANDLERS
   // ===========================================================================
 
   const resetForm = () => {
     setErrors({});
-    setEditingAction(null);
+    setEditingDeduction(null);
     setSelectedEmployees([]);
-    setSelectedWarningTypeId("");
-    setActionDate(undefined);
-    setDescription("");
+    setDeductionAmount("");
+    setDeductionDate(undefined);
+    setDeductionReason("");
   };
 
   const handleEdit = (row) => {
-    setEditingAction(row);
+    setEditingDeduction(row);
     setSelectedEmployees(
       row.employee
-        ? [{
-            _id: row.employee._id,
-            fullName: row.employee.fullName,
-            employeeID: row.employee.employeeID,
-          }]
+        ? [
+            {
+              _id: row.employee._id,
+              fullName: row.employee.fullName,
+              employeeID: row.employee.employeeID,
+            },
+          ]
         : [],
     );
-    setSelectedWarningTypeId(row.warningType?._id || "");
-    setActionDate(row.actionDate ? new Date(row.actionDate) : undefined);
-    setDescription(row.description || "");
+    setDeductionAmount(String(row.amount || ""));
+    setDeductionDate(row.date ? new Date(row.date) : undefined);
+    setDeductionReason(row.reason || "");
     setDialogOpen(true);
   };
 
   const handleDelete = (row) => {
-    setDeletingAction(row);
+    setDeletingDeduction(row);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
-    if (deletingAction) {
-      deleteMutation.mutate(deletingAction._id);
+    if (deletingDeduction) {
+      deleteMutation.mutate(deletingDeduction._id);
     }
-  };
-
-  const handleToggleStatus = (row) => {
-    if (togglingActionId) return;
-    setTogglingActionId(row._id);
-    toggleMutation.mutate(row._id);
   };
 
   const handleAddClick = () => {
-    // Check if warning types exist
-    if (!warningTypesList || warningTypesList.length === 0) {
-      toast.error(
-        "No warning types exist. Please create warning types first.",
-      );
-      return;
-    }
     setDialogOpen(true);
   };
 
@@ -543,26 +510,61 @@ const DisciplinaryActions = () => {
     }
   };
 
-  // Form submit
-  const toggleEmployee = useCallback(
-    (empId) => {
-      setSelectedEmployees((prev) => {
-        const exists = prev.some((e) => e._id === empId);
-        if (exists) {
-          return prev.filter((e) => e._id !== empId);
-        }
-        const emp = employeesList.find((e) => e._id === empId);
-        return emp
-          ? [...prev, { _id: emp._id, fullName: emp.fullName, employeeID: emp.employeeID }]
-          : prev;
-      });
-    },
-    [employeesList],
-  );
+  // Filters
+  const handleFilterPopoverOpenChange = (open) => {
+    setFilterPopoverOpen(open);
+  };
 
-  const handleRemoveEmployee = useCallback((empId) => {
-    setSelectedEmployees((prev) => prev.filter((e) => e._id !== empId));
-  }, []);
+  const handleFilterClick = async (event) => {
+    event.preventDefault();
+    setIsFiltersLoading(true);
+    try {
+      await Promise.all([fetchDepartments(), fetchPositions()]);
+      setTempFilterDepartment(filterDepartment);
+      setTempFilterPosition(filterPosition);
+      setTempFilterYear(filterYear);
+      setTempFilterMonth(filterMonth);
+      setFilterPopoverOpen(true);
+    } catch {
+      toast.error("Failed to load filters");
+    } finally {
+      setIsFiltersLoading(false);
+    }
+  };
+
+  const applyFilters = () => {
+    setFilterDepartment(tempFilterDepartment);
+    setFilterPosition(tempFilterPosition);
+    setFilterYear(tempFilterYear);
+    setFilterMonth(tempFilterMonth);
+    setPage(1);
+    setFilterPopoverOpen(false);
+  };
+
+  const resetFilters = () => {
+    setTempFilterDepartment("");
+    setTempFilterPosition("");
+    setTempFilterYear("");
+    setTempFilterMonth("");
+    setFilterDepartment("");
+    setFilterPosition("");
+    setFilterYear("");
+    setFilterMonth("");
+    setPage(1);
+    setFilterPopoverOpen(false);
+  };
+
+  // Employee selection
+  const toggleEmployee = (empId) => {
+    setSelectedEmployees((prev) => {
+      const exists = prev.some((e) => e._id === empId);
+      if (exists) {
+        return prev.filter((e) => e._id !== empId);
+      }
+      const emp = employeesList.find((e) => e._id === empId);
+      return emp ? [...prev, emp] : prev;
+    });
+  };
 
   const selectedEmployeeLabels = useMemo(() => {
     return selectedEmployees
@@ -570,6 +572,7 @@ const DisciplinaryActions = () => {
       .join(", ");
   }, [selectedEmployees]);
 
+  // Form submit
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrors({});
@@ -580,16 +583,25 @@ const DisciplinaryActions = () => {
       newErrors.employee = "Please select at least one employee";
     }
 
-    if (!selectedWarningTypeId) {
-      newErrors.warningType = "Please select a warning type";
+    const parsedAmount = Number(deductionAmount);
+    if (!deductionAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      newErrors.amount = "Amount must be a positive number greater than zero";
     }
 
-    if (!actionDate) {
-      newErrors.actionDate = "Action date is required";
+    if (!deductionDate) {
+      newErrors.date = "Date is required";
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(deductionDate);
+      selectedDate.setHours(0, 0, 0, 0);
+      if (selectedDate < today && !editingDeduction) {
+        newErrors.date = "Date cannot be in the past";
+      }
     }
 
-    if (!description?.trim()) {
-      newErrors.description = "Description is required";
+    if (!deductionReason?.trim()) {
+      newErrors.reason = "Reason is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -597,20 +609,20 @@ const DisciplinaryActions = () => {
       return;
     }
 
-    if (editingAction) {
+    if (editingDeduction) {
       const payload = {
         employee: selectedEmployees[0]._id,
-        warningType: selectedWarningTypeId,
-        actionDate: actionDate.toISOString(),
-        description: description.trim(),
+        amount: parsedAmount,
+        date: deductionDate.toISOString(),
+        reason: deductionReason.trim(),
       };
-      updateMutation.mutate({ id: editingAction._id, payload });
+      updateMutation.mutate({ id: editingDeduction._id, payload });
     } else {
       const payload = {
         employees: selectedEmployees.map((e) => e._id),
-        warningType: selectedWarningTypeId,
-        actionDate: actionDate.toISOString(),
-        description: description.trim(),
+        amount: parsedAmount,
+        date: deductionDate.toISOString(),
+        reason: deductionReason.trim(),
       };
       createMutation.mutate(payload);
     }
@@ -624,7 +636,7 @@ const DisciplinaryActions = () => {
     <div className={styles.container}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Disciplinary Actions</h1>
+        <h1 className={styles.title}>Deductions</h1>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -642,19 +654,17 @@ const DisciplinaryActions = () => {
             onClick={handleAddClick}
           >
             <PlusIcon size={16} />
-            Report Disciplinary Action
+            Apply Deduction
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
               <DialogTitle className="flex justify-center text-[#02542D]">
-                {editingAction
-                  ? "Edit Disciplinary Action"
-                  : "Report Disciplinary Action"}
+                {editingDeduction ? "Edit Deduction" : "Apply Deduction"}
               </DialogTitle>
               <DialogDescription className="sr-only">
-                {editingAction
-                  ? "Edit the disciplinary action details below"
-                  : "Report a new disciplinary action against an employee"}
+                {editingDeduction
+                  ? "Edit the deduction details below"
+                  : "Apply a new deduction to selected employees"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
@@ -664,7 +674,7 @@ const DisciplinaryActions = () => {
                 </div>
               )}
               <div className="grid gap-4">
-                {/* Employee Search */}
+                {/* Employee Multi-select — Command Combobox */}
                 <div className="grid gap-3">
                   <Label className="text-[#344054]">
                     Employee{" "}
@@ -741,7 +751,7 @@ const DisciplinaryActions = () => {
                       </Command>
                     </PopoverContent>
                   </Popover>
-                  {/* Selected Employees Pills */}
+                  {/* Selected pills */}
                   {selectedEmployees.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {selectedEmployees.map((emp) => (
@@ -753,7 +763,11 @@ const DisciplinaryActions = () => {
                           <button
                             type="button"
                             className="ml-0.5 rounded-full hover:bg-green-200 p-0.5 cursor-pointer"
-                            onClick={() => handleRemoveEmployee(emp._id)}
+                            onClick={() =>
+                              setSelectedEmployees((prev) =>
+                                prev.filter((e) => e._id !== emp._id),
+                              )
+                            }
                           >
                             <XIcon size={12} />
                           </button>
@@ -768,36 +782,27 @@ const DisciplinaryActions = () => {
                   )}
                 </div>
 
-                {/* Warning Type Selection */}
+                {/* Amount */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Warning Type</Label>
-                  <Select
-                    value={selectedWarningTypeId}
-                    onValueChange={(value) => setSelectedWarningTypeId(value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select warning type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {warningTypesList.map((wt) => (
-                          <SelectItem key={wt._id} value={wt._id}>
-                            {wt.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.warningType && (
+                  <Label className="text-[#344054]">Amount (PKR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="Enter deduction amount"
+                    value={deductionAmount}
+                    onChange={(e) => setDeductionAmount(e.target.value)}
+                  />
+                  {errors.amount && (
                     <p className="text-sm text-red-500 mt-1">
-                      {errors.warningType}
+                      {errors.amount}
                     </p>
                   )}
                 </div>
 
-                {/* Action Date */}
+                {/* Date */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Action Date</Label>
+                  <Label className="text-[#344054]">Deduction Date</Label>
                   <Popover
                     open={datePickerOpen}
                     onOpenChange={setDatePickerOpen}
@@ -807,44 +812,50 @@ const DisciplinaryActions = () => {
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal cursor-pointer",
-                          !actionDate && "text-muted-foreground",
+                          !deductionDate && "text-muted-foreground",
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {actionDate ? formatDate(actionDate) : "Pick a date"}
+                        {deductionDate
+                          ? formatDate(deductionDate)
+                          : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={actionDate}
+                        selected={deductionDate}
                         onSelect={(date) => {
-                          setActionDate(date);
+                          setDeductionDate(date);
                           setDatePickerOpen(false);
+                        }}
+                        disabled={(date) => {
+                          if (editingDeduction) return false;
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
                         }}
                         initialFocus
                       />
                     </PopoverContent>
                   </Popover>
-                  {errors.actionDate && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.actionDate}
-                    </p>
+                  {errors.date && (
+                    <p className="text-sm text-red-500 mt-1">{errors.date}</p>
                   )}
                 </div>
 
-                {/* Description */}
+                {/* Reason */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Description</Label>
+                  <Label className="text-[#344054]">Reason</Label>
                   <Textarea
-                    placeholder="Enter description of the disciplinary action..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={4}
+                    placeholder="Enter reason for the deduction..."
+                    value={deductionReason}
+                    onChange={(e) => setDeductionReason(e.target.value)}
+                    rows={3}
                   />
-                  {errors.description && (
+                  {errors.reason && (
                     <p className="text-sm text-red-500 mt-1">
-                      {errors.description}
+                      {errors.reason}
                     </p>
                   )}
                 </div>
@@ -870,12 +881,12 @@ const DisciplinaryActions = () => {
                   {createMutation.isPending || updateMutation.isPending ? (
                     <>
                       <Spinner />
-                      {editingAction ? "Updating" : "Reporting"}
+                      {editingDeduction ? "Updating" : "Applying"}
                     </>
-                  ) : editingAction ? (
+                  ) : editingDeduction ? (
                     "Update"
                   ) : (
-                    "Report"
+                    "Apply Deduction"
                   )}
                 </Button>
               </DialogFooter>
@@ -888,7 +899,7 @@ const DisciplinaryActions = () => {
       <div className={styles.controls}>
         <InputGroup className={styles.tableSearchInput}>
           <InputGroupInput
-            placeholder="Search by employee name, ID, or warning type..."
+            placeholder="Search by employee name or ID..."
             value={searchValue}
             onChange={handleSearchChange}
           />
@@ -907,7 +918,6 @@ const DisciplinaryActions = () => {
         <Select
           value={limit.toString()}
           onValueChange={handleLimitChange}
-          className={styles.pageLimitSelect}
         >
           <SelectTrigger className="w-45">
             <SelectValue placeholder="Select page limit" />
@@ -922,18 +932,169 @@ const DisciplinaryActions = () => {
             </SelectGroup>
           </SelectContent>
         </Select>
+
+        {/* Filters */}
+        <Popover
+          open={filterPopoverOpen}
+          onOpenChange={handleFilterPopoverOpenChange}
+        >
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Filters"
+              className="cursor-pointer"
+              disabled={isFiltersLoading}
+              onClick={handleFilterClick}
+            >
+              {isFiltersLoading ? <Spinner /> : <SlidersHorizontalIcon />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80" align="end">
+            {isLoadingDepartments || isLoadingPositions ? (
+              <div className="flex items-center justify-center py-6">
+                <Spinner />
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <h4 className="leading-none font-medium">Filters</h4>
+                  <p className="text-muted-foreground text-sm">
+                    Apply the filters for deduction records.
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label>Department</Label>
+                    <Select
+                      value={tempFilterDepartment || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterDepartment(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All departments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Departments</SelectItem>
+                          {departmentsList?.map((dept) => (
+                            <SelectItem key={dept._id} value={dept.name}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label>Position</Label>
+                    <Select
+                      value={tempFilterPosition || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterPosition(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All positions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Positions</SelectItem>
+                          {uniquePositionNames.map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label>Year</Label>
+                    <Select
+                      value={tempFilterYear || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterYear(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All years" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Years</SelectItem>
+                          {YEARS.map((yearOption) => (
+                            <SelectItem key={yearOption} value={yearOption}>
+                              {yearOption}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <Label>Month</Label>
+                    <Select
+                      value={tempFilterMonth || "all"}
+                      onValueChange={(value) =>
+                        setTempFilterMonth(value === "all" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full col-span-2">
+                        <SelectValue placeholder="All months" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="all">All Months</SelectItem>
+                          {MONTHS.map((monthOption) => (
+                            <SelectItem
+                              key={monthOption.value}
+                              value={monthOption.value}
+                            >
+                              {monthOption.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="green"
+                    className="cursor-pointer flex-1"
+                    onClick={applyFilters}
+                  >
+                    Apply
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="cursor-pointer flex-1"
+                    onClick={resetFilters}
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       <DataTable
         columns={columns}
-        data={data?.disciplinaryActions || []}
+        data={data?.deductions || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        onApprove={handleToggleStatus}
-        approveLabel="Toggle Status"
         isLoading={isLoading}
         isError={isError}
-        loadingText="Loading disciplinary actions..."
+        loadingText="Loading deductions..."
       />
 
       {data?.pagination && data.pagination.totalPages > 1 && (
@@ -1052,7 +1213,7 @@ const DisciplinaryActions = () => {
           setDeleteDialogOpen(open);
           if (!open) {
             setTimeout(() => {
-              setDeletingAction(null);
+              setDeletingDeduction(null);
             }, 200);
           }
         }}
@@ -1060,12 +1221,16 @@ const DisciplinaryActions = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#02542D]">
-              Delete Disciplinary Action
+              Delete Deduction
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the disciplinary action for{" "}
+              Are you sure you want to delete the deduction of{" "}
               <span className="font-semibold text-[#02542D]">
-                "{deletingAction?.employee?.fullName}"
+                PKR {Number(deletingDeduction?.amount || 0).toLocaleString()}
+              </span>{" "}
+              for{" "}
+              <span className="font-semibold text-[#02542D]">
+                "{deletingDeduction?.employee?.fullName}"
               </span>
               ? This action cannot be undone.
             </AlertDialogDescription>
@@ -1098,4 +1263,4 @@ const DisciplinaryActions = () => {
   );
 };
 
-export default DisciplinaryActions;
+export default Deductions;

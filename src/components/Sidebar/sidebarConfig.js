@@ -69,6 +69,7 @@ export const sidebarItems = [
     collapseIcon: ChevronDownIcon,
     children: [
       { label: "Payroll", path: "/salary/payroll" },
+      { label: "Deductions", path: "/salary/deductions" },
       { label: "Allowance Components", path: "/allowances/components" },
       { label: "Allowance Policies", path: "/allowances/policies" },
     ],

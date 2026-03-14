@@ -78,8 +78,9 @@ import styles from "./Payroll.module.css";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const START_YEAR = CURRENT_YEAR - 2;
-const YEARS = Array.from({ length: CURRENT_YEAR - START_YEAR + 1 }, (_, index) =>
-  String(START_YEAR + index)
+const YEARS = Array.from(
+  { length: CURRENT_YEAR - START_YEAR + 1 },
+  (_, index) => String(START_YEAR + index),
 );
 const MONTHS = [
   { value: "1", label: "January" },
@@ -100,27 +101,32 @@ const monthLabel = (month) =>
   MONTHS.find((item) => Number(item.value) === Number(month))?.label || "-";
 
 const currency = (value) => `PKR ${Number(value || 0).toLocaleString()}`;
-const PAYROLL_GENERATION_ENABLED = import.meta.env.VITE_ENABLE_PAYROLL_GENERATION !== "false";
+const PAYROLL_GENERATION_ENABLED =
+  import.meta.env.VITE_ENABLE_PAYROLL_GENERATION !== "false";
 
 const Payroll = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  const [searchValue, setSearchValue] = useState(searchParams.get("search") || "");
+  const [searchValue, setSearchValue] = useState(
+    searchParams.get("search") || "",
+  );
   const [debouncedSearch, setDebouncedSearch] = useState(
-    searchParams.get("search") || ""
+    searchParams.get("search") || "",
   );
   const [page, setPage] = useState(Number(searchParams.get("page") || 1));
   const [limit, setLimit] = useState(Number(searchParams.get("limit") || 10));
 
   const [filterDepartment, setFilterDepartment] = useState(
-    searchParams.get("department") || ""
+    searchParams.get("department") || "",
   );
   const [filterPosition, setFilterPosition] = useState(
-    searchParams.get("position") || ""
+    searchParams.get("position") || "",
   );
   const [filterYear, setFilterYear] = useState(searchParams.get("year") || "");
-  const [filterMonth, setFilterMonth] = useState(searchParams.get("month") || "");
+  const [filterMonth, setFilterMonth] = useState(
+    searchParams.get("month") || "",
+  );
 
   const [tempFilterDepartment, setTempFilterDepartment] = useState("");
   const [tempFilterPosition, setTempFilterPosition] = useState("");
@@ -133,7 +139,7 @@ const Payroll = () => {
   const [isOpeningGenerateDialog, setIsOpeningGenerateDialog] = useState(false);
   const [generateYear, setGenerateYear] = useState(String(CURRENT_YEAR));
   const [generateMonth, setGenerateMonth] = useState(
-    String(new Date().getMonth() + 1)
+    String(new Date().getMonth() + 1),
   );
   const [forceReplace, setForceReplace] = useState(false);
 
@@ -231,7 +237,8 @@ const Payroll = () => {
         year: Number(generateYear),
         month: Number(generateMonth),
       }),
-    enabled: generateDialogOpen && Boolean(generateYear) && Boolean(generateMonth),
+    enabled:
+      generateDialogOpen && Boolean(generateYear) && Boolean(generateMonth),
   });
 
   const { data: payslipData, isFetching: isPayslipFetching } = useQuery({
@@ -253,7 +260,7 @@ const Payroll = () => {
       }
 
       toast.success(
-        `Payroll generation completed. Generated: ${response?.summary?.generated || 0}, Failed: ${response?.summary?.failed || 0}`
+        `Payroll generation completed. Generated: ${response?.summary?.generated || 0}, Failed: ${response?.summary?.failed || 0}`,
       );
     },
     onError: (error) => {
@@ -269,8 +276,8 @@ const Payroll = () => {
             employeeId: target.employeeId,
             year: target.year,
             month: target.month,
-          })
-        )
+          }),
+        ),
       );
 
       const failed = results
@@ -297,7 +304,7 @@ const Payroll = () => {
 
       if (response.failed.length > 0) {
         toast.error(
-          `Regenerated ${response.success}/${response.total}. ${response.failed[0]?.employeeName}: ${response.failed[0]?.error}`
+          `Regenerated ${response.success}/${response.total}. ${response.failed[0]?.employeeName}: ${response.failed[0]?.error}`,
         );
         return;
       }
@@ -305,13 +312,23 @@ const Payroll = () => {
       toast.success(`Payroll regenerated for ${response.success} employee(s)`);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || "Failed to regenerate payroll");
+      toast.error(
+        error.response?.data?.message || "Failed to regenerate payroll",
+      );
     },
   });
 
   useEffect(() => {
     setSelectedPayrollIds([]);
-  }, [page, limit, debouncedSearch, filterDepartment, filterPosition, filterYear, filterMonth]);
+  }, [
+    page,
+    limit,
+    debouncedSearch,
+    filterDepartment,
+    filterPosition,
+    filterYear,
+    filterMonth,
+  ]);
 
   const selectedPayrollTargets = useMemo(() => {
     const payrollRows = payrollData?.payrolls || [];
@@ -408,7 +425,7 @@ const Payroll = () => {
       setGenerateDialogOpen(true);
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Failed to load eligible employees"
+        error.response?.data?.message || "Failed to load eligible employees",
       );
     } finally {
       setIsOpeningGenerateDialog(false);
@@ -448,7 +465,9 @@ const Payroll = () => {
 
     try {
       const blob = await downloadPayslipPdf(selectedPayslipId);
-      const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+      const url = window.URL.createObjectURL(
+        new Blob([blob], { type: "application/pdf" }),
+      );
       const link = document.createElement("a");
       link.href = url;
       link.download = `payslip-${selectedPayslipId}.pdf`;
@@ -457,7 +476,9 @@ const Payroll = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to download payslip");
+      toast.error(
+        error.response?.data?.message || "Failed to download payslip",
+      );
     }
   };
 
@@ -491,13 +512,21 @@ const Payroll = () => {
       label: "Working Days",
       render: (row) => row.workingDays?.totalScheduled ?? 0,
     },
-    { key: "present", label: "Present", render: (row) => row.workingDays?.present ?? 0 },
+    {
+      key: "present",
+      label: "Present",
+      render: (row) => row.workingDays?.present ?? 0,
+    },
     {
       key: "absences",
       label: "Absences",
       render: (row) => row.workingDays?.absences ?? 0,
     },
-    { key: "leaves", label: "Leaves", render: (row) => row.workingDays?.leaves ?? 0 },
+    {
+      key: "leaves",
+      label: "Leaves",
+      render: (row) => row.workingDays?.leaves ?? 0,
+    },
     {
       key: "halfDay",
       label: "Half Day",
@@ -550,7 +579,10 @@ const Payroll = () => {
           <Button
             variant="outline"
             className="cursor-pointer relative"
-            disabled={selectedPayrollTargets.length === 0 || regenerateMutation.isPending}
+            disabled={
+              selectedPayrollTargets.length === 0 ||
+              regenerateMutation.isPending
+            }
             onClick={openRegenerateDialog}
           >
             <RefreshCcwIcon className={styles.buttonIcon} />
@@ -579,7 +611,9 @@ const Payroll = () => {
       </div>
 
       {!PAYROLL_GENERATION_ENABLED && (
-        <div className={styles.previewSubtext}>Payroll generation is currently disabled by feature flag.</div>
+        <div className={styles.previewSubtext}>
+          Payroll generation is currently disabled by feature flag.
+        </div>
       )}
 
       <div className={styles.controls}>
@@ -646,7 +680,11 @@ const Payroll = () => {
               disabled={isFiltersLoading}
               onClick={handleFilterClick}
             >
-              {isFiltersLoading ? <Spinner className={styles.filterSpinner} /> : <SlidersHorizontalIcon />}
+              {isFiltersLoading ? (
+                <Spinner className={styles.filterSpinner} />
+              ) : (
+                <SlidersHorizontalIcon />
+              )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-80" align="end">
@@ -679,7 +717,10 @@ const Payroll = () => {
                         <SelectGroup>
                           <SelectItem value="all">All Departments</SelectItem>
                           {departmentsList?.map((department) => (
-                            <SelectItem key={department._id} value={department.name}>
+                            <SelectItem
+                              key={department._id}
+                              value={department.name}
+                            >
                               {department.name}
                             </SelectItem>
                           ))}
@@ -751,7 +792,10 @@ const Payroll = () => {
                         <SelectGroup>
                           <SelectItem value="all">All Months</SelectItem>
                           {MONTHS.map((monthOption) => (
-                            <SelectItem key={monthOption.value} value={monthOption.value}>
+                            <SelectItem
+                              key={monthOption.value}
+                              value={monthOption.value}
+                            >
                               {monthOption.label}
                             </SelectItem>
                           ))}
@@ -762,10 +806,18 @@ const Payroll = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="green" className="cursor-pointer flex-1" onClick={applyFilters}>
+                  <Button
+                    variant="green"
+                    className="cursor-pointer flex-1"
+                    onClick={applyFilters}
+                  >
                     Apply
                   </Button>
-                  <Button variant="outline" className="cursor-pointer flex-1" onClick={resetFilters}>
+                  <Button
+                    variant="outline"
+                    className="cursor-pointer flex-1"
+                    onClick={resetFilters}
+                  >
                     Reset
                   </Button>
                 </div>
@@ -800,11 +852,12 @@ const Payroll = () => {
               (pageNo) =>
                 pageNo === 1 ||
                 pageNo === totalPages ||
-                Math.abs(pageNo - page) <= 1
+                Math.abs(pageNo - page) <= 1,
             )
             .map((pageNo, index, array) => {
               const previousPageNo = array[index - 1];
-              const showEllipsis = previousPageNo && pageNo - previousPageNo > 1;
+              const showEllipsis =
+                previousPageNo && pageNo - previousPageNo > 1;
 
               return (
                 <div key={pageNo} className={styles.paginationInline}>
@@ -870,7 +923,10 @@ const Payroll = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {MONTHS.map((monthOption) => (
-                    <SelectItem key={monthOption.value} value={monthOption.value}>
+                    <SelectItem
+                      key={monthOption.value}
+                      value={monthOption.value}
+                    >
                       {monthOption.label}
                     </SelectItem>
                   ))}
@@ -888,10 +944,12 @@ const Payroll = () => {
             ) : (
               <div>
                 <div>
-                  Eligible employees: {generationPreview?.eligibleEmployeesCount || 0}
+                  Eligible employees:{" "}
+                  {generationPreview?.eligibleEmployeesCount || 0}
                 </div>
                 <div className={styles.previewSubtext}>
-                  Generation allowed only when selected month is fully closed in Pakistan time.
+                  Generation allowed only when selected month is fully closed in
+                  Pakistan time.
                 </div>
               </div>
             )}
@@ -913,7 +971,9 @@ const Payroll = () => {
               onClick={handleGeneratePayroll}
               disabled={generateMutation.isPending}
             >
-              {generateMutation.isPending ? "Generating..." : "Generate Payroll"}
+              {generateMutation.isPending
+                ? "Generating..."
+                : "Generate Payroll"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -924,22 +984,30 @@ const Payroll = () => {
           <DialogHeader>
             <DialogTitle>Payroll Generation Errors</DialogTitle>
             <DialogDescription>
-              Review failed employees below. Each entry shows employee, month/year, and failure reason.
+              Review failed employees below. Each entry shows employee,
+              month/year, and failure reason.
             </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className={styles.errorListScroll}>
             <div className={styles.errorListWrap}>
               {generationErrors.map((item, index) => (
-                <div key={`${item.employeeId}-${index}`} className={styles.errorItem}>
+                <div
+                  key={`${item.employeeId}-${index}`}
+                  className={styles.errorItem}
+                >
                   <div className={styles.errorItemHeader}>
-                    <span className={styles.errorEmployee}>{item.employeeName}</span>
+                    <span className={styles.errorEmployee}>
+                      {item.employeeName}
+                    </span>
                     <span className={styles.errorPeriod}>
                       {monthLabel(item.month)} {item.year}
                     </span>
                   </div>
                   <ScrollArea className={styles.errorReasonScroll}>
-                    <div className={styles.errorReason}>{item.reasonMessage}</div>
+                    <div className={styles.errorReason}>
+                      {item.reasonMessage}
+                    </div>
                   </ScrollArea>
                 </div>
               ))}
@@ -959,7 +1027,8 @@ const Payroll = () => {
           <DialogHeader>
             <DialogTitle>Payslip</DialogTitle>
             <DialogDescription>
-              {monthLabel(payslipData?.payslip?.month)} {payslipData?.payslip?.year}
+              {monthLabel(payslipData?.payslip?.month)}{" "}
+              {payslipData?.payslip?.year}
             </DialogDescription>
           </DialogHeader>
 
@@ -981,7 +1050,8 @@ const Payroll = () => {
                 <div className={styles.payslipInfoGroup}>
                   <div className={styles.payslipInfoLabel}>Position</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.positionName || "-"}
+                    {payslipData?.payslip?.employeeSnapshot?.positionName ||
+                      "-"}
                   </div>
                 </div>
                 <div className={styles.payslipInfoGroup}>
@@ -989,7 +1059,7 @@ const Payroll = () => {
                   <div className={styles.payslipInfoValue}>
                     {payslipData?.payslip?.employeeSnapshot?.joiningDate
                       ? new Date(
-                          payslipData.payslip.employeeSnapshot.joiningDate
+                          payslipData.payslip.employeeSnapshot.joiningDate,
                         ).toLocaleDateString()
                       : "-"}
                   </div>
@@ -997,7 +1067,8 @@ const Payroll = () => {
                 <div className={styles.payslipInfoGroup}>
                   <div className={styles.payslipInfoLabel}>Department</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.departmentName || "-"}
+                    {payslipData?.payslip?.employeeSnapshot?.departmentName ||
+                      "-"}
                   </div>
                 </div>
               </div>
@@ -1049,31 +1120,135 @@ const Payroll = () => {
               <div className={styles.payslipSectionTitle}>Salary Breakdown</div>
               <div className={styles.payslipBreakdownWrap}>
                 <div className={styles.payslipBreakdownRow}>
-                  <span className={styles.payslipBreakdownLabel}>Basic Salary</span>
+                  <span className={styles.payslipBreakdownLabel}>
+                    Basic Salary
+                  </span>
                   <span className={styles.payslipBreakdownAmount}>
-                    {currency(payslipData?.payslip?.calculations?.basicSalaryAmount)}
+                    {currency(
+                      payslipData?.payslip?.calculations?.basicSalaryAmount,
+                    )}
                   </span>
                 </div>
-                {(payslipData?.payslip?.allowanceBreakdown || []).length > 0 && (
+                {(payslipData?.payslip?.allowanceBreakdown || []).length >
+                  0 && (
                   <>
-                    <div className={styles.payslipAllowanceHeader}>Allowances</div>
-                    {(payslipData?.payslip?.allowanceBreakdown || []).map((item, index) => (
-                      <div key={`${item.name}-${index}`} className={styles.payslipAllowanceRow}>
-                        <span className={styles.payslipAllowanceName}>{item.name}</span>
-                        <span className={styles.payslipAllowanceAmount}>{currency(item.amount)}</span>
-                      </div>
-                    ))}
+                    <div className={styles.payslipAllowanceHeader}>
+                      Allowances
+                    </div>
+                    {(payslipData?.payslip?.allowanceBreakdown || []).map(
+                      (item, index) => (
+                        <div
+                          key={`${item.name}-${index}`}
+                          className={styles.payslipAllowanceRow}
+                        >
+                          <span className={styles.payslipAllowanceName}>
+                            {item.name}
+                          </span>
+                          <span className={styles.payslipAllowanceAmount}>
+                            {currency(item.amount)}
+                          </span>
+                        </div>
+                      ),
+                    )}
                   </>
                 )}
-                {Number(payslipData?.payslip?.calculations?.arrearsAmount || 0) !== 0 && (
+                {Number(
+                  payslipData?.payslip?.calculations?.arrearsAmount || 0,
+                ) !== 0 && (
                   <div className={styles.payslipBreakdownRow}>
-                    <span className={styles.payslipBreakdownLabel}>Arrears</span>
+                    <span className={styles.payslipBreakdownLabel}>
+                      Arrears
+                    </span>
                     <span className={styles.payslipBreakdownAmount}>
-                      {currency(payslipData?.payslip?.calculations?.arrearsAmount)}
+                      {currency(
+                        payslipData?.payslip?.calculations?.arrearsAmount,
+                      )}
                     </span>
                   </div>
                 )}
+                <div className={styles.payslipBreakdownRow}>
+                  <span className={styles.payslipBreakdownLabel} style={{ fontWeight: 600 }}>
+                    Gross Salary
+                  </span>
+                  <span className={styles.payslipBreakdownAmount} style={{ fontWeight: 700 }}>
+                    {currency(
+                      payslipData?.payslip?.calculations?.grossSalary,
+                    )}
+                  </span>
+                </div>
               </div>
+
+              {/* Deductions section */}
+              {(Number(payslipData?.payslip?.calculations?.latePenaltyAmount || 0) > 0 ||
+                Number(payslipData?.payslip?.calculations?.manualDeductionAmount || 0) > 0) && (
+                <>
+                  <div className={styles.payslipSectionTitle}>Deductions</div>
+                  <div className={styles.payslipBreakdownWrap}>
+                    {Number(payslipData?.payslip?.calculations?.latePenaltyAmount || 0) > 0 && (
+                      <div className={styles.payslipBreakdownRow}>
+                        <span className={styles.payslipBreakdownLabel}>
+                          Late Penalty
+                          {payslipData?.payslip?.calculations?.lateCount > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({payslipData.payslip.calculations.lateCount} late →{" "}
+                              {payslipData.payslip.calculations.latePenaltyGroups || 0} deduction
+                              {(payslipData.payslip.calculations.latePenaltyGroups || 0) !== 1
+                                ? "s"
+                                : ""}
+                              )
+                            </span>
+                          )}
+                        </span>
+                        <span className={styles.payslipBreakdownAmount} style={{ color: "#dc2626" }}>
+                          -{currency(
+                            payslipData?.payslip?.calculations?.latePenaltyAmount,
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {Number(payslipData?.payslip?.calculations?.manualDeductionAmount || 0) > 0 && (
+                      <>
+                        {(payslipData?.payslip?.deductionBreakdown || []).length > 0 ? (
+                          <>
+                            <div className={styles.payslipAllowanceHeader}>
+                              Manual Deductions
+                            </div>
+                            {payslipData.payslip.deductionBreakdown.map(
+                              (item, index) => (
+                                <div
+                                  key={`deduction-${index}`}
+                                  className={styles.payslipAllowanceRow}
+                                >
+                                  <span className={styles.payslipAllowanceName}>
+                                    {item.reason}
+                                  </span>
+                                  <span
+                                    className={styles.payslipAllowanceAmount}
+                                    style={{ color: "#dc2626" }}
+                                  >
+                                    -{currency(item.amount)}
+                                  </span>
+                                </div>
+                              ),
+                            )}
+                          </>
+                        ) : (
+                          <div className={styles.payslipBreakdownRow}>
+                            <span className={styles.payslipBreakdownLabel}>
+                              Manual Deductions
+                            </span>
+                            <span className={styles.payslipBreakdownAmount} style={{ color: "#dc2626" }}>
+                              -{currency(
+                                payslipData?.payslip?.calculations?.manualDeductionAmount,
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
 
               <div className={styles.payslipTotalRow}>
                 <span>Total Salary</span>
@@ -1083,7 +1258,9 @@ const Payroll = () => {
               </div>
 
               <div className={styles.payslipFooter}>
-                <Button variant="green" onClick={handleDownloadPayslip}>Download PDF</Button>
+                <Button variant="green" onClick={handleDownloadPayslip}>
+                  Download PDF
+                </Button>
               </div>
             </div>
           }
@@ -1098,8 +1275,9 @@ const Payroll = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Regenerate Payroll</AlertDialogTitle>
             <AlertDialogDescription>
-              Regenerate payroll for {selectedPayrollTargets.length} selected employee(s)?
-              This replaces existing payroll snapshots for each selected employee month.
+              Regenerate payroll for {selectedPayrollTargets.length} selected
+              employee(s)? This replaces existing payroll snapshots for each
+              selected employee month.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
