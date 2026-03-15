@@ -38,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -194,6 +193,7 @@ const LeavesApplications = () => {
 
   // Form state
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [selectedEmployeeLabel, setSelectedEmployeeLabel] = useState("");
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState("");
   const [dateRanges, setDateRanges] = useState([
     { startDate: undefined, endDate: undefined },
@@ -204,6 +204,8 @@ const LeavesApplications = () => {
   const [singleDate, setSingleDate] = useState(undefined);
   const [reason, setReason] = useState("");
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [debouncedEmployeeQuery, setDebouncedEmployeeQuery] = useState("");
   const [datePickerOpenIndex, setDatePickerOpenIndex] = useState(null);
   const [datePickerType, setDatePickerType] = useState(null); // 'start' or 'end'
 
@@ -223,6 +225,13 @@ const LeavesApplications = () => {
       setPage(1);
     }
   }, [debouncedSearch, searchValue]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmployeeQuery(employeeSearchQuery.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [employeeSearchQuery]);
 
   useEffect(() => {
     const params = {};
@@ -246,9 +255,14 @@ const LeavesApplications = () => {
 
   // Fetch Employees List (for combobox)
   const { data: employeesData } = useQuery({
-    queryKey: ["employees-list"],
-    queryFn: fetchEmployeesList,
-    enabled: dialogOpen,
+    queryKey: ["employees-list", debouncedEmployeeQuery],
+    queryFn: () =>
+      fetchEmployeesList({ q: debouncedEmployeeQuery, limit: 10 }),
+    enabled:
+      dialogOpen &&
+      employeeComboboxOpen &&
+      debouncedEmployeeQuery.length >= 1,
+    placeholderData: (previous) => previous,
   });
 
   // Fetch Leave Types List (for dropdown)
@@ -391,15 +405,14 @@ const LeavesApplications = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "employeeName",
-      label: "Employee Name",
+      key: "employee",
+      label: "Employee",
       fontWeight: "medium",
-      render: (row) => row.employee?.fullName || "-",
-    },
-    {
-      key: "employeeID",
-      label: "Employee ID",
-      render: (row) => row.employee?.employeeID || "-",
+      render: (row) => {
+        const name = row.employee?.fullName || "-";
+        const id = row.employee?.employeeID || "";
+        return id ? `${name} (${id})` : name;
+      },
     },
     {
       key: "leaveType",
@@ -503,6 +516,9 @@ const LeavesApplications = () => {
     setErrors({});
     setEditingApplication(null);
     setSelectedEmployeeId("");
+    setSelectedEmployeeLabel("");
+    setEmployeeSearchQuery("");
+    setDebouncedEmployeeQuery("");
     setSelectedLeaveTypeId("");
     setDateRanges([{ startDate: undefined, endDate: undefined }]);
     setDateSelectionMode(DATE_SELECTION_MODES.range);
@@ -513,6 +529,11 @@ const LeavesApplications = () => {
   const handleEdit = (row) => {
     setEditingApplication(row);
     setSelectedEmployeeId(row.employee?._id || "");
+    setSelectedEmployeeLabel(
+      row.employee
+        ? `${row.employee.fullName} (${row.employee.employeeID})`
+        : "",
+    );
     setSelectedLeaveTypeId(row.leaveType?._id || "");
     // Restore date ranges
     if (row.dateRanges && row.dateRanges.length > 0) {
@@ -705,12 +726,6 @@ const LeavesApplications = () => {
   // RENDER HELPERS
   // ===========================================================================
 
-  const selectedEmployeeLabel = useMemo(() => {
-    if (!selectedEmployeeId) return "";
-    const emp = employeesList.find((e) => e._id === selectedEmployeeId);
-    return emp ? `${emp.fullName} (${emp.employeeID})` : "";
-  }, [selectedEmployeeId, employeesList]);
-
   // ===========================================================================
   // RENDER
   // ===========================================================================
@@ -777,46 +792,67 @@ const LeavesApplications = () => {
                         <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search by name or ID..." />
-                        <CommandList>
-                          <CommandEmpty>No employee found.</CommandEmpty>
-                          <CommandGroup>
-                            {employeesList.map((emp) => (
-                              <CommandItem
-                                key={emp._id}
-                                value={`${emp.fullName} ${emp.employeeID}`}
-                                onSelect={() => {
-                                  const newId =
-                                    emp._id === selectedEmployeeId
-                                      ? ""
-                                      : emp._id;
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search by name or ID..."
+                          value={employeeSearchQuery}
+                          onValueChange={setEmployeeSearchQuery}
+                        />
+                        <CommandList className="max-h-64">
+                          {employeeSearchQuery.trim().length < 1 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              Type to search employees.
+                            </div>
+                          ) : employeesList.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              No employee found.
+                            </div>
+                          ) : (
+                            <CommandGroup>
+                              {employeesList.map((emp) => (
+                                <CommandItem
+                                  key={emp._id}
+                                  value={`${emp.fullName} ${emp.employeeID}`}
+                                  onSelect={() => {
+                                    const newId =
+                                      emp._id === selectedEmployeeId
+                                        ? ""
+                                        : emp._id;
                                   setSelectedEmployeeId(newId);
+                                  setSelectedEmployeeLabel(
+                                    newId
+                                      ? `${emp.fullName} (${emp.employeeID})`
+                                      : "",
+                                  );
                                   setSelectedLeaveTypeId("");
                                   setEmployeeComboboxOpen(false);
                                 }}
-                                className="cursor-pointer"
-                              >
-                                <CheckIcon
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedEmployeeId === emp._id
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {emp.fullName}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {emp.employeeID}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                                  className="cursor-pointer"
+                                >
+                                  <CheckIcon
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedEmployeeId === emp._id
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {emp.fullName}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {emp.employeeID}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>

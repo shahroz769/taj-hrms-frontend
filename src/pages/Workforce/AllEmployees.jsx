@@ -313,12 +313,13 @@ const AllEmployees = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "employeeID",
-      label: "Employee ID",
-    },
-    {
-      key: "fullName",
-      label: "Employee Name",
+      key: "employee",
+      label: "Employee",
+      render: (row) => {
+        const name = row.fullName || "-";
+        const id = row.employeeID || "";
+        return id ? `${name} (${id})` : name;
+      },
     },
     {
       key: "department",

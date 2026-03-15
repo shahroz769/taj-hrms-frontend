@@ -320,12 +320,13 @@ const EmployeeProgressReports = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "fullName",
-      label: "Employee Name",
-    },
-    {
-      key: "employeeID",
-      label: "Employee ID",
+      key: "employee",
+      label: "Employee",
+      render: (row) => {
+        const name = row.fullName || "-";
+        const id = row.employeeID || "";
+        return id ? `${name} (${id})` : name;
+      },
     },
     {
       key: "department",

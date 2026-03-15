@@ -1348,10 +1348,23 @@ export const getEmployeeCompensationHistory = async (req, res, next) => {
 // @access          Admin
 export const getEmployeesList = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ status: "Active" })
+    const q = (req.query.q || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 50);
+
+    const filter = { status: "Active" };
+    if (q) {
+      filter.$or = [
+        { fullName: { $regex: q, $options: "i" } },
+        { employeeID: { $regex: q, $options: "i" } },
+      ];
+    }
+
+    const employees = await Employee.find(filter)
       .select("_id fullName employeeID position")
       .populate("position", "name")
-      .sort({ fullName: 1 });
+      .sort({ fullName: 1 })
+      .limit(limit)
+      .lean();
 
     res.json({ employees });
   } catch (err) {

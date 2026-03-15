@@ -180,23 +180,12 @@
   white-space: nowrap;
 }
 
-.employeeId {
-  font-size: 11px;
-  color: #9ca3af;
-  margin-top: 1px;
-}
-
 /* Attendance cells */
 .attendanceCell {
   padding: 8px 4px;
   text-align: center;
   vertical-align: middle;
   transition: background-color 0.15s;
-}
-
-.attendanceCellOff {
-  composes: attendanceCell;
-  background-color: #f9fafb;
 }
 
 /* Summary cells (sticky right) */
@@ -218,14 +207,22 @@
 
 /* Right offsets for summary columns */
 .summaryP {
-  right: 150px;
+  right: 250px;
 }
 
 .summaryA {
+  right: 200px;
+}
+
+.summaryLPaid {
+  right: 150px;
+}
+
+.summaryLUnpaid {
   right: 100px;
 }
 
-.summaryL {
+.summaryHD {
   right: 50px;
 }
 
@@ -233,21 +230,19 @@
   right: 0;
 }
 
+.summaryWD {
+  right: 300px;
+}
+
 /* Cell-specific colors (compound selectors keep header text neutral) */
-.summaryCell.summaryP {
-  color: #059669;
-}
-
-.summaryCell.summaryA {
-  color: #dc2626;
-}
-
-.summaryCell.summaryL {
-  color: #d97706;
-}
-
-.summaryCell.summaryOff {
-  color: #9ca3af;
+.summaryCell.summaryP,
+.summaryCell.summaryA,
+.summaryCell.summaryLPaid,
+.summaryCell.summaryLUnpaid,
+.summaryCell.summaryHD,
+.summaryCell.summaryOff,
+.summaryCell.summaryWD {
+  color: #475467;
 }
 
 /* --- Status Badges --- */
@@ -453,6 +448,38 @@
   background-color: #ede9fe;
   color: #6d28d9;
   border: 1px solid #c4b5fd;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cornerBadgeLeavePaid {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cornerBadgeLeaveUnpaid {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  background-color: #ffedd5;
+  color: #c2410c;
+  border: 1px solid #fdba74;
   font-size: 8px;
   font-weight: 600;
   border-radius: 3px;

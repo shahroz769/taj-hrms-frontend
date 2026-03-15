@@ -817,12 +817,20 @@ export const getMonthlyAttendance = async (req, res, next) => {
         halfDay: 0,
         off: 0,
         leave: 0,
+        paidLeave: 0,
+        unpaidLeave: 0,
+        workingDays: 0,
       };
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateUTC = new Date(Date.UTC(y, m, d));
         if (joiningDate && dateUTC < joiningDate) continue;
         if (resignationDate && dateUTC > resignationDate) continue;
+
+        const workingDays = getWorkingDaysForDate(empShiftHistory, dateUTC);
+        const dayName = DAY_NAMES[dateUTC.getUTCDay()];
+        const isScheduledWorkingDay =
+          Array.isArray(workingDays) && workingDays.includes(dayName);
 
         const rec = empRecords[d];
         if (rec) {
@@ -832,7 +840,14 @@ export const getMonthlyAttendance = async (req, res, next) => {
             case "Late":      summary.late++;     break;
             case "Half Day":  summary.halfDay++;  break;
             case "Off":       summary.off++;      break;
-            case "Leave":     summary.leave++;    break;
+            case "Leave":
+              summary.leave++;
+              if (rec.leaveIsPaid === true) summary.paidLeave++;
+              if (rec.leaveIsPaid === false) summary.unpaidLeave++;
+              break;
+          }
+          if (dateUTC <= todayUTC && isScheduledWorkingDay) {
+            summary.workingDays++;
           }
           continue;
         }
@@ -841,11 +856,11 @@ export const getMonthlyAttendance = async (req, res, next) => {
           continue; // future day with no record
         } else {
           // No DB record — infer off day from shift active on that specific date
-          const workingDays = getWorkingDaysForDate(empShiftHistory, dateUTC);
           if (workingDays) {
-            const dayName = DAY_NAMES[dateUTC.getUTCDay()];
             if (!workingDays.includes(dayName)) {
               summary.off++;
+            } else {
+              summary.workingDays++;
             }
           }
         }

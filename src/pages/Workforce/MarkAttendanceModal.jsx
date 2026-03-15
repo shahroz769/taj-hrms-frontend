@@ -1,5 +1,5 @@
 // React
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -110,6 +110,8 @@ const MarkAttendanceModal = ({
   // ---------------------------------------------------------------------------
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [debouncedEmployeeQuery, setDebouncedEmployeeQuery] = useState("");
 
   const [dateRanges, setDateRanges] = useState([
     { startDate: undefined, endDate: undefined },
@@ -130,6 +132,8 @@ const MarkAttendanceModal = ({
   // ---------------------------------------------------------------------------
   const resetForm = useCallback(() => {
     setSelectedEmployeeIds([]);
+    setEmployeeSearchQuery("");
+    setDebouncedEmployeeQuery("");
     setDateRanges([{ startDate: undefined, endDate: undefined }]);
     setDatePickerOpenIndex(null);
     setDatePickerType(null);
@@ -148,14 +152,27 @@ const MarkAttendanceModal = ({
     }
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmployeeQuery(employeeSearchQuery.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [employeeSearchQuery]);
+
   // ---------------------------------------------------------------------------
   // QUERIES
   // ---------------------------------------------------------------------------
-  const { data: employeesList = [], isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["employees-list"],
-    queryFn: fetchEmployeesList,
-    enabled: open && !hasPreSelected,
+  const { data: employeesList = [], isFetching: isLoadingEmployees } = useQuery({
+    queryKey: ["employees-list", debouncedEmployeeQuery],
+    queryFn: () =>
+      fetchEmployeesList({ q: debouncedEmployeeQuery, limit: 10 }),
+    enabled:
+      open &&
+      !hasPreSelected &&
+      employeeComboboxOpen &&
+      debouncedEmployeeQuery.length >= 1,
     select: (data) => data?.employees || [],
+    placeholderData: (previous) => previous,
   });
 
   const {
@@ -319,16 +336,6 @@ const MarkAttendanceModal = ({
   // RENDER
   // ---------------------------------------------------------------------------
 
-  const selectedEmployeeLabels = useMemo(() => {
-    if (hasPreSelected) return null;
-    return selectedEmployeeIds
-      .map((id) => {
-        const emp = employeesList.find((e) => e._id === id);
-        return emp ? `${emp.fullName} (${emp.employeeID})` : id;
-      })
-      .join(", ");
-  }, [selectedEmployeeIds, employeesList, hasPreSelected]);
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -370,51 +377,63 @@ const MarkAttendanceModal = ({
                       {selectedEmployeeIds.length === 0
                         ? "Search and select employees..."
                         : selectedEmployeeIds.length === 1
-                          ? selectedEmployeeLabels
+                          ? "1 employee selected"
                           : `${selectedEmployeeIds.length} employees selected`}
                     </span>
                     <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search by name or ID..." />
-                    <CommandList>
-                      {isLoadingEmployees ? (
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
+                >
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search by name or ID..."
+                      value={employeeSearchQuery}
+                      onValueChange={setEmployeeSearchQuery}
+                    />
+                    <CommandList className="max-h-64">
+                      {employeeSearchQuery.trim().length < 1 ? (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          Type to search employees.
+                        </div>
+                      ) : isLoadingEmployees ? (
                         <div className="flex items-center justify-center p-4">
                           <Spinner />
                         </div>
+                      ) : employeesList.length === 0 ? (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          No employee found.
+                        </div>
                       ) : (
-                        <>
-                          <CommandEmpty>No employee found.</CommandEmpty>
-                          <CommandGroup>
-                            {employeesList.map((emp) => (
-                              <CommandItem
-                                key={emp._id}
-                                value={`${emp.fullName} ${emp.employeeID}`}
-                                onSelect={() => toggleEmployee(emp._id)}
-                                className="cursor-pointer"
-                              >
-                                <CheckIcon
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedEmployeeIds.includes(emp._id)
-                                      ? "opacity-100"
-                                      : "opacity-0",
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {emp.fullName}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {emp.employeeID}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </>
+                        <CommandGroup>
+                          {employeesList.map((emp) => (
+                            <CommandItem
+                              key={emp._id}
+                              value={`${emp.fullName} ${emp.employeeID}`}
+                              onSelect={() => toggleEmployee(emp._id)}
+                              className="cursor-pointer"
+                            >
+                              <CheckIcon
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedEmployeeIds.includes(emp._id)
+                                    ? "opacity-100"
+                                    : "opacity-0",
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {emp.fullName}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {emp.employeeID}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
                       )}
                     </CommandList>
                   </Command>

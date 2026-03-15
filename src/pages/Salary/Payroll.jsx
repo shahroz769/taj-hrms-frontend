@@ -101,6 +101,12 @@ const monthLabel = (month) =>
   MONTHS.find((item) => Number(item.value) === Number(month))?.label || "-";
 
 const currency = (value) => `PKR ${Number(value || 0).toLocaleString()}`;
+const amount = (value) => Number(value || 0).toLocaleString();
+const sumAmounts = (items = []) =>
+  items.reduce((sum, item) => {
+    if (typeof item === "number") return sum + Number(item || 0);
+    return sum + Number(item?.amount || 0);
+  }, 0);
 const PAYROLL_GENERATION_ENABLED =
   import.meta.env.VITE_ENABLE_PAYROLL_GENERATION !== "false";
 
@@ -149,6 +155,7 @@ const Payroll = () => {
   const [selectedPayslipId, setSelectedPayslipId] = useState(null);
   const [payslipDialogOpen, setPayslipDialogOpen] = useState(false);
   const [openingPayslipId, setOpeningPayslipId] = useState(null);
+  const [isDownloadingPayslip, setIsDownloadingPayslip] = useState(false);
 
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
   const [selectedPayrollIds, setSelectedPayrollIds] = useState([]);
@@ -461,9 +468,15 @@ const Payroll = () => {
   };
 
   const handleDownloadPayslip = async () => {
-    if (!selectedPayslipId) return;
+    if (!selectedPayslipId || isDownloadingPayslip) return;
 
     try {
+      setIsDownloadingPayslip(true);
+      await queryClient.fetchQuery({
+        queryKey: ["payslip", selectedPayslipId],
+        queryFn: () => fetchPayslip(selectedPayslipId),
+      });
+
       const blob = await downloadPayslipPdf(selectedPayslipId);
       const url = window.URL.createObjectURL(
         new Blob([blob], { type: "application/pdf" }),
@@ -477,8 +490,12 @@ const Payroll = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Failed to download payslip",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to download payslip",
       );
+    } finally {
+      setIsDownloadingPayslip(false);
     }
   };
 
@@ -508,44 +525,70 @@ const Payroll = () => {
       },
     },
     {
-      key: "totalWorkingDays",
-      label: "Working Days",
-      render: (row) => row.workingDays?.totalScheduled ?? 0,
+      key: "basicSalary",
+      label: "Basic Salary",
+      render: (row) =>
+        amount(
+          row.employeeSnapshot?.basicSalary ||
+            Math.max(
+              0,
+              ...(row.salarySegments || []).map((segment) =>
+                Number(segment?.basicSalary || 0),
+              ),
+            ) ||
+            row.calculations?.fullBasicSalaryAmount ||
+            row.calculations?.basicSalaryAmount,
+        ),
     },
     {
-      key: "present",
-      label: "Present",
-      render: (row) => row.workingDays?.present ?? 0,
+      key: "allowances",
+      label: "Allowances",
+      render: (row) =>
+        amount(
+          sumAmounts(row.allowanceBreakdown || []) ||
+            row.calculations?.fullAllowanceAmount ||
+            row.calculations?.allowanceAmount,
+        ),
     },
     {
-      key: "absences",
-      label: "Absences",
-      render: (row) => row.workingDays?.absences ?? 0,
+      key: "netSalary",
+      label: "Net Salary",
+      render: (row) =>
+        amount(row.calculations?.netSalary || row.calculations?.totalSalary),
     },
     {
-      key: "leaves",
-      label: "Leaves",
-      render: (row) => row.workingDays?.leaves ?? 0,
-    },
-    {
-      key: "halfDay",
-      label: "Half Day",
-      render: (row) => row.workingDays?.halfDay ?? 0,
-    },
-    {
-      key: "late",
-      label: "Late",
-      render: (row) => row.workingDays?.late ?? 0,
-    },
-    {
-      key: "grossSalary",
-      label: "Gross Salary",
-      render: (row) => currency(row.calculations?.grossSalary),
-    },
-    {
-      key: "totalSalary",
-      label: "Total Salary",
-      render: (row) => currency(row.calculations?.totalSalary),
+      key: "totalDeductions",
+      label: "Total Deductions",
+      render: (row) => {
+        const fullBasicSalary =
+          Number(row.employeeSnapshot?.basicSalary || 0) ||
+          Math.max(
+            0,
+            ...(row.salarySegments || []).map((segment) =>
+              Number(segment?.basicSalary || 0),
+            ),
+          ) ||
+          Number(row.calculations?.fullBasicSalaryAmount || 0) ||
+          Number(row.calculations?.basicSalaryAmount || 0);
+        const fullAllowances =
+          sumAmounts(row.allowanceBreakdown || []) ||
+          Number(row.calculations?.fullAllowanceAmount || 0) ||
+          Number(row.calculations?.allowanceAmount || 0);
+        const attendanceDeductions =
+          Number(row.calculations?.attendanceDeductionAmount || 0) ||
+          Math.max(
+            0,
+            fullBasicSalary +
+              fullAllowances -
+              Number(row.calculations?.grossSalary || 0),
+          );
+
+        return amount(
+          attendanceDeductions +
+            Number(row.calculations?.latePenaltyAmount || 0) +
+            Number(row.calculations?.manualDeductionAmount || 0),
+        );
+      },
     },
     {
       key: "salarySlip",
@@ -570,6 +613,204 @@ const Payroll = () => {
 
   const pagination = payrollData?.pagination || {};
   const totalPages = pagination.totalPages || 1;
+  const payslip = payslipData?.payslip;
+  const presentCount =
+    Number(payslip?.workingDays?.present || 0) +
+    Number(payslip?.workingDays?.late || 0) +
+    Number(payslip?.workingDays?.halfDay || 0);
+  const fullAllowanceAmount =
+    sumAmounts(payslip?.allowanceBreakdown || []) ||
+    Number(payslip?.calculations?.fullAllowanceAmount || 0);
+  const fullBasicSalaryAmount =
+    Number(payslip?.employeeSnapshot?.basicSalary || 0) ||
+    Math.max(
+      0,
+      ...(payslip?.salarySegments || []).map((segment) =>
+        Number(segment?.basicSalary || 0),
+      ),
+    ) ||
+    Number(payslip?.calculations?.fullBasicSalaryAmount || 0) ||
+    Number(payslip?.calculations?.basicSalaryAmount || 0);
+  const storedAttendanceDeductionBreakdown =
+    payslip?.attendanceDeductionBreakdown || [];
+  const manualDeductionBreakdown = payslip?.deductionBreakdown || [];
+  const totalManualDeduction = Number(
+    payslip?.calculations?.manualDeductionAmount || 0,
+  );
+  const latePenaltyAmount = Number(
+    payslip?.calculations?.latePenaltyAmount || 0,
+  );
+  const latePenaltyBasicAmount = Number(
+    payslip?.calculations?.latePenaltyBasicAmount || 0,
+  );
+  const latePenaltyAllowanceAmount = Number(
+    payslip?.calculations?.latePenaltyAllowanceAmount || 0,
+  );
+  const displayedLateCount =
+    Number(payslip?.calculations?.lateCount || 0) ||
+    Number(payslip?.workingDays?.late || 0);
+  const displayedLatePenaltyGroups =
+    Number(payslip?.calculations?.latePenaltyGroups || 0) ||
+    Math.floor(displayedLateCount / 3);
+  const totalScheduledDays = Number(payslip?.workingDays?.totalScheduled || 0);
+  const basicPerScheduledDay =
+    totalScheduledDays > 0 ? fullBasicSalaryAmount / totalScheduledDays : 0;
+  const allowancePerScheduledDay =
+    totalScheduledDays > 0 ? fullAllowanceAmount / totalScheduledDays : 0;
+  const storedAttendanceDeductionAmount = Number(
+    payslip?.calculations?.attendanceDeductionAmount || 0,
+  );
+  const totalCompensationAmount = fullBasicSalaryAmount + fullAllowanceAmount;
+  const basicCompensationRatio =
+    totalCompensationAmount > 0
+      ? fullBasicSalaryAmount / totalCompensationAmount
+      : 1;
+  const allowanceCompensationRatio =
+    totalCompensationAmount > 0
+      ? fullAllowanceAmount / totalCompensationAmount
+      : 0;
+  const inferredAttendanceBreakdown = [
+    {
+      key: "absent",
+      label: "Absent",
+      count: Number(payslip?.workingDays?.absences || 0),
+      basicAmount: basicPerScheduledDay * Number(payslip?.workingDays?.absences || 0),
+      allowanceAmount:
+        allowancePerScheduledDay * Number(payslip?.workingDays?.absences || 0),
+    },
+    {
+      key: "unpaidLeave",
+      label: "Unpaid Leave",
+      count: Number(payslip?.workingDays?.unpaidLeaves || 0),
+      basicAmount:
+        basicPerScheduledDay * Number(payslip?.workingDays?.unpaidLeaves || 0),
+      allowanceAmount:
+        allowancePerScheduledDay * Number(payslip?.workingDays?.unpaidLeaves || 0),
+    },
+    {
+      key: "halfDay",
+      label: "Half Day",
+      count: Number(payslip?.workingDays?.halfDay || 0),
+      basicAmount:
+        basicPerScheduledDay * Number(payslip?.workingDays?.halfDay || 0) * 0.5,
+      allowanceAmount:
+        allowancePerScheduledDay *
+        Number(payslip?.workingDays?.halfDay || 0) *
+        0.5,
+    },
+  ]
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      ...item,
+      basicAmount: Number(item.basicAmount.toFixed(2)),
+      allowanceAmount: Number(item.allowanceAmount.toFixed(2)),
+      totalAmount: Number((item.basicAmount + item.allowanceAmount).toFixed(2)),
+      isInferred: true,
+    }));
+  const attendanceDeductionBreakdown =
+    storedAttendanceDeductionBreakdown.length > 0
+      ? storedAttendanceDeductionBreakdown
+      : inferredAttendanceBreakdown;
+  const storedAttendanceBasicBreakdownAmount = sumAmounts(
+    attendanceDeductionBreakdown.map((item) => item?.basicAmount || 0),
+  );
+  const storedAttendanceAllowanceBreakdownAmount = sumAmounts(
+    attendanceDeductionBreakdown.map((item) => item?.allowanceAmount || 0),
+  );
+  const inferredAttendanceBasicAmount =
+    storedAttendanceDeductionAmount > 0
+      ? storedAttendanceDeductionAmount * basicCompensationRatio
+      : storedAttendanceBasicBreakdownAmount;
+  const inferredAttendanceAllowanceAmount =
+    storedAttendanceDeductionAmount > 0
+      ? storedAttendanceDeductionAmount * allowanceCompensationRatio
+      : storedAttendanceAllowanceBreakdownAmount;
+  const displayedBasicAttendanceDeduction =
+    storedAttendanceBasicBreakdownAmount || inferredAttendanceBasicAmount;
+  const displayedAllowanceAttendanceDeduction =
+    storedAttendanceAllowanceBreakdownAmount || inferredAttendanceAllowanceAmount;
+  const joiningDate = payslip?.employeeSnapshot?.joiningDate
+    ? new Date(payslip.employeeSnapshot.joiningDate)
+    : null;
+  const resignationDate = payslip?.employeeSnapshot?.resignationDate
+    ? new Date(payslip.employeeSnapshot.resignationDate)
+    : null;
+  const payslipYear = Number(payslip?.year || 0);
+  const payslipMonth = Number(payslip?.month || 0);
+  const monthEndDate =
+    payslipYear > 0 && payslipMonth > 0
+      ? new Date(payslipYear, payslipMonth, 0)
+      : null;
+  const isMidJoin =
+    joiningDate &&
+    joiningDate.getFullYear() === payslipYear &&
+    joiningDate.getMonth() + 1 === payslipMonth &&
+    joiningDate.getDate() > 1;
+  const isMidLeft =
+    resignationDate &&
+    resignationDate.getFullYear() === payslipYear &&
+    resignationDate.getMonth() + 1 === payslipMonth &&
+    monthEndDate &&
+    resignationDate.getDate() < monthEndDate.getDate();
+  const hasEmploymentPeriodAdjustment = Boolean(isMidJoin || isMidLeft);
+  const employmentScheduledDays =
+    Number(payslip?.workingDays?.present || 0) +
+    Number(payslip?.workingDays?.late || 0) +
+    Number(payslip?.workingDays?.halfDay || 0) +
+    Number(payslip?.workingDays?.paidLeaves || 0) +
+    Number(payslip?.workingDays?.unpaidLeaves || 0) +
+    Number(payslip?.workingDays?.absences || 0);
+  const outOfEmploymentScheduledDays = Math.max(
+    0,
+    totalScheduledDays - employmentScheduledDays,
+  );
+  const employmentAdjustmentBasicAmount =
+    hasEmploymentPeriodAdjustment && totalScheduledDays > 0
+      ? Number((basicPerScheduledDay * outOfEmploymentScheduledDays).toFixed(2))
+      : 0;
+  const employmentAdjustmentAllowanceAmount =
+    hasEmploymentPeriodAdjustment && totalScheduledDays > 0
+      ? Number(
+          (allowancePerScheduledDay * outOfEmploymentScheduledDays).toFixed(2),
+        )
+      : 0;
+  const employmentAdjustmentAmount =
+    employmentAdjustmentBasicAmount + employmentAdjustmentAllowanceAmount;
+  const employmentAdjustmentLabel = isMidJoin && isMidLeft
+    ? "Mid Join / Mid Left Adjustment"
+    : isMidJoin
+      ? "Mid Join Adjustment"
+      : "Mid Left Adjustment";
+  const formatAdjustmentDate = (value) =>
+    value
+      ? value.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+  const employmentAdjustmentMeta = isMidJoin && isMidLeft
+    ? `Salary is prorated because the employee joined on ${formatAdjustmentDate(joiningDate)} and left on ${formatAdjustmentDate(resignationDate)}.`
+    : isMidJoin
+      ? `Salary is prorated because the employee joined on ${formatAdjustmentDate(joiningDate)}.`
+      : `Salary is prorated because the employee left on ${formatAdjustmentDate(resignationDate)}.`;
+  const displayedBasicDeduction =
+    displayedBasicAttendanceDeduction +
+    latePenaltyBasicAmount +
+    employmentAdjustmentBasicAmount;
+  const displayedAllowanceDeduction =
+    displayedAllowanceAttendanceDeduction +
+    latePenaltyAllowanceAmount +
+    employmentAdjustmentAllowanceAmount;
+  const displayedAttendanceDeductionAmount =
+    storedAttendanceDeductionAmount ||
+    sumAmounts(attendanceDeductionBreakdown.map((item) => item?.totalAmount || 0));
+  const totalDeductions =
+    displayedAttendanceDeductionAmount +
+    latePenaltyAmount +
+    totalManualDeduction +
+    employmentAdjustmentAmount;
+  const displayedTotalDeductions = totalDeductions;
 
   return (
     <div className={styles.container}>
@@ -585,8 +826,12 @@ const Payroll = () => {
             }
             onClick={openRegenerateDialog}
           >
-            <RefreshCcwIcon className={styles.buttonIcon} />
-            {regenerateMutation.isPending ? "Regenerating..." : "Regenerate"}
+            {regenerateMutation.isPending ? (
+              <Spinner className={styles.buttonSpinner} />
+            ) : (
+              <RefreshCcwIcon className={styles.buttonIcon} />
+            )}
+            Regenerate
             {selectedPayrollTargets.length > 0 && (
               <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
                 {selectedPayrollTargets.length}
@@ -827,12 +1072,12 @@ const Payroll = () => {
         </Popover>
       </div>
 
-      <DataTable
+        <DataTable
         columns={columns}
         data={payrollData?.payrolls || []}
         isLoading={isLoading}
         isError={isError}
-        loadingText="Loading payrolls..."
+        loadingText="Loading payrolls"
         selectable={true}
         selectedIds={selectedPayrollIds}
         onSelectionChange={setSelectedPayrollIds}
@@ -939,7 +1184,7 @@ const Payroll = () => {
             {isPreviewFetching ? (
               <div className={styles.previewLoading}>
                 <Spinner className={styles.smallSpinner} />
-                Loading eligible count...
+                Loading eligible count
               </div>
             ) : (
               <div>
@@ -970,16 +1215,21 @@ const Payroll = () => {
               onClick={handleGeneratePayroll}
               disabled={generateMutation.isPending}
             >
-              {generateMutation.isPending
-                ? "Generating..."
-                : "Generate Payroll"}
+              {generateMutation.isPending ? (
+                <>
+                  <Spinner className={styles.buttonSpinner} />
+                  Generate Payroll
+                </>
+              ) : (
+                "Generate Payroll"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={errorModalOpen} onOpenChange={setErrorModalOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className={`sm:max-w-2xl ${styles.payslipDialogContent}`}>
           <DialogHeader>
             <DialogTitle>Payroll Generation Errors</DialogTitle>
             <DialogDescription>
@@ -1022,43 +1272,40 @@ const Payroll = () => {
           if (!open) setSelectedPayslipId(null);
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Payslip</DialogTitle>
-            <DialogDescription>
-              {monthLabel(payslipData?.payslip?.month)}{" "}
-              {payslipData?.payslip?.year}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <div>
+            <DialogHeader>
+              <div className="px-6 pt-6">
+                <DialogTitle>Payslip</DialogTitle>
+                <DialogDescription>
+                  {monthLabel(payslipData?.payslip?.month)}{" "}
+                  {payslipData?.payslip?.year}
+                </DialogDescription>
+              </div>
+            </DialogHeader>
 
-          {
-            <div className={styles.payslipContent}>
+            <ScrollArea className={styles.payslipScrollArea}>
+              <div className={styles.payslipContent}>
               <div className={styles.payslipInfoGrid}>
                 <div className={styles.payslipInfoGroup}>
-                  <div className={styles.payslipInfoLabel}>Employee Name</div>
+                  <div className={styles.payslipInfoLabel}>Employee</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.fullName || "-"}
-                  </div>
-                </div>
-                <div className={styles.payslipInfoGroup}>
-                  <div className={styles.payslipInfoLabel}>Employee ID</div>
-                  <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.employeeID || "-"}
+                    {payslip?.employeeSnapshot?.fullName || "-"} (
+                    {payslip?.employeeSnapshot?.employeeID || "-"})
                   </div>
                 </div>
                 <div className={styles.payslipInfoGroup}>
                   <div className={styles.payslipInfoLabel}>Position</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.positionName ||
-                      "-"}
+                    {payslip?.employeeSnapshot?.positionName || "-"}
                   </div>
                 </div>
                 <div className={styles.payslipInfoGroup}>
                   <div className={styles.payslipInfoLabel}>Joining Date</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.joiningDate
+                    {payslip?.employeeSnapshot?.joiningDate
                       ? new Date(
-                          payslipData.payslip.employeeSnapshot.joiningDate,
+                          payslip.employeeSnapshot.joiningDate,
                         ).toLocaleDateString()
                       : "-"}
                   </div>
@@ -1066,8 +1313,16 @@ const Payroll = () => {
                 <div className={styles.payslipInfoGroup}>
                   <div className={styles.payslipInfoLabel}>Department</div>
                   <div className={styles.payslipInfoValue}>
-                    {payslipData?.payslip?.employeeSnapshot?.departmentName ||
-                      "-"}
+                    {payslip?.employeeSnapshot?.departmentName || "-"}
+                  </div>
+                </div>
+                <div className={styles.payslipInfoGroup}>
+                  <div className={styles.payslipInfoLabel}>Net Salary</div>
+                  <div className={styles.payslipInfoValue}>
+                    {currency(
+                      payslip?.calculations?.netSalary ||
+                        payslip?.calculations?.totalSalary,
+                    )}
                   </div>
                 </div>
               </div>
@@ -1078,108 +1333,240 @@ const Payroll = () => {
               <div className={styles.payslipAttendanceGrid}>
                 <div className={styles.payslipAttendanceStat}>
                   <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.totalScheduled ?? 0}
+                    {payslip?.workingDays?.totalScheduled ?? 0}
                   </div>
                   <div className={styles.payslipStatLabel}>Working Days</div>
                 </div>
                 <div className={styles.payslipAttendanceStat}>
-                  <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.present ?? 0}
-                  </div>
+                  <div className={styles.payslipStatValue}>{presentCount}</div>
                   <div className={styles.payslipStatLabel}>Present</div>
+                  <div className={styles.payslipStatBadgeRow}>
+                    <Badge
+                      variant="outline"
+                      className={styles.payslipStatBadge}
+                    >
+                      Half Day {payslip?.workingDays?.halfDay ?? 0}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={styles.payslipStatBadge}
+                    >
+                      Late {payslip?.workingDays?.late ?? 0}
+                    </Badge>
+                  </div>
                 </div>
                 <div className={styles.payslipAttendanceStat}>
                   <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.absences ?? 0}
+                    {payslip?.workingDays?.leaves ?? 0}
+                  </div>
+                  <div className={styles.payslipStatLabel}>Leave</div>
+                  <div className={styles.payslipStatBadgeRow}>
+                    <Badge
+                      variant="outline"
+                      className={styles.payslipStatBadge}
+                    >
+                      Paid {payslip?.workingDays?.paidLeaves ?? 0}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={styles.payslipStatBadge}
+                    >
+                      Unpaid {payslip?.workingDays?.unpaidLeaves ?? 0}
+                    </Badge>
+                  </div>
+                </div>
+                <div className={styles.payslipAttendanceStat}>
+                  <div className={styles.payslipStatValue}>
+                    {payslip?.workingDays?.absences ?? 0}
                   </div>
                   <div className={styles.payslipStatLabel}>Absent</div>
-                </div>
-                <div className={styles.payslipAttendanceStat}>
-                  <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.leaves ?? 0}
-                  </div>
-                  <div className={styles.payslipStatLabel}>Leaves</div>
-                </div>
-                <div className={styles.payslipAttendanceStat}>
-                  <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.halfDay ?? 0}
-                  </div>
-                  <div className={styles.payslipStatLabel}>Half Day</div>
-                </div>
-                <div className={styles.payslipAttendanceStat}>
-                  <div className={styles.payslipStatValue}>
-                    {payslipData?.payslip?.workingDays?.late ?? 0}
-                  </div>
-                  <div className={styles.payslipStatLabel}>Late</div>
                 </div>
               </div>
 
               <Separator />
 
-              <div className={styles.payslipSectionTitle}>Salary Breakdown</div>
+              <div className={styles.payslipSectionTitle}>Salary</div>
               <div className={styles.payslipBreakdownWrap}>
                 <div className={styles.payslipBreakdownRow}>
                   <span className={styles.payslipBreakdownLabel}>
                     Basic Salary
                   </span>
                   <span className={styles.payslipBreakdownAmount}>
-                    {currency(
-                      payslipData?.payslip?.calculations?.basicSalaryAmount,
-                    )}
+                    {currency(fullBasicSalaryAmount)}
                   </span>
                 </div>
-                {(payslipData?.payslip?.allowanceBreakdown || []).length >
-                  0 && (
+                {(payslip?.allowanceBreakdown || []).length > 0 && (
                   <>
                     <div className={styles.payslipAllowanceHeader}>
                       Allowances
                     </div>
-                    {(payslipData?.payslip?.allowanceBreakdown || []).map(
-                      (item, index) => (
-                        <div
-                          key={`${item.name}-${index}`}
-                          className={styles.payslipAllowanceRow}
-                        >
-                          <span className={styles.payslipAllowanceName}>
-                            {item.name}
-                          </span>
-                          <span className={styles.payslipAllowanceAmount}>
-                            {currency(item.amount)}
-                          </span>
-                        </div>
-                      ),
-                    )}
+                    {(payslip?.allowanceBreakdown || []).map((item, index) => (
+                      <div
+                        key={`${item.name}-${index}`}
+                        className={styles.payslipAllowanceRow}
+                      >
+                        <span className={styles.payslipAllowanceName}>
+                          {item.name}
+                        </span>
+                        <span className={styles.payslipAllowanceAmount}>
+                          {currency(item.amount)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className={styles.payslipAllowanceTotalRow}>
+                      <span>Total Allowances</span>
+                      <span>{currency(fullAllowanceAmount)}</span>
+                    </div>
                   </>
                 )}
-                {Number(
-                  payslipData?.payslip?.calculations?.arrearsAmount || 0,
-                ) !== 0 && (
+                <div className={styles.payslipBreakdownRow}>
+                  <span className={styles.payslipBreakdownLabel}>
+                    Gross Before Deductions
+                  </span>
+                  <span className={styles.payslipBreakdownAmount}>
+                    {currency(fullBasicSalaryAmount + fullAllowanceAmount)}
+                  </span>
+                </div>
+                {Number(payslip?.calculations?.arrearsAmount || 0) !== 0 && (
                   <div className={styles.payslipBreakdownRow}>
                     <span className={styles.payslipBreakdownLabel}>
                       Arrears
                     </span>
                     <span className={styles.payslipBreakdownAmount}>
-                      {currency(
-                        payslipData?.payslip?.calculations?.arrearsAmount,
-                      )}
+                      {currency(payslip?.calculations?.arrearsAmount)}
                     </span>
                   </div>
                 )}
-                <div className={styles.payslipBreakdownRow}>
-                  <span className={styles.payslipBreakdownLabel} style={{ fontWeight: 600 }}>
-                    Gross Salary
-                  </span>
-                  <span className={styles.payslipBreakdownAmount} style={{ fontWeight: 700 }}>
-                    {currency(
-                      payslipData?.payslip?.calculations?.grossSalary,
-                    )}
-                  </span>
-                </div>
               </div>
 
-              {/* Deductions section */}
-              {(Number(payslipData?.payslip?.calculations?.latePenaltyAmount || 0) > 0 ||
-                Number(payslipData?.payslip?.calculations?.manualDeductionAmount || 0) > 0) && (
+              <>
+                <div className={styles.payslipSectionTitle}>Deductions</div>
+                <div className={styles.payslipBreakdownWrap}>
+                    <div className={styles.payslipBreakdownRow}>
+                      <span className={styles.payslipBreakdownLabel}>
+                        Deducted From Basic Salary
+                      </span>
+                      <span className={styles.payslipNegativeAmount}>
+                        -{currency(displayedBasicDeduction)}
+                      </span>
+                    </div>
+                    <div className={styles.payslipBreakdownRow}>
+                      <span className={styles.payslipBreakdownLabel}>
+                        Deducted From Allowances
+                      </span>
+                      <span className={styles.payslipNegativeAmount}>
+                        -{currency(displayedAllowanceDeduction)}
+                      </span>
+                    </div>
+                    {(hasEmploymentPeriodAdjustment &&
+                      employmentAdjustmentAmount > 0) ||
+                    attendanceDeductionBreakdown.length > 0 ||
+                    latePenaltyAmount > 0 ? (
+                    <>
+                      <div className={styles.payslipAllowanceHeader}>
+                        Deduction Breakdown
+                      </div>
+                      {hasEmploymentPeriodAdjustment &&
+                        employmentAdjustmentAmount > 0 && (
+                          <div className={styles.payslipBreakdownDetailRow}>
+                            <div>
+                              <div className={styles.payslipBreakdownLabel}>
+                                {employmentAdjustmentLabel}
+                              </div>
+                              <div className={styles.payslipBreakdownMeta}>
+                                {employmentAdjustmentMeta}
+                              </div>
+                            </div>
+                            <span className={styles.payslipNegativeAmount}>
+                              -{currency(employmentAdjustmentAmount)}
+                            </span>
+                          </div>
+                        )}
+                      {attendanceDeductionBreakdown.map((item) => (
+                        <div
+                          key={item.key}
+                          className={styles.payslipBreakdownDetailRow}
+                        >
+                          <div>
+                            <div className={styles.payslipBreakdownLabel}>
+                              {item.label}
+                            </div>
+                            <div className={styles.payslipBreakdownMeta}>
+                              {`Count ${item.count} | Basic ${currency(item.basicAmount)} | Allowances ${currency(item.allowanceAmount)}`}
+                            </div>
+                          </div>
+                          <span className={styles.payslipNegativeAmount}>
+                            -{currency(item.totalAmount)}
+                          </span>
+                        </div>
+                      ))}
+                      {latePenaltyAmount > 0 && (
+                        <div className={styles.payslipBreakdownDetailRow}>
+                          <div>
+                            <div className={styles.payslipBreakdownLabel}>
+                              Late Penalty
+                            </div>
+                            <div className={styles.payslipBreakdownMeta}>
+                              {displayedLateCount} late marks |{" "}
+                              {displayedLatePenaltyGroups} late penalty{" "}
+                              {displayedLatePenaltyGroups === 1
+                                ? "group"
+                                : "groups"}
+                            </div>
+                          </div>
+                          <span className={styles.payslipNegativeAmount}>
+                            -{currency(latePenaltyAmount)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                    ) : null}
+                  {totalManualDeduction > 0 && (
+                    <>
+                      <div className={styles.payslipAllowanceHeader}>
+                        Manual Deduction Breakdown
+                      </div>
+                      {manualDeductionBreakdown.length > 0 ? (
+                        manualDeductionBreakdown.map((item, index) => (
+                          <div
+                            key={`deduction-${index}`}
+                            className={styles.payslipBreakdownDetailRow}
+                          >
+                            <span className={styles.payslipBreakdownLabel}>
+                              {item.reason}
+                            </span>
+                            <span className={styles.payslipNegativeAmount}>
+                              -{currency(item.amount)}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className={styles.payslipBreakdownDetailRow}>
+                          <span className={styles.payslipBreakdownLabel}>
+                            Manual Deduction
+                          </span>
+                          <span className={styles.payslipNegativeAmount}>
+                            -{currency(totalManualDeduction)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div className={styles.payslipAllowanceTotalRow}>
+                    <span>Total Deductions</span>
+                    <span className={styles.payslipNegativeAmount}>
+                      -{currency(displayedTotalDeductions)}
+                    </span>
+                  </div>
+                </div>
+              </>
+
+              {false && totalDeductions > 0 && (
+                <>
+                </>
+              )}
+
+              {false && (
                 <>
                   <div className={styles.payslipSectionTitle}>Deductions</div>
                   <div className={styles.payslipBreakdownWrap}>
@@ -1250,19 +1637,30 @@ const Payroll = () => {
               )}
 
               <div className={styles.payslipTotalRow}>
-                <span>Total Salary</span>
+                <span>Net Salary</span>
                 <span className={styles.payslipTotalAmount}>
-                  {currency(payslipData?.payslip?.calculations?.totalSalary)}
+                  {currency(
+                    payslip?.calculations?.netSalary ||
+                      payslip?.calculations?.totalSalary,
+                  )}
                 </span>
               </div>
 
               <div className={styles.payslipFooter}>
                 <Button variant="green" onClick={handleDownloadPayslip}>
-                  Download PDF
+                  {isDownloadingPayslip ? (
+                    <>
+                      <Spinner className={styles.smallSpinner} />
+                      Downloading
+                    </>
+                  ) : (
+                    "Download PDF"
+                  )}
                 </Button>
               </div>
             </div>
-          }
+            </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1288,7 +1686,14 @@ const Payroll = () => {
               disabled={regenerateMutation.isPending}
               className="bg-[#02542D] text-white hover:bg-[#02542D]/90"
             >
-              {regenerateMutation.isPending ? "Regenerating..." : "Regenerate"}
+              {regenerateMutation.isPending ? (
+                <>
+                  <Spinner className={styles.smallSpinner} />
+                  Regenerate
+                </>
+              ) : (
+                "Regenerate"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -448,6 +448,31 @@ export const calculateEmployeePayroll = async ({
 
   let basicSalaryAmount = 0;
   let allowanceAmount = 0;
+  let fullBasicSalaryAmount = 0;
+  let fullAllowanceAmount = 0;
+  const attendanceDeductionTracker = {
+    absent: {
+      key: "absent",
+      label: "Absent",
+      count: 0,
+      basicAmount: 0,
+      allowanceAmount: 0,
+    },
+    unpaidLeave: {
+      key: "unpaidLeave",
+      label: "Unpaid Leave",
+      count: 0,
+      basicAmount: 0,
+      allowanceAmount: 0,
+    },
+    halfDay: {
+      key: "halfDay",
+      label: "Half Day",
+      count: 0,
+      basicAmount: 0,
+      allowanceAmount: 0,
+    },
+  };
 
   for (const date of scheduledDates) {
     if (isOutsideEmploymentWindow(date, employmentBounds)) {
@@ -501,11 +526,34 @@ export const calculateEmployeePayroll = async ({
     const basicPerDay = Number(basicSalaryMonthly || 0) / divisor;
     const allowancePerDay = Number(policyComponentsInfo.amount || 0) / divisor;
 
+    fullBasicSalaryAmount += basicPerDay;
+    fullAllowanceAmount += allowancePerDay;
+
     const payableFactor = dayState.payableFactor;
     payableDayUnitsTotal += payableFactor;
 
     basicSalaryAmount += basicPerDay * payableFactor;
     allowanceAmount += allowancePerDay * payableFactor;
+
+    if (dayState.type === "absent") {
+      attendanceDeductionTracker.absent.count += 1;
+      attendanceDeductionTracker.absent.basicAmount += basicPerDay;
+      attendanceDeductionTracker.absent.allowanceAmount += allowancePerDay;
+    }
+
+    if (dayState.type === "unpaidLeave") {
+      attendanceDeductionTracker.unpaidLeave.count += 1;
+      attendanceDeductionTracker.unpaidLeave.basicAmount += basicPerDay;
+      attendanceDeductionTracker.unpaidLeave.allowanceAmount +=
+        allowancePerDay;
+    }
+
+    if (dayState.type === "halfDay") {
+      attendanceDeductionTracker.halfDay.count += 1;
+      attendanceDeductionTracker.halfDay.basicAmount += basicPerDay * 0.5;
+      attendanceDeductionTracker.halfDay.allowanceAmount +=
+        allowancePerDay * 0.5;
+    }
 
     if (dayState.type === "late") {
       lateDayRates.push({ basicPerDay, allowancePerDay });
@@ -541,6 +589,35 @@ export const calculateEmployeePayroll = async ({
   const latePenaltyInfo = calculateLatePenalty(lateDayRates);
   const latePenaltyAmount = latePenaltyInfo.totalPenaltyAmount;
   const grossSalary = round2(basicSalaryAmount + allowanceAmount);
+  const roundedFullBasicSalaryAmount = round2(fullBasicSalaryAmount);
+  const roundedFullAllowanceAmount = round2(fullAllowanceAmount);
+  const attendanceDeductionBreakdown = Object.values(
+    attendanceDeductionTracker,
+  )
+    .filter(
+      (item) =>
+        item.count > 0 ||
+        Math.abs(item.basicAmount) > 0.009 ||
+        Math.abs(item.allowanceAmount) > 0.009,
+    )
+    .map((item) => ({
+      ...item,
+      basicAmount: round2(item.basicAmount),
+      allowanceAmount: round2(item.allowanceAmount),
+      totalAmount: round2(item.basicAmount + item.allowanceAmount),
+    }));
+  const attendanceDeductionAmount = round2(
+    attendanceDeductionBreakdown.reduce(
+      (sum, item) => sum + Number(item.totalAmount || 0),
+      0,
+    ),
+  );
+  const basicSalaryDeductionAmount = round2(
+    roundedFullBasicSalaryAmount - round2(basicSalaryAmount),
+  );
+  const allowanceDeductionAmount = round2(
+    roundedFullAllowanceAmount - round2(allowanceAmount),
+  );
 
   if (!skipArrearsSync) {
     await syncArrearsForEmployee({
@@ -624,7 +701,9 @@ export const calculateEmployeePayroll = async ({
     employeeSnapshot: {
       employeeID: employee.employeeID,
       fullName: employee.fullName,
+      basicSalary: Number(employee.basicSalary || 0),
       joiningDate: employee.joiningDate || null,
+      resignationDate: employee.resignationDate || null,
       positionName: employee.position?.name || "-",
       departmentName: employee.position?.department?.name || "-",
       status: employee.status,
@@ -649,8 +728,13 @@ export const calculateEmployeePayroll = async ({
     })),
     calculations: {
       grossSalary,
+      fullBasicSalaryAmount: roundedFullBasicSalaryAmount,
+      fullAllowanceAmount: roundedFullAllowanceAmount,
       basicSalaryAmount: round2(basicSalaryAmount),
       allowanceAmount: round2(allowanceAmount),
+      basicSalaryDeductionAmount,
+      allowanceDeductionAmount,
+      attendanceDeductionAmount,
       allowanceRatio: round2(payableDayUnitsTotal / (totalScheduledDays || 1)),
       payableDayUnits: round2(payableDayUnitsTotal),
       latePenaltyBasicAmount: latePenaltyInfo.basicPenaltyAmount,
@@ -717,7 +801,9 @@ export const calculateEmployeePayroll = async ({
       ),
       lateCount: late,
       latePenaltyGroups: Math.floor(late / 3),
+      netSalary: totalSalary,
     },
+    attendanceDeductionBreakdown,
     deductionBreakdown,
     allowanceBreakdown,
     arrearsLedgerEntries: unsettledArrearsEntries

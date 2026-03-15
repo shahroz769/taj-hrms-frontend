@@ -36,7 +36,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -160,6 +159,8 @@ const DisciplinaryActions = () => {
   // Form state
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [debouncedEmployeeQuery, setDebouncedEmployeeQuery] = useState("");
   const [selectedWarningTypeId, setSelectedWarningTypeId] = useState("");
   const [actionDate, setActionDate] = useState(undefined);
   const [description, setDescription] = useState("");
@@ -184,6 +185,13 @@ const DisciplinaryActions = () => {
       setPage(1);
     }
   }, [debouncedSearch, searchValue]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmployeeQuery(employeeSearchQuery.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [employeeSearchQuery]);
 
   useEffect(() => {
     const params = {};
@@ -215,11 +223,16 @@ const DisciplinaryActions = () => {
   // ---------------------------------------------------------------------------
   // Employee list for Command combobox
   // ---------------------------------------------------------------------------
-  const { data: employeesList = [], isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["employees-list"],
-    queryFn: fetchEmployeesList,
-    enabled: dialogOpen,
+  const { data: employeesList = [], isFetching: isLoadingEmployees } = useQuery({
+    queryKey: ["employees-list", debouncedEmployeeQuery],
+    queryFn: () =>
+      fetchEmployeesList({ q: debouncedEmployeeQuery, limit: 10 }),
+    enabled:
+      dialogOpen &&
+      employeeComboboxOpen &&
+      debouncedEmployeeQuery.length >= 1,
     select: (data) => data?.employees || [],
+    placeholderData: (previous) => previous,
   });
 
   // ---------------------------------------------------------------------------
@@ -316,15 +329,14 @@ const DisciplinaryActions = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "employeeName",
-      label: "Employee Name",
+      key: "employee",
+      label: "Employee",
       fontWeight: "medium",
-      render: (row) => row.employee?.fullName || "-",
-    },
-    {
-      key: "employeeID",
-      label: "Employee ID",
-      render: (row) => row.employee?.employeeID || "-",
+      render: (row) => {
+        const name = row.employee?.fullName || "-";
+        const id = row.employee?.employeeID || "";
+        return id ? `${name} (${id})` : name;
+      },
     },
     {
       key: "warningType",
@@ -462,6 +474,8 @@ const DisciplinaryActions = () => {
     setErrors({});
     setEditingAction(null);
     setSelectedEmployees([]);
+    setEmployeeSearchQuery("");
+    setDebouncedEmployeeQuery("");
     setSelectedWarningTypeId("");
     setActionDate(undefined);
     setDescription("");
@@ -695,47 +709,59 @@ const DisciplinaryActions = () => {
                         <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search by name or ID..." />
-                        <CommandList>
-                          {isLoadingEmployees ? (
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search by name or ID..."
+                          value={employeeSearchQuery}
+                          onValueChange={setEmployeeSearchQuery}
+                        />
+                        <CommandList className="max-h-64">
+                          {employeeSearchQuery.trim().length < 1 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              Type to search employees.
+                            </div>
+                          ) : isLoadingEmployees ? (
                             <div className="flex items-center justify-center p-4">
                               <Spinner />
                             </div>
+                          ) : employeesList.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              No employee found.
+                            </div>
                           ) : (
-                            <>
-                              <CommandEmpty>No employee found.</CommandEmpty>
-                              <CommandGroup>
-                                {employeesList.map((emp) => (
-                                  <CommandItem
-                                    key={emp._id}
-                                    value={`${emp.fullName} ${emp.employeeID}`}
-                                    onSelect={() => toggleEmployee(emp._id)}
-                                    className="cursor-pointer"
-                                  >
-                                    <CheckIcon
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        selectedEmployees.some(
-                                          (e) => e._id === emp._id,
-                                        )
-                                          ? "opacity-100"
-                                          : "opacity-0",
-                                      )}
-                                    />
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">
-                                        {emp.fullName}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {emp.employeeID}
-                                      </span>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </>
+                            <CommandGroup>
+                              {employeesList.map((emp) => (
+                                <CommandItem
+                                  key={emp._id}
+                                  value={`${emp.fullName} ${emp.employeeID}`}
+                                  onSelect={() => toggleEmployee(emp._id)}
+                                  className="cursor-pointer"
+                                >
+                                  <CheckIcon
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedEmployees.some(
+                                        (e) => e._id === emp._id,
+                                      )
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {emp.fullName}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {emp.employeeID}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
                           )}
                         </CommandList>
                       </Command>

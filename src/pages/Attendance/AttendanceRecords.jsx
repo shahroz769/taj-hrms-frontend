@@ -71,9 +71,6 @@ const MONTH_NAMES = [
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Full day name as used in shift workingDays (e.g. "Monday") */
-const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 /** Get array of day numbers for a month (1-indexed) */
 const getDaysInMonth = (year, month) => {
   const count = new Date(year, month + 1, 0).getDate();
@@ -331,9 +328,9 @@ const AttendanceRecords = () => {
     const status = record.status;
     const leaveLabel =
       record?.leaveIsPaid === true
-        ? "Paid Leave"
+        ? "Leave"
         : record?.leaveIsPaid === false
-          ? "Unpaid Leave"
+          ? "Leave"
           : "Leave";
     const leaveClass =
       record?.leaveIsPaid === true
@@ -347,7 +344,22 @@ const AttendanceRecords = () => {
       Late: { cls: styles.badgeP, label: "Present", cornerLabel: "Late", cornerCls: styles.cornerBadgeLate },
       "Half Day": { cls: styles.badgeP, label: "Present", cornerLabel: "Half Day", cornerCls: styles.cornerBadgeHalfDay },
       Off: { cls: styles.badgeOff, label: "Off" },
-      Leave: { cls: leaveClass, label: leaveLabel },
+      Leave: {
+        cls: leaveClass,
+        label: leaveLabel,
+        cornerLabel:
+          record?.leaveIsPaid === true
+            ? "Paid"
+            : record?.leaveIsPaid === false
+              ? "Unpaid"
+              : null,
+        cornerCls:
+          record?.leaveIsPaid === true
+            ? styles.cornerBadgeLeavePaid
+            : record?.leaveIsPaid === false
+              ? styles.cornerBadgeLeaveUnpaid
+              : null,
+      },
     };
     const config = statusConfig[status];
     if (!config) return <span className={styles.badgeFuture}>—</span>;
@@ -493,18 +505,13 @@ const AttendanceRecords = () => {
                   );
                 })}
                 {/* Summary columns */}
-                <th className={`${styles.summaryHeader} ${styles.summaryP}`}>
-                  P
-                </th>
-                <th className={`${styles.summaryHeader} ${styles.summaryA}`}>
-                  A
-                </th>
-                <th className={`${styles.summaryHeader} ${styles.summaryL}`}>
-                  L
-                </th>
-                <th className={`${styles.summaryHeader} ${styles.summaryOff}`}>
-                  Off
-                </th>
+                <th className={`${styles.summaryHeader} ${styles.summaryWD}`}>WD</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryP}`}>P</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryA}`}>A</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryLPaid}`}>LP</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryLUnpaid}`}>LU</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryHD}`}>HD</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryOff}`}>Off</th>
               </tr>
             </thead>
 
@@ -512,7 +519,7 @@ const AttendanceRecords = () => {
             <tbody className={styles.tableBody}>
               {isLoading ? (
                 <tr>
-                  <td colSpan={days.length + 5}>
+                  <td colSpan={days.length + 9}>
                     <div className={styles.stateContainer}>
                       <Spinner className={styles.loader} />
                       <p className={styles.stateText}>
@@ -523,7 +530,7 @@ const AttendanceRecords = () => {
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={days.length + 5}>
+                  <td colSpan={days.length + 9}>
                     <div className={styles.stateContainer}>
                       <p className={styles.stateText}>
                         Failed to load attendance data.{" "}
@@ -539,7 +546,7 @@ const AttendanceRecords = () => {
                 </tr>
               ) : attendanceData.length === 0 ? (
                 <tr>
-                  <td colSpan={days.length + 5}>
+                  <td colSpan={days.length + 9}>
                     <div className={styles.stateContainer}>
                       <p className={styles.stateText}>
                         No attendance records found.
@@ -553,22 +560,13 @@ const AttendanceRecords = () => {
                     {/* Sticky employee column */}
                     <td className={styles.stickyCell}>
                       <div className={styles.employeeName}>
-                        {row.employee.fullName}
-                      </div>
-                      <div className={styles.employeeId}>
-                        {row.employee.employeeID}
+                        {row.employee.fullName} ({row.employee.employeeID})
                       </div>
                     </td>
 
                     {/* Day cells */}
                     {days.map((day) => {
                       const record = row.records[day];
-                      const dow = getDayOfWeek(selectedYear, selectedMonth, day);
-                      const dayName = DAY_FULL[dow];
-                      const workingDays = row.shiftWorkingDays;
-                      const isOffDay = workingDays
-                        ? !workingDays.includes(dayName)
-                        : false;
                       const isFutureDate = record === null;
                       const isBeforeJoining = record === "before_joining";
                       const cellKey = `${row.employee._id}-${day}`;
@@ -579,9 +577,7 @@ const AttendanceRecords = () => {
                           className={
                             isBeforeJoining
                               ? styles.attendanceCell
-                              : isOffDay
-                                ? `${styles.attendanceCellOff}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
-                                : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                              : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
                           }
                           onClick={
                             !isFutureDate && !isBeforeJoining && !isCellLoading
@@ -603,6 +599,11 @@ const AttendanceRecords = () => {
 
                     {/* Summary cells */}
                     <td
+                      className={`${styles.summaryCell} ${styles.summaryWD}`}
+                    >
+                      {row.summary?.workingDays || 0}
+                    </td>
+                    <td
                       className={`${styles.summaryCell} ${styles.summaryP}`}
                     >
                       {(row.summary?.present || 0) + (row.summary?.late || 0) + (row.summary?.halfDay || 0)}
@@ -613,9 +614,19 @@ const AttendanceRecords = () => {
                       {row.summary?.absent || 0}
                     </td>
                     <td
-                      className={`${styles.summaryCell} ${styles.summaryL}`}
+                      className={`${styles.summaryCell} ${styles.summaryLPaid}`}
                     >
-                      {row.summary?.leave || 0}
+                      {row.summary?.paidLeave || 0}
+                    </td>
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryLUnpaid}`}
+                    >
+                      {row.summary?.unpaidLeave || 0}
+                    </td>
+                    <td
+                      className={`${styles.summaryCell} ${styles.summaryHD}`}
+                    >
+                      {row.summary?.halfDay || 0}
                     </td>
                     <td
                       className={`${styles.summaryCell} ${styles.summaryOff}`}

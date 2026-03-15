@@ -30,8 +30,13 @@ router.get("/", protect, authorize(ROLES.admin), getAllEmployees);
 
 // @route           GET /api/employees/list
 // @description     Get employees list for dropdowns
-// @access          Admin
-router.get("/list", protect, authorize(ROLES.admin), getEmployeesList);
+// @access          Admin, Supervisor
+router.get(
+  "/list",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getEmployeesList,
+);
 
 // @route           POST /api/employees/renew-all-leave-balances
 // @description     Bulk renew leave balances for all active employees
