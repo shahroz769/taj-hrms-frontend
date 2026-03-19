@@ -4,7 +4,6 @@ import styles from "./Sidebar.module.css";
 import logo from "../../assets/taj-logo.png";
 import { Link, useLocation } from "react-router";
 import { useState, useMemo } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // import { Button } from "@/components/ui/button";
 // import {
@@ -46,9 +45,6 @@ const saveToLocalStorage = (state) => {
 const Sidebar = () => {
   const role = useSelector((state) => state.auth.user?.role);
   const location = useLocation();
-  const shouldReduceMotion = useReducedMotion();
-  const MotionSpan = motion.span;
-  const MotionDiv = motion.div;
   // const dispatch = useDispatch();
   // const navigate = useNavigate();
   // const user = useSelector((state) => state.auth.user);
@@ -86,14 +82,6 @@ const Sidebar = () => {
   };
 
   const [openItems, setOpenItems] = useState(getInitialOpenItems);
-
-  const submenuTransition = shouldReduceMotion
-    ? { duration: 0 }
-    : { duration: 0.24, ease: "easeInOut" };
-
-  const chevronTransition = shouldReduceMotion
-    ? { duration: 0 }
-    : { duration: 0.2, ease: "easeInOut" };
 
   const toggleItem = (index) => {
     setOpenItems((prev) => {
@@ -146,43 +134,39 @@ const Sidebar = () => {
                     </div>
                     <div className={styles.menuItemTitleRight}>
                       {item.collapsible && (
-                        <MotionSpan
-                          animate={{ rotate: openItems[index] ? 180 : 0 }}
-                          transition={chevronTransition}
-                          style={{ display: "inline-flex" }}
+                        <span
+                          className={`${styles.collapseIcon} ${
+                            openItems[index] ? styles.collapseIconOpen : ""
+                          }`}
                         >
                           <item.collapseIcon size={20} color="#344054" />
-                        </MotionSpan>
+                        </span>
                       )}
                     </div>
                   </div>
                 )}
                 {item.children && (
-                  <AnimatePresence initial={false}>
-                    {openItems[index] && (
-                      <MotionDiv
-                        className={styles.subMenu}
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={submenuTransition}
-                      >
-                        {item.children.map((subItem, subIndex) => (
-                          <Link
-                            key={subIndex}
-                            to={subItem.path}
-                            className={`${styles.subMenuItem} ${
-                              location.pathname === subItem.path
-                                ? styles.subMenuItemActive
-                                : ""
-                            }`}
-                          >
-                            {subItem.label}
-                          </Link>
-                        ))}
-                      </MotionDiv>
-                    )}
-                  </AnimatePresence>
+                  <div
+                    className={`${styles.subMenu} ${
+                      openItems[index] ? styles.subMenuOpen : ""
+                    }`}
+                  >
+                    <div className={styles.subMenuContent}>
+                      {item.children.map((subItem, subIndex) => (
+                        <Link
+                          key={subIndex}
+                          to={subItem.path}
+                          className={`${styles.subMenuItem} ${
+                            location.pathname === subItem.path
+                              ? styles.subMenuItemActive
+                              : ""
+                          }`}
+                        >
+                          {subItem.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

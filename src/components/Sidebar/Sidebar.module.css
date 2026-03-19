@@ -74,12 +74,27 @@
 }
 
 .subMenu {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 0fr;
   color: #345435;
   font-size: 14px;
-  gap: 2px;
   overflow: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s ease-in-out,
+    opacity 0.24s ease-in-out;
+}
+
+.subMenuOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.subMenuContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
 }
 
 .subMenuItem {
@@ -101,6 +116,15 @@
 
 .subMenuItemActive:hover {
   background-color: #e6eeea;
+}
+
+.collapseIcon {
+  display: inline-flex;
+  transition: transform 0.2s ease-in-out;
+}
+
+.collapseIconOpen {
+  transform: rotate(180deg);
 }
 
 /* Footer */
