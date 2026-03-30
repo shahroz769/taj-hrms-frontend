@@ -622,10 +622,10 @@ const Loans = () => {
     if (!amount || amount <= 0 || !repaymentType) return null;
 
     if (repaymentType === "fixed_amount") {
-      const inst = Number(monthlyInstallment);
+      const inst = Math.floor(Number(monthlyInstallment));
       if (!inst || inst <= 0) return null;
       const months = Math.ceil(amount / inst);
-      const lastInstallment = +(amount - inst * (months - 1)).toFixed(2);
+      const lastInstallment = amount - inst * (months - 1);
       return {
         monthlyInstallment: inst,
         totalMonths: months,
@@ -635,8 +635,8 @@ const Loans = () => {
     if (repaymentType === "fixed_months") {
       const months = Number(totalMonths);
       if (!months || months < 1) return null;
-      const inst = Math.floor((amount / months) * 100) / 100;
-      const lastInstallment = +(amount - inst * (months - 1)).toFixed(2);
+      const inst = Math.floor(amount / months);
+      const lastInstallment = amount - inst * (months - 1);
       return {
         monthlyInstallment: inst,
         totalMonths: months,

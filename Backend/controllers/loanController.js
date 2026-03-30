@@ -9,6 +9,9 @@ import { PAKISTAN_TZ } from "../utils/timezone.js";
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+/** Floor to whole number — no decimals in installments */
+const floorInt = (value) => Math.floor(Number(value));
+
 /**
  * Get the next month {year, month} after a given date (Pakistan TZ).
  */
@@ -36,20 +39,21 @@ const buildRepaymentSchedule = ({
   let m = startMonth;
 
   if (repaymentType === "fixed_amount") {
+    const base = floorInt(monthlyInstallment);
     while (remaining > 0) {
-      const amt = round2(Math.min(monthlyInstallment, remaining));
+      const amt = remaining <= base ? remaining : base;
       schedule.push({ year: y, month: m, amount: amt, actualAmount: 0, status: "Pending" });
-      remaining = round2(remaining - amt);
+      remaining -= amt;
       m += 1;
       if (m > 12) { m = 1; y += 1; }
     }
   } else if (repaymentType === "fixed_months") {
-    const base = round2(Math.floor((loanAmount / totalMonths) * 100) / 100);
+    const base = floorInt(loanAmount / totalMonths);
     for (let i = 0; i < totalMonths; i++) {
       const isLast = i === totalMonths - 1;
-      const amt = isLast ? round2(remaining) : base;
+      const amt = isLast ? remaining : base;
       schedule.push({ year: y, month: m, amount: amt, actualAmount: 0, status: "Pending" });
-      remaining = round2(remaining - amt);
+      remaining -= amt;
       m += 1;
       if (m > 12) { m = 1; y += 1; }
     }
@@ -59,7 +63,7 @@ const buildRepaymentSchedule = ({
     schedule.push({
       year: y,
       month: m,
-      amount: round2(loanAmount),
+      amount: loanAmount,
       actualAmount: 0,
       status: "Pending",
     });
@@ -292,9 +296,9 @@ export const createLoan = async (req, res, next) => {
       throw new Error("Loan amount is required");
     }
     const parsedAmount = Number(loanAmount);
-    if (isNaN(parsedAmount) || parsedAmount < 1) {
+    if (isNaN(parsedAmount) || parsedAmount < 1 || !Number.isInteger(parsedAmount)) {
       res.status(400);
-      throw new Error("Loan amount must be at least 1");
+      throw new Error("Loan amount must be a whole number (no decimals)");
     }
 
     // Validate repayment type
@@ -309,15 +313,15 @@ export const createLoan = async (req, res, next) => {
 
     if (repaymentType === "fixed_amount") {
       const parsed = Number(monthlyInstallment);
-      if (!parsed || parsed <= 0) {
+      if (!parsed || parsed <= 0 || !Number.isInteger(parsed)) {
         res.status(400);
-        throw new Error("Monthly installment must be a positive number");
+        throw new Error("Monthly installment must be a positive whole number");
       }
       if (parsed > parsedAmount) {
         res.status(400);
         throw new Error("Monthly installment cannot exceed loan amount");
       }
-      computedInstallment = round2(parsed);
+      computedInstallment = floorInt(parsed);
       computedMonths = Math.ceil(parsedAmount / computedInstallment);
     } else if (repaymentType === "fixed_months") {
       const parsed = Number(totalMonths);
@@ -326,12 +330,10 @@ export const createLoan = async (req, res, next) => {
         throw new Error("Total months must be a positive integer");
       }
       computedMonths = parsed;
-      computedInstallment = round2(
-        Math.floor((parsedAmount / parsed) * 100) / 100,
-      );
+      computedInstallment = floorInt(parsedAmount / parsed);
     } else {
       // next_salary — installment is full amount
-      computedInstallment = round2(parsedAmount);
+      computedInstallment = floorInt(parsedAmount);
       computedMonths = null;
     }
 
@@ -370,11 +372,11 @@ export const createLoan = async (req, res, next) => {
 
       const loanDoc = {
         employee: empId,
-        loanAmount: round2(parsedAmount),
+        loanAmount: floorInt(parsedAmount),
         repaymentType,
         monthlyInstallment: computedInstallment,
         totalMonths: computedMonths,
-        remainingBalance: round2(parsedAmount),
+        remainingBalance: floorInt(parsedAmount),
         reason: reason?.trim() || "",
         status,
         createdBy: req.user?._id || null,
@@ -384,7 +386,7 @@ export const createLoan = async (req, res, next) => {
         loanDoc.approvedBy = req.user?._id || null;
         loanDoc.approvedAt = new Date();
         loanDoc.repaymentSchedule = buildRepaymentSchedule({
-          loanAmount: round2(parsedAmount),
+          loanAmount: floorInt(parsedAmount),
           repaymentType,
           monthlyInstallment: computedInstallment,
           totalMonths: computedMonths,

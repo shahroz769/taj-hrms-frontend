@@ -695,16 +695,11 @@ export const calculateEmployeePayroll = async ({
 
       if (activeLoan.repaymentType === "next_salary") {
         // For next_salary: deduct as much as possible from available net salary
-        const deductible = Math.max(0, salaryBeforeLoan);
-        const actualDeduction = round2(
-          Math.min(activeLoan.remainingBalance, deductible),
-        );
-        loanDeductionAmount = actualDeduction;
+        const deductible = Math.max(0, Math.floor(salaryBeforeLoan));
+        loanDeductionAmount = Math.min(activeLoan.remainingBalance, deductible);
       } else {
-        // For fixed_amount / fixed_months: deduct scheduled amount
-        loanDeductionAmount = round2(
-          Math.min(entry.amount, activeLoan.remainingBalance),
-        );
+        // For fixed_amount / fixed_months: deduct scheduled amount (whole numbers)
+        loanDeductionAmount = Math.min(entry.amount, activeLoan.remainingBalance);
       }
 
       // Count installment number (how many Paid/Partial before this one + 1)
