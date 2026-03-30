@@ -70,6 +70,7 @@ export const sidebarItems = [
     children: [
       { label: "Payroll", path: "/salary/payroll" },
       { label: "Deductions", path: "/salary/deductions" },
+      { label: "Loans", path: "/salary/loans" },
       { label: "Allowance Components", path: "/allowances/components" },
       { label: "Allowance Policies", path: "/allowances/policies" },
     ],

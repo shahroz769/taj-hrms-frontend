@@ -22,6 +22,7 @@ import leaveApplicationRouter from "./routes/leaveApplicationRoutes.js";
 import attendanceRouter from "./routes/attendanceRoutes.js";
 import payrollRouter from "./routes/payrollRoutes.js";
 import deductionRouter from "./routes/deductionRoutes.js";
+import loanRouter from "./routes/loanRoutes.js";
 import dashboardRouter from "./routes/dashboardRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import connectDB from "./config/db.js";
@@ -76,6 +77,7 @@ app.use("/api/leave-applications", leaveApplicationRouter);
 app.use("/api/attendances", attendanceRouter);
 app.use("/api/payrolls", payrollRouter);
 app.use("/api/deductions", deductionRouter);
+app.use("/api/loans", loanRouter);
 app.use("/api/dashboard", dashboardRouter);
 
 // 404 Fallback

@@ -1,5 +1,6 @@
 import Attendance from "../models/Attendance.js";
 import Deduction from "../models/Deduction.js";
+import Loan from "../models/Loan.js";
 import EmployeeShift from "../models/EmployeeShift.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 import Payroll from "../models/Payroll.js";
@@ -669,7 +670,60 @@ export const calculateEmployeePayroll = async ({
     date: d.date,
   }));
 
-  const totalSalary = round2(grossSalary - latePenaltyAmount - manualDeductionAmount + arrearsAmount);
+  // ── Loan Deduction ──
+  let loanDeductionAmount = 0;
+  const loanDeductionBreakdown = [];
+
+  const activeLoan = await Loan.findOne({
+    employee: employee._id,
+    status: "Approved",
+    "repaymentSchedule.year": year,
+    "repaymentSchedule.month": month,
+    "repaymentSchedule.status": "Pending",
+  }).lean();
+
+  if (activeLoan) {
+    const scheduleIndex = activeLoan.repaymentSchedule.findIndex(
+      (entry) => entry.year === year && entry.month === month && entry.status === "Pending",
+    );
+
+    if (scheduleIndex !== -1) {
+      const entry = activeLoan.repaymentSchedule[scheduleIndex];
+      const salaryBeforeLoan = round2(
+        grossSalary - latePenaltyAmount - manualDeductionAmount + arrearsAmount,
+      );
+
+      if (activeLoan.repaymentType === "next_salary") {
+        // For next_salary: deduct as much as possible from available net salary
+        const deductible = Math.max(0, salaryBeforeLoan);
+        const actualDeduction = round2(
+          Math.min(activeLoan.remainingBalance, deductible),
+        );
+        loanDeductionAmount = actualDeduction;
+      } else {
+        // For fixed_amount / fixed_months: deduct scheduled amount
+        loanDeductionAmount = round2(
+          Math.min(entry.amount, activeLoan.remainingBalance),
+        );
+      }
+
+      // Count installment number (how many Paid/Partial before this one + 1)
+      const paidBefore = activeLoan.repaymentSchedule.filter(
+        (e) => e.status === "Paid" || e.status === "Partial",
+      ).length;
+      const totalInstallments = activeLoan.repaymentSchedule.length;
+
+      loanDeductionBreakdown.push({
+        loan: activeLoan._id,
+        installmentAmount: round2(loanDeductionAmount),
+        installmentNumber: paidBefore + 1,
+        totalInstallments,
+        remainingBalance: round2(activeLoan.remainingBalance - loanDeductionAmount),
+      });
+    }
+  }
+
+  const totalSalary = round2(grossSalary - latePenaltyAmount - manualDeductionAmount - loanDeductionAmount + arrearsAmount);
 
   const monthEndDate = new Date(nextMonthStartUtc);
   monthEndDate.setUTCDate(monthEndDate.getUTCDate() - 1);
@@ -741,6 +795,7 @@ export const calculateEmployeePayroll = async ({
       latePenaltyAllowanceAmount: latePenaltyInfo.allowancePenaltyAmount,
       latePenaltyAmount,
       manualDeductionAmount,
+      loanDeductionAmount,
       arrearsAmount,
       totalSalary,
       perDaySalary: round2(
@@ -806,6 +861,7 @@ export const calculateEmployeePayroll = async ({
     attendanceDeductionBreakdown,
     deductionBreakdown,
     allowanceBreakdown,
+    loanDeductionBreakdown,
     arrearsLedgerEntries: unsettledArrearsEntries
       .filter((entry) =>
         isEarlierMonth(entry.sourceYear, entry.sourceMonth, year, month),

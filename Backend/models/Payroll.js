@@ -111,6 +111,7 @@ const payrollSchema = new mongoose.Schema(
       lateCount: { type: Number, default: 0 },
       latePenaltyGroups: { type: Number, default: 0 },
       manualDeductionAmount: { type: Number, default: 0 },
+      loanDeductionAmount: { type: Number, default: 0 },
       arrearsAmount: { type: Number, default: 0 },
       earnedBasic: { type: Number, default: 0 },
       paidLeaveAmount: { type: Number, default: 0 },
@@ -148,6 +149,21 @@ const payrollSchema = new mongoose.Schema(
         {
           name: String,
           amount: Number,
+        },
+      ],
+      default: [],
+    },
+    loanDeductionBreakdown: {
+      type: [
+        {
+          loan: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Loan",
+          },
+          installmentAmount: Number,
+          installmentNumber: Number,
+          totalInstallments: Number,
+          remainingBalance: Number,
         },
       ],
       default: [],

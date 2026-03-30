@@ -637,6 +637,10 @@ const Payroll = () => {
   const totalManualDeduction = Number(
     payslip?.calculations?.manualDeductionAmount || 0,
   );
+  const loanDeductionAmount = Number(
+    payslip?.calculations?.loanDeductionAmount || 0,
+  );
+  const loanDeductionBreakdown = payslip?.loanDeductionBreakdown || [];
   const latePenaltyAmount = Number(
     payslip?.calculations?.latePenaltyAmount || 0,
   );
@@ -809,6 +813,7 @@ const Payroll = () => {
     displayedAttendanceDeductionAmount +
     latePenaltyAmount +
     totalManualDeduction +
+    loanDeductionAmount +
     employmentAdjustmentAmount;
   const displayedTotalDeductions = totalDeductions;
 
@@ -1547,6 +1552,43 @@ const Payroll = () => {
                           </span>
                           <span className={styles.payslipNegativeAmount}>
                             -{currency(totalManualDeduction)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {loanDeductionAmount > 0 && (
+                    <>
+                      <div className={styles.payslipAllowanceHeader}>
+                        Loan Repayment
+                      </div>
+                      {loanDeductionBreakdown.length > 0 ? (
+                        loanDeductionBreakdown.map((entry, index) => (
+                          <div
+                            key={`loan-${index}`}
+                            className={styles.payslipBreakdownDetailRow}
+                          >
+                            <div>
+                              <div className={styles.payslipBreakdownLabel}>
+                                Installment {entry.installmentNumber} of{" "}
+                                {entry.totalInstallments}
+                              </div>
+                              <div className={styles.payslipBreakdownMeta}>
+                                Remaining: {currency(entry.remainingBalance)}
+                              </div>
+                            </div>
+                            <span className={styles.payslipNegativeAmount}>
+                              -{currency(entry.installmentAmount)}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className={styles.payslipBreakdownDetailRow}>
+                          <span className={styles.payslipBreakdownLabel}>
+                            Loan Repayment
+                          </span>
+                          <span className={styles.payslipNegativeAmount}>
+                            -{currency(loanDeductionAmount)}
                           </span>
                         </div>
                       )}

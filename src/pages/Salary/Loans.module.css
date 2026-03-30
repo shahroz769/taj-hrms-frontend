@@ -1,0 +1,131 @@
+.container {
+  background-color: #ffffff;
+  margin: 16px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.title {
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: #02542d;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controls {
+  display: flex;
+  margin-top: 16px;
+  gap: 12px;
+}
+
+.tableSearchInput {
+  width: 100%;
+}
+
+.reasonCell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* ── View Dialog ── */
+
+.viewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+}
+
+.viewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viewLabel {
+  font-size: 12px;
+  color: #667085;
+  font-weight: 500;
+}
+
+.viewValue {
+  font-size: 14px;
+  color: #1d2939;
+  font-weight: 500;
+}
+
+/* ── Schedule Table ── */
+
+.scheduleWrap {
+  margin-top: 12px;
+}
+
+.scheduleTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #02542d;
+  margin-bottom: 8px;
+}
+
+.scheduleTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scheduleTable th {
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #344054;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.scheduleTable td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #1d2939;
+}
+
+.scheduleTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Breakdown Preview ── */
+
+.breakdownPreview {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.breakdownPreviewTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #02542d;
+  margin-bottom: 8px;
+}
+
+.breakdownPreviewRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  color: #344054;
+}
+
+.breakdownPreviewValue {
+  font-weight: 600;
+  color: #02542d;
+}
