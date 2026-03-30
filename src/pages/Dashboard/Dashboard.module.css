@@ -1,0 +1,337 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18rem;
+}
+
+.loadingSpinner {
+  width: 2rem;
+  height: 2rem;
+  color: #02542d;
+}
+
+.hero {
+  display: block;
+}
+
+.heroShell {
+  border-radius: 16px;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.heroContent {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+  align-items: stretch;
+  padding: 1.5rem;
+}
+
+.heroMain {
+  display: flex;
+  min-height: 15rem;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.heroControls {
+  display: flex;
+  min-width: 320px;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1rem;
+}
+
+.heroControlGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.heroBadgeRow,
+.heroHighlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.heroHighlights {
+  align-items: center;
+  gap: 1rem;
+}
+
+.heroLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #667085;
+}
+
+.title {
+  font-family: "Outfit", sans-serif;
+  font-size: clamp(2rem, 3vw, 2.7rem);
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #02542d;
+}
+
+.subtitle {
+  max-width: 64ch;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: #667085;
+}
+
+.metricCard {
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: none;
+}
+
+.metricGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.metricWide {
+  grid-column: span 2;
+}
+
+.metricHeader,
+.metricMetaRow,
+.inlineStatRow,
+.footerSplit {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.metricValue {
+  margin-top: 0.5rem;
+  font-size: clamp(1.85rem, 2.2vw, 2.5rem);
+  line-height: 1;
+  color: #02542d;
+}
+
+.metricIconWrap,
+.quickActionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.9rem;
+  background: #ecfdf3;
+  color: #02542d;
+}
+
+.metricContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.analyticsGrid,
+.actionGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.analyticsFull {
+  grid-column: span 12;
+}
+
+.analyticsHalf {
+  grid-column: span 6;
+}
+
+.analyticsQuarter {
+  grid-column: span 3;
+}
+
+.actionThird {
+  grid-column: span 4;
+}
+
+.actionFull {
+  grid-column: span 12;
+}
+
+.actionWide {
+  grid-column: span 8;
+}
+
+.dualChartGrid,
+.dualMiniChartGrid,
+.peopleSplit {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chartFrame {
+  min-height: 17rem;
+}
+
+.chartFrameCompact {
+  min-height: 13rem;
+}
+
+.chartFrameTall {
+  min-height: 21rem;
+}
+
+.compactSectionContent {
+  padding-top: 0.5rem;
+  padding-bottom: 0.75rem;
+}
+
+.sectionControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.compactSelect {
+  min-width: 8.5rem;
+  background: #ffffff;
+}
+
+.payrollFooterMetric {
+  text-align: right;
+}
+
+.quickActionList {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quickActionLink {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #ffffff;
+  transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
+.quickActionLink:hover {
+  transform: translateY(-1px);
+  border-color: #bbf7d0;
+  background: #f7fbf8;
+}
+
+.analyticsGrid :global(.rounded-xl),
+.actionGrid :global(.rounded-xl),
+.hero :global(.rounded-xl) {
+  border-radius: 16px;
+}
+
+.analyticsGrid :global(.border),
+.actionGrid :global(.border),
+.hero :global(.border) {
+  border-color: #e5e7eb;
+}
+
+.analyticsGrid :global(.bg-card),
+.actionGrid :global(.bg-card) {
+  background-color: #ffffff;
+}
+
+@media (max-width: 1600px) {
+  .metricGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metricWide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 1280px) {
+  .heroContent {
+    grid-template-columns: 1fr;
+  }
+
+  .heroControls {
+    min-width: 0;
+  }
+
+  .analyticsHalf,
+  .analyticsQuarter,
+  .actionThird,
+  .actionWide {
+    grid-column: span 6;
+  }
+
+  .actionFull {
+    grid-column: span 12;
+  }
+}
+
+@media (max-width: 960px) {
+  .page {
+    margin: 12px;
+    padding: 16px;
+  }
+
+  .metricGrid,
+  .analyticsGrid,
+  .actionGrid,
+  .dualChartGrid,
+  .dualMiniChartGrid,
+  .peopleSplit,
+  .quickActionList {
+    grid-template-columns: 1fr;
+  }
+
+  .metricWide {
+    grid-column: span 1;
+  }
+
+  .analyticsFull,
+  .analyticsHalf,
+  .analyticsQuarter,
+  .actionThird,
+  .actionFull,
+  .actionWide {
+    grid-column: span 1;
+  }
+
+  .footerSplit,
+  .metricMetaRow,
+  .inlineStatRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .compactSelect {
+    width: 100%;
+  }
+
+  .payrollFooterMetric {
+    text-align: left;
+  }
+}
