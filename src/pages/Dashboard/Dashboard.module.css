@@ -1,3 +1,5 @@
+/* ─── Page shell ─── */
+
 .page {
   display: flex;
   flex-direction: column;
@@ -8,6 +10,33 @@
   background-color: #ffffff;
   overflow: hidden;
 }
+
+/* ─── Global period filter bar ─── */
+
+.globalFilters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.filterLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #02542d;
+  white-space: nowrap;
+}
+
+/* ─── Loading / error states ─── */
 
 .loadingState {
   display: flex;
@@ -22,81 +51,7 @@
   color: #02542d;
 }
 
-.hero {
-  display: block;
-}
-
-.heroShell {
-  border-radius: 16px;
-  background-color: transparent;
-  box-shadow: none;
-}
-
-.heroContent {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-  align-items: stretch;
-  padding: 1.5rem;
-}
-
-.heroMain {
-  display: flex;
-  min-height: 15rem;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 1.25rem;
-}
-
-.heroControls {
-  display: flex;
-  min-width: 320px;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 1rem;
-}
-
-.heroControlGrid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.heroBadgeRow,
-.heroHighlights {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.heroHighlights {
-  align-items: center;
-  gap: 1rem;
-}
-
-.heroLabel {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #667085;
-}
-
-.title {
-  font-family: "Outfit", sans-serif;
-  font-size: clamp(2rem, 3vw, 2.7rem);
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #02542d;
-}
-
-.subtitle {
-  max-width: 64ch;
-  font-size: 0.98rem;
-  line-height: 1.65;
-  color: #667085;
-}
+/* ─── Metric cards ─── */
 
 .metricCard {
   border-radius: 16px;
@@ -107,11 +62,7 @@
 .metricGrid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.metricWide {
-  grid-column: span 2;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .metricHeader,
@@ -126,7 +77,7 @@
 
 .metricValue {
   margin-top: 0.5rem;
-  font-size: clamp(1.85rem, 2.2vw, 2.5rem);
+  font-size: clamp(1.75rem, 2vw, 2.25rem);
   line-height: 1;
   color: #02542d;
 }
@@ -149,8 +100,9 @@
   gap: 1rem;
 }
 
-.analyticsGrid,
-.actionGrid {
+/* ─── Analytics grid (12 columns) ─── */
+
+.analyticsGrid {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -160,45 +112,33 @@
   grid-column: span 12;
 }
 
+.analyticsWide {
+  grid-column: span 8;
+}
+
 .analyticsHalf {
   grid-column: span 6;
 }
 
-.analyticsQuarter {
-  grid-column: span 3;
-}
-
-.actionThird {
+.analyticsSide {
   grid-column: span 4;
 }
 
-.actionFull {
-  grid-column: span 12;
-}
-
-.actionWide {
-  grid-column: span 8;
-}
-
-.dualChartGrid,
-.dualMiniChartGrid,
-.peopleSplit {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
+/* ─── Chart frame heights ─── */
 
 .chartFrame {
-  min-height: 17rem;
+  height: 17rem;
 }
 
 .chartFrameCompact {
-  min-height: 13rem;
+  height: 14rem;
 }
 
 .chartFrameTall {
-  min-height: 21rem;
+  height: 20rem;
 }
+
+/* ─── Section chrome ─── */
 
 .compactSectionContent {
   padding-top: 0.5rem;
@@ -219,6 +159,28 @@
 .payrollFooterMetric {
   text-align: right;
 }
+
+/* ─── Action grid (12 columns) ─── */
+
+.actionGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.actionThird {
+  grid-column: span 4;
+}
+
+.actionWide {
+  grid-column: span 8;
+}
+
+.actionFull {
+  grid-column: span 12;
+}
+
+/* ─── Quick-action links ─── */
 
 .quickActionList {
   display: grid;
@@ -243,15 +205,15 @@
   background: #f7fbf8;
 }
 
+/* ─── Card overrides inside grids ─── */
+
 .analyticsGrid :global(.rounded-xl),
-.actionGrid :global(.rounded-xl),
-.hero :global(.rounded-xl) {
+.actionGrid :global(.rounded-xl) {
   border-radius: 16px;
 }
 
 .analyticsGrid :global(.border),
-.actionGrid :global(.border),
-.hero :global(.border) {
+.actionGrid :global(.border) {
   border-color: #e5e7eb;
 }
 
@@ -260,27 +222,27 @@
   background-color: #ffffff;
 }
 
+/* ─── Responsive: large screens ─── */
+
 @media (max-width: 1600px) {
   .metricGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-
-  .metricWide {
-    grid-column: span 2;
-  }
 }
 
+/* ─── Responsive: medium screens ─── */
+
 @media (max-width: 1280px) {
-  .heroContent {
-    grid-template-columns: 1fr;
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .heroControls {
-    min-width: 0;
-  }
-
+  .analyticsWide,
   .analyticsHalf,
-  .analyticsQuarter,
+  .analyticsSide {
+    grid-column: span 6;
+  }
+
   .actionThird,
   .actionWide {
     grid-column: span 6;
@@ -291,29 +253,30 @@
   }
 }
 
+/* ─── Responsive: small screens ─── */
+
 @media (max-width: 960px) {
   .page {
     margin: 12px;
     padding: 16px;
   }
 
+  .globalFilters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .metricGrid,
   .analyticsGrid,
   .actionGrid,
-  .dualChartGrid,
-  .dualMiniChartGrid,
-  .peopleSplit,
   .quickActionList {
     grid-template-columns: 1fr;
   }
 
-  .metricWide {
-    grid-column: span 1;
-  }
-
   .analyticsFull,
+  .analyticsWide,
   .analyticsHalf,
-  .analyticsQuarter,
+  .analyticsSide,
   .actionThird,
   .actionFull,
   .actionWide {
