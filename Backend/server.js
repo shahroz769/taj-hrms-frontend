@@ -24,6 +24,7 @@ import payrollRouter from "./routes/payrollRoutes.js";
 import deductionRouter from "./routes/deductionRoutes.js";
 import loanRouter from "./routes/loanRoutes.js";
 import dashboardRouter from "./routes/dashboardRoutes.js";
+import webhookRouter from "./routes/webhookRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import connectDB from "./config/db.js";
 import chalk from "chalk";
@@ -79,6 +80,7 @@ app.use("/api/payrolls", payrollRouter);
 app.use("/api/deductions", deductionRouter);
 app.use("/api/loans", loanRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/webhook", webhookRouter);
 
 // 404 Fallback
 app.use((req, res, next) => {
