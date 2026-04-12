@@ -38,41 +38,115 @@
 
 /* ── View Dialog ── */
 
-.viewGrid {
+.loanScrollArea {
+  max-height: calc(90vh - 80px);
+}
+
+.loanDialogContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.infoGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px 24px;
 }
 
-.viewItem {
+.infoGroup {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.viewLabel {
+.infoLabel {
   font-size: 12px;
   color: var(--muted-foreground);
   font-weight: 500;
 }
 
-.viewValue {
+.infoValue {
   font-size: 14px;
-  color: #1d2939;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* ── Loan Summary Stats ── */
+
+.loanSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.loanSummaryStat {
+  text-align: center;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 6px;
+}
+
+.loanStatValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.loanStatLabel {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+/* ── Details Breakdown ── */
+
+.detailsWrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+.detailLabel {
   font-weight: 500;
+  color: var(--foreground);
+}
+
+.detailValue {
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Schedule Table ── */
 
-.scheduleWrap {
-  margin-top: 12px;
-}
-
-.scheduleTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--primary);
-  margin-bottom: 8px;
+.scheduleTableWrap {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .scheduleTable {
@@ -81,23 +155,48 @@
   font-size: 13px;
 }
 
+.scheduleTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .scheduleTable th {
   text-align: left;
-  padding: 6px 10px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--primary);
   background: var(--muted);
   border-bottom: 1px solid var(--border);
 }
 
 .scheduleTable td {
-  padding: 6px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--muted);
-  color: #1d2939;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.scheduleTable tr {
+  transition: background-color 0.2s ease;
+}
+
+.scheduleTable tbody tr:hover {
+  background-color: var(--muted);
 }
 
 .scheduleTable tr:last-child td {
   border-bottom: none;
+}
+
+/* ── Dialog Footer ── */
+
+.loanDialogFooter {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
 /* ── Breakdown Preview ── */

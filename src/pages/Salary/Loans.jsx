@@ -86,6 +86,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Services
 import {
@@ -122,11 +124,11 @@ const REPAYMENT_LABELS = {
   next_salary: "Next Salary",
 };
 
-const STATUS_VARIANT = {
-  Pending: "outline",
-  Approved: "default",
-  Rejected: "destructive",
-  Completed: "secondary",
+const STATUS_BADGE_CLASS = {
+  Pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100",
+  Approved: "bg-green-100 text-green-700 hover:bg-green-100",
+  Rejected: "bg-red-100 text-red-700 hover:bg-red-100",
+  Completed: "bg-blue-100 text-blue-700 hover:bg-blue-100",
 };
 
 const MONTH_NAMES = [
@@ -216,6 +218,7 @@ const Loans = () => {
   // View dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingLoanId, setViewingLoanId] = useState(null);
+  const [loadingLoanId, setLoadingLoanId] = useState(null);
 
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -308,12 +311,12 @@ const Loans = () => {
       placeholderData: (prev) => prev,
     });
 
-  // Loan details for view dialog
-  const { data: loanDetailsData, isFetching: isLoanDetailsFetching } =
+  // Loan details for view dialog (data is pre-fetched via handleEdit)
+  const { data: loanDetailsData } =
     useQuery({
       queryKey: ["loan-details", viewingLoanId],
       queryFn: () => fetchLoanDetails(viewingLoanId),
-      enabled: Boolean(viewingLoanId) && viewDialogOpen,
+      enabled: Boolean(viewingLoanId),
     });
 
   // Filter data
@@ -455,7 +458,7 @@ const Loans = () => {
       key: "status",
       label: "Status",
       render: (row) => (
-        <Badge variant={STATUS_VARIANT[row.status] || "outline"}>
+        <Badge className={STATUS_BADGE_CLASS[row.status] || "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"}>
           {row.status}
         </Badge>
       ),
@@ -469,12 +472,12 @@ const Loans = () => {
       key: "actions",
       label: "Actions",
       align: "center",
-      renderEdit: (row) => (
-        <EyeIcon
-          size={18}
-          className="text-muted-foreground"
-        />
-      ),
+      renderEdit: (row) =>
+        loadingLoanId === row._id ? (
+          <Spinner className="h-4.5 w-4.5" />
+        ) : (
+          <EyeIcon size={18} className="text-muted-foreground" />
+        ),
       renderDelete: (row) => {
         if (!isAdmin) return null;
         const canDelete =
@@ -513,10 +516,22 @@ const Loans = () => {
     setLoanReason("");
   }, []);
 
-  // View loan — open detail dialog
-  const handleEdit = (row) => {
-    setViewingLoanId(row._id);
-    setViewDialogOpen(true);
+  // View loan — fetch first, then open dialog
+  const handleEdit = async (row) => {
+    if (loadingLoanId) return;
+    setLoadingLoanId(row._id);
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ["loan-details", row._id],
+        queryFn: () => fetchLoanDetails(row._id),
+      });
+      setViewingLoanId(row._id);
+      setViewDialogOpen(true);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to load loan details");
+    } finally {
+      setLoadingLoanId(null);
+    }
   };
 
   // Delete
@@ -1372,231 +1387,248 @@ const Loans = () => {
           if (!open) setTimeout(() => setViewingLoanId(null), 200);
         }}
       >
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-primary">Loan Details</DialogTitle>
-            <DialogDescription className="sr-only">
-              View details for this loan
-            </DialogDescription>
-          </DialogHeader>
-          {isLoanDetailsFetching ? (
-            <div className="flex items-center justify-center py-8">
-              <Spinner />
-            </div>
-          ) : loanDetail ? (
-            <div className="grid gap-5">
-              {/* Employee Info */}
-              <div className={styles.viewGrid}>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Employee</span>
-                  <span className={styles.viewValue}>
-                    {loanDetail.employee?.fullName || "-"} (
-                    {loanDetail.employee?.employeeID || "-"})
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Department</span>
-                  <span className={styles.viewValue}>
-                    {loanDetail.employee?.position?.department?.name || "-"}
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Position</span>
-                  <span className={styles.viewValue}>
-                    {loanDetail.employee?.position?.name || "-"}
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Status</span>
-                  <Badge
-                    variant={STATUS_VARIANT[loanDetail.status] || "outline"}
-                  >
-                    {loanDetail.status}
-                  </Badge>
-                </div>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <div>
+            <DialogHeader>
+              <div className="px-6 pt-6">
+                <DialogTitle className="text-primary">Loan Details</DialogTitle>
+                <DialogDescription className="sr-only">
+                  View details for this loan
+                </DialogDescription>
               </div>
+            </DialogHeader>
 
-              {/* Loan Info */}
-              <div className={styles.viewGrid}>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Loan Amount</span>
-                  <span className={styles.viewValue}>
-                    {currency(loanDetail.loanAmount)}
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Repayment Type</span>
-                  <span className={styles.viewValue}>
-                    {REPAYMENT_LABELS[loanDetail.repaymentType] ||
-                      loanDetail.repaymentType}
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Total Paid</span>
-                  <span className={styles.viewValue}>
-                    {currency(loanDetail.totalPaid)}
-                  </span>
-                </div>
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Remaining Balance</span>
-                  <span className={styles.viewValue}>
-                    {currency(loanDetail.remainingBalance)}
-                  </span>
-                </div>
-                {loanDetail.monthlyInstallment > 0 && (
-                  <div className={styles.viewItem}>
-                    <span className={styles.viewLabel}>
-                      Monthly Installment
-                    </span>
-                    <span className={styles.viewValue}>
-                      {currency(loanDetail.monthlyInstallment)}
-                    </span>
-                  </div>
-                )}
-                {loanDetail.reason && (
-                  <div className={styles.viewItem}>
-                    <span className={styles.viewLabel}>Reason</span>
-                    <span className={styles.viewValue}>
-                      {loanDetail.reason}
-                    </span>
-                  </div>
-                )}
-                <div className={styles.viewItem}>
-                  <span className={styles.viewLabel}>Created</span>
-                  <span className={styles.viewValue}>
-                    {formatDate(loanDetail.createdAt)}
-                  </span>
-                </div>
-                {loanDetail.approvedBy && (
-                  <div className={styles.viewItem}>
-                    <span className={styles.viewLabel}>Approved By</span>
-                    <span className={styles.viewValue}>
-                      {loanDetail.approvedBy.name || loanDetail.approvedBy.email}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Repayment Schedule */}
-              {loanDetail.repaymentSchedule?.length > 0 && (
-                <div className={styles.scheduleWrap}>
-                  <div className={styles.scheduleTitle}>
-                    Repayment Schedule
-                  </div>
-                  <div className="max-h-64 overflow-y-auto border rounded-md">
-                    <table className={styles.scheduleTable}>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Month</th>
-                          <th>Scheduled</th>
-                          <th>Paid</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {loanDetail.repaymentSchedule.map((entry, idx) => (
-                          <tr key={idx}>
-                            <td>{idx + 1}</td>
-                            <td>
-                              {MONTH_NAMES[entry.month]} {entry.year}
-                            </td>
-                            <td>{currency(entry.amount)}</td>
-                            <td>
-                              {entry.actualAmount > 0
-                                ? currency(entry.actualAmount)
-                                : "-"}
-                            </td>
-                            <td>
-                              <Badge
-                                variant={
-                                  entry.status === "Paid"
-                                    ? "default"
-                                    : entry.status === "Partial"
-                                      ? "outline"
-                                      : entry.status === "Skipped"
-                                        ? "secondary"
-                                        : "outline"
-                                }
-                                className="text-xs"
-                              >
-                                {entry.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 justify-end">
-                {isAdmin &&
-                  loanDetail.status === "Approved" &&
-                  loanDetail.remainingBalance > 0 && (
-                    <Button
-                      variant="outline"
-                      className="cursor-pointer"
-                      onClick={() => handleSettle(loanDetail)}
-                      disabled={settleMutation.isPending}
-                    >
-                      {settleMutation.isPending ? (
-                        <>
-                          <Spinner />
-                          Settling
-                        </>
-                      ) : (
-                        "Early Settlement"
-                      )}
-                    </Button>
-                  )}
-                {isAdmin && loanDetail.status === "Pending" && (
+            <ScrollArea className={styles.loanScrollArea}>
+              <div className={styles.loanDialogContent}>
+                {loanDetail ? (
                   <>
-                    <Button
-                      variant="green"
-                      className="cursor-pointer"
-                      onClick={() => {
-                        approveMutation.mutate(loanDetail._id);
-                      }}
-                      disabled={approveMutation.isPending}
-                    >
-                      {approveMutation.isPending ? (
-                        <>
-                          <Spinner />
-                          Approving
-                        </>
-                      ) : (
-                        "Approve"
+                    {/* ── Employee Info ── */}
+                    <div className={styles.sectionTitle}>Employee</div>
+                    <div className={styles.infoGrid}>
+                      <div className={styles.infoGroup}>
+                        <div className={styles.infoLabel}>Name</div>
+                        <div className={styles.infoValue}>
+                          {loanDetail.employee?.fullName || "-"} (
+                          {loanDetail.employee?.employeeID || "-"})
+                        </div>
+                      </div>
+                      <div className={styles.infoGroup}>
+                        <div className={styles.infoLabel}>Department</div>
+                        <div className={styles.infoValue}>
+                          {loanDetail.employee?.position?.department?.name || "-"}
+                        </div>
+                      </div>
+                      <div className={styles.infoGroup}>
+                        <div className={styles.infoLabel}>Position</div>
+                        <div className={styles.infoValue}>
+                          {loanDetail.employee?.position?.name || "-"}
+                        </div>
+                      </div>
+                      <div className={styles.infoGroup}>
+                        <div className={styles.infoLabel}>Status</div>
+                        <div>
+                          <Badge
+                            className={STATUS_BADGE_CLASS[loanDetail.status] || "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"}
+                          >
+                            {loanDetail.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* ── Loan Summary ── */}
+                    <div className={styles.sectionTitle}>Loan Summary</div>
+                    <div className={styles.loanSummaryGrid}>
+                      <div className={styles.loanSummaryStat}>
+                        <div className={styles.loanStatValue}>
+                          {currency(loanDetail.loanAmount)}
+                        </div>
+                        <div className={styles.loanStatLabel}>Loan Amount</div>
+                      </div>
+                      <div className={styles.loanSummaryStat}>
+                        <div className={styles.loanStatValue}>
+                          {currency(loanDetail.totalPaid)}
+                        </div>
+                        <div className={styles.loanStatLabel}>Total Paid</div>
+                      </div>
+                      <div className={styles.loanSummaryStat}>
+                        <div className={styles.loanStatValue}>
+                          {currency(loanDetail.remainingBalance)}
+                        </div>
+                        <div className={styles.loanStatLabel}>Remaining</div>
+                      </div>
+                      {loanDetail.monthlyInstallment > 0 && (
+                        <div className={styles.loanSummaryStat}>
+                          <div className={styles.loanStatValue}>
+                            {currency(loanDetail.monthlyInstallment)}
+                          </div>
+                          <div className={styles.loanStatLabel}>Installment</div>
+                        </div>
                       )}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      className="cursor-pointer"
-                      onClick={() => {
-                        rejectMutation.mutate(loanDetail._id);
-                      }}
-                      disabled={rejectMutation.isPending}
-                    >
-                      {rejectMutation.isPending ? (
-                        <>
-                          <Spinner />
-                          Rejecting
-                        </>
-                      ) : (
-                        "Reject"
+                    </div>
+
+                    <Separator />
+
+                    {/* ── Details ── */}
+                    <div className={styles.sectionTitle}>Details</div>
+                    <div className={styles.detailsWrap}>
+                      <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Repayment Type</span>
+                        <span className={styles.detailValue}>
+                          {REPAYMENT_LABELS[loanDetail.repaymentType] ||
+                            loanDetail.repaymentType}
+                        </span>
+                      </div>
+                      {loanDetail.reason && (
+                        <div className={styles.detailRow}>
+                          <span className={styles.detailLabel}>Reason</span>
+                          <span className={styles.detailValue}>
+                            {loanDetail.reason}
+                          </span>
+                        </div>
                       )}
-                    </Button>
+                      <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Created</span>
+                        <span className={styles.detailValue}>
+                          {formatDate(loanDetail.createdAt)}
+                        </span>
+                      </div>
+                      {loanDetail.approvedBy && (
+                        <div className={styles.detailRow}>
+                          <span className={styles.detailLabel}>Approved By</span>
+                          <span className={styles.detailValue}>
+                            {loanDetail.approvedBy.name || loanDetail.approvedBy.email}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Repayment Schedule ── */}
+                    {loanDetail.repaymentSchedule?.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className={styles.sectionTitle}>
+                          Repayment Schedule
+                        </div>
+                        <div className={styles.scheduleTableWrap}>
+                          <table className={styles.scheduleTable}>
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Month</th>
+                                <th>Scheduled</th>
+                                <th>Paid</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {loanDetail.repaymentSchedule.map((entry, idx) => (
+                                <tr key={idx}>
+                                  <td>{idx + 1}</td>
+                                  <td>
+                                    {MONTH_NAMES[entry.month]} {entry.year}
+                                  </td>
+                                  <td>{currency(entry.amount)}</td>
+                                  <td>
+                                    {entry.actualAmount > 0
+                                      ? currency(entry.actualAmount)
+                                      : "-"}
+                                  </td>
+                                  <td>
+                                    <Badge
+                                      className={cn(
+                                        "text-xs",
+                                        entry.status === "Paid"
+                                          ? "bg-green-100 text-green-700 hover:bg-green-100"
+                                          : entry.status === "Partial"
+                                            ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+                                            : entry.status === "Skipped"
+                                              ? "bg-red-100 text-red-700 hover:bg-red-100"
+                                              : "bg-yellow-100 text-yellow-700 hover:bg-yellow-100",
+                                      )}
+                                    >
+                                      {entry.status}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+
+                    {/* ── Action Buttons ── */}
+                    <div className={styles.loanDialogFooter}>
+                      {isAdmin &&
+                        loanDetail.status === "Approved" &&
+                        loanDetail.remainingBalance > 0 && (
+                          <Button
+                            variant="outline"
+                            className="cursor-pointer"
+                            onClick={() => handleSettle(loanDetail)}
+                            disabled={settleMutation.isPending}
+                          >
+                            {settleMutation.isPending ? (
+                              <>
+                                <Spinner />
+                                Settling
+                              </>
+                            ) : (
+                              "Early Settlement"
+                            )}
+                          </Button>
+                        )}
+                      {isAdmin && loanDetail.status === "Pending" && (
+                        <>
+                          <Button
+                            variant="green"
+                            className="cursor-pointer"
+                            onClick={() => {
+                              approveMutation.mutate(loanDetail._id);
+                            }}
+                            disabled={approveMutation.isPending}
+                          >
+                            {approveMutation.isPending ? (
+                              <>
+                                <Spinner />
+                                Approving
+                              </>
+                            ) : (
+                              "Approve"
+                            )}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="cursor-pointer"
+                            onClick={() => {
+                              rejectMutation.mutate(loanDetail._id);
+                            }}
+                            disabled={rejectMutation.isPending}
+                          >
+                            {rejectMutation.isPending ? (
+                              <>
+                                <Spinner />
+                                Rejecting
+                              </>
+                            ) : (
+                              "Reject"
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Loan not found.
+                  </p>
                 )}
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              Loan not found.
-            </p>
-          )}
+            </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 
