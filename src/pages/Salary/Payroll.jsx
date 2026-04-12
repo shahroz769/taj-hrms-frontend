@@ -11,16 +11,6 @@ import { toast } from "sonner";
 
 import DataTable from "@/components/DataTable/data-table";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -62,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 
 import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchPositionsFilters } from "@/services/positionsApi";
@@ -151,6 +142,13 @@ const Payroll = () => {
 
   const [generationErrors, setGenerationErrors] = useState([]);
   const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [generationSummary, setGenerationSummary] = useState(null);
+  const [generationProgress, setGenerationProgress] = useState({
+    processed: 0,
+    total: 0,
+    percent: 0,
+    currentEmployee: "",
+  });
 
   const [selectedPayslipId, setSelectedPayslipId] = useState(null);
   const [payslipDialogOpen, setPayslipDialogOpen] = useState(false);
@@ -158,6 +156,13 @@ const Payroll = () => {
   const [isDownloadingPayslip, setIsDownloadingPayslip] = useState(false);
 
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
+  const [regenerateProgress, setRegenerateProgress] = useState({
+    processed: 0,
+    total: 0,
+    percent: 0,
+    currentEmployee: "",
+  });
+  const [regenerateSummary, setRegenerateSummary] = useState(null);
   const [selectedPayrollIds, setSelectedPayrollIds] = useState([]);
 
   useEffect(() => {
@@ -255,68 +260,71 @@ const Payroll = () => {
   });
 
   const generateMutation = useMutation({
-    mutationFn: generatePayrolls,
+    mutationFn: ({ year, month, forceReplace }) =>
+      generatePayrolls({
+        year,
+        month,
+        forceReplace,
+        onProgress: (event) => {
+          if (event.type === "processing") {
+            setGenerationProgress({
+              processed: event.processed,
+              total: event.total,
+              percent: event.percent,
+              currentEmployee: event.currentEmployee || "",
+            });
+          }
+        },
+      }),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-      setGenerateDialogOpen(false);
-
-      const failedRows = response?.errors || [];
-      if (failedRows.length > 0) {
-        setGenerationErrors(failedRows);
-        setErrorModalOpen(true);
-      }
-
-      toast.success(
-        `Payroll generation completed. Generated: ${response?.summary?.generated || 0}, Failed: ${response?.summary?.failed || 0}`,
-      );
+      setGenerationProgress({ processed: 0, total: 0, percent: 0, currentEmployee: "" });
+      setGenerationSummary(response);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || "Payroll generation failed");
+      toast.error(error.message || error.response?.data?.message || "Payroll generation failed");
     },
   });
 
   const regenerateMutation = useMutation({
     mutationFn: async (targets) => {
-      const results = await Promise.allSettled(
-        targets.map((target) =>
-          regenerateEmployeePayroll({
+      const total = targets.length;
+      const failed = [];
+      let success = 0;
+
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        setRegenerateProgress({
+          processed: i,
+          total,
+          percent: Math.round((i / Math.max(total, 1)) * 100),
+          currentEmployee: target.employeeName || "",
+        });
+
+        try {
+          await regenerateEmployeePayroll({
             employeeId: target.employeeId,
             year: target.year,
             month: target.month,
-          }),
-        ),
-      );
+          });
+          success++;
+        } catch (error) {
+          failed.push({
+            employeeName: target.employeeName || "Employee",
+            error:
+              error?.response?.data?.message ||
+              error?.message ||
+              "Failed to regenerate payroll",
+          });
+        }
+      }
 
-      const failed = results
-        .map((result, index) => ({ result, target: targets[index] }))
-        .filter((entry) => entry.result.status === "rejected")
-        .map(({ result, target }) => ({
-          employeeName: target.employeeName || "Employee",
-          error:
-            result.reason?.response?.data?.message ||
-            result.reason?.message ||
-            "Failed to regenerate payroll",
-        }));
-
-      return {
-        total: targets.length,
-        success: targets.length - failed.length,
-        failed,
-      };
+      return { total, success, failed };
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-      setRegenerateDialogOpen(false);
-      setSelectedPayrollIds([]);
-
-      if (response.failed.length > 0) {
-        toast.error(
-          `Regenerated ${response.success}/${response.total}. ${response.failed[0]?.employeeName}: ${response.failed[0]?.error}`,
-        );
-        return;
-      }
-
-      toast.success(`Payroll regenerated for ${response.success} employee(s)`);
+      setRegenerateProgress({ processed: 0, total: 0, percent: 0, currentEmployee: "" });
+      setRegenerateSummary(response);
     },
     onError: (error) => {
       toast.error(
@@ -1139,96 +1147,186 @@ const Payroll = () => {
         </PaginationContent>
       </Pagination>
 
-      <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
+      <Dialog
+        open={generateDialogOpen}
+        onOpenChange={(open) => {
+          if (generateMutation.isPending) return;
+          if (!open) setGenerationSummary(null);
+          setGenerateDialogOpen(open);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Generate Payroll</DialogTitle>
             <DialogDescription>
-              Select year and month to generate payroll for eligible employees.
+              {generateMutation.isPending
+                ? "Generating payroll, please wait…"
+                : generationSummary
+                  ? `${monthLabel(generationSummary.month)} ${generationSummary.year} — generation complete`
+                  : "Select year and month to generate payroll for eligible employees."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className={styles.dialogGrid}>
-            <div className={styles.dialogField}>
-              <Label>Year</Label>
-              <Select value={generateYear} onValueChange={setGenerateYear}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEARS.map((yearOption) => (
-                    <SelectItem key={yearOption} value={yearOption}>
-                      {yearOption}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className={styles.dialogField}>
-              <Label>Month</Label>
-              <Select value={generateMonth} onValueChange={setGenerateMonth}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((monthOption) => (
-                    <SelectItem
-                      key={monthOption.value}
-                      value={monthOption.value}
-                    >
-                      {monthOption.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className={styles.previewBox}>
-            {isPreviewFetching ? (
-              <div className={styles.previewLoading}>
-                <Spinner className={styles.smallSpinner} />
-                Loading eligible count
+          {generateMutation.isPending ? (
+            <div className={styles.progressSection}>
+              <div className={styles.progressHeader}>
+                <span className={styles.progressCount}>
+                  {generationProgress.processed} / {generationProgress.total} employees
+                </span>
+                <span className={styles.progressPercent}>
+                  {generationProgress.percent}%
+                </span>
               </div>
-            ) : (
-              <div>
-                <div>
-                  Eligible employees:{" "}
-                  {generationPreview?.eligibleEmployeesCount || 0}
+              <Progress value={generationProgress.percent} className={styles.progressBar} />
+              {generationProgress.currentEmployee && (
+                <div className={styles.progressEmployee}>
+                  Processing:{" "}
+                  <span className={styles.progressEmployeeName}>
+                    {generationProgress.currentEmployee}
+                  </span>
                 </div>
-                <div className={styles.previewSubtext}>
-                  Generation allowed only when selected month is fully closed.
+              )}
+            </div>
+          ) : generationSummary ? (
+            <div className={styles.summarySection}>
+              <div className={styles.summaryStats}>
+                <div className={styles.summaryStat}>
+                  <span className={styles.summaryStatValue}>
+                    {generationSummary.summary?.totalEligible || 0}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Eligible</span>
+                </div>
+                <div className={`${styles.summaryStat} ${styles.summaryStatSuccess}`}>
+                  <span className={styles.summaryStatValue}>
+                    {generationSummary.summary?.generated || 0}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Generated</span>
+                </div>
+                <div className={`${styles.summaryStat} ${generationSummary.summary?.failed > 0 ? styles.summaryStatFailed : ""}`}>
+                  <span className={styles.summaryStatValue}>
+                    {generationSummary.summary?.failed || 0}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Failed</span>
                 </div>
               </div>
-            )}
-          </div>
 
-          <div className={styles.forceToggleRow}>
-            <Checkbox
-              checked={forceReplace}
-              onCheckedChange={(checked) => setForceReplace(Boolean(checked))}
-            />
-            <Label className={styles.checkboxLabel}>
-              Force replace existing payrolls for selected month
-            </Label>
-          </div>
+              {(generationSummary.errors || []).length > 0 && (
+                <ScrollArea className={styles.summaryErrorScroll}>
+                  <div className={styles.summaryErrorList}>
+                    {generationSummary.errors.map((item, index) => (
+                      <div
+                        key={`${item.employeeId}-${index}`}
+                        className={styles.summaryErrorItem}
+                      >
+                        <div className={styles.summaryErrorName}>
+                          {item.employeeName}
+                        </div>
+                        <div className={styles.summaryErrorReason}>
+                          {item.reasonMessage}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className={styles.dialogGrid}>
+                <div className={styles.dialogField}>
+                  <Label>Year</Label>
+                  <Select value={generateYear} onValueChange={setGenerateYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEARS.map((yearOption) => (
+                        <SelectItem key={yearOption} value={yearOption}>
+                          {yearOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className={styles.dialogField}>
+                  <Label>Month</Label>
+                  <Select value={generateMonth} onValueChange={setGenerateMonth}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((monthOption) => (
+                        <SelectItem
+                          key={monthOption.value}
+                          value={monthOption.value}
+                        >
+                          {monthOption.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className={styles.previewBox}>
+                {isPreviewFetching ? (
+                  <div className={styles.previewLoading}>
+                    <Spinner className={styles.smallSpinner} />
+                    Loading eligible count
+                  </div>
+                ) : (
+                  <div>
+                    <div>
+                      Eligible employees:{" "}
+                      {generationPreview?.eligibleEmployeesCount || 0}
+                    </div>
+                    <div className={styles.previewSubtext}>
+                      Generation allowed only when selected month is fully closed.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className={styles.forceToggleRow}>
+                <Checkbox
+                  checked={forceReplace}
+                  onCheckedChange={(checked) => setForceReplace(Boolean(checked))}
+                />
+                <Label className={styles.checkboxLabel}>
+                  Force replace existing payrolls for selected month
+                </Label>
+              </div>
+            </>
+          )}
 
           <DialogFooter>
-            <Button
-              variant="green"
-              onClick={handleGeneratePayroll}
-              disabled={generateMutation.isPending}
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <Spinner className={styles.buttonSpinner} />
-                  Generate Payroll
-                </>
-              ) : (
-                "Generate Payroll"
-              )}
-            </Button>
+            {generationSummary ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setGenerationSummary(null);
+                  setGenerateDialogOpen(false);
+                }}
+              >
+                Close
+              </Button>
+            ) : (
+              <Button
+                variant="green"
+                onClick={handleGeneratePayroll}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Spinner className={styles.buttonSpinner} />
+                    Generating…
+                  </>
+                ) : (
+                  "Generate Payroll"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1706,40 +1804,130 @@ const Payroll = () => {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
+      <Dialog
         open={regenerateDialogOpen}
-        onOpenChange={setRegenerateDialogOpen}
+        onOpenChange={(open) => {
+          if (regenerateMutation.isPending) return;
+          if (!open) {
+            setRegenerateSummary(null);
+            if (regenerateSummary) setSelectedPayrollIds([]);
+          }
+          setRegenerateDialogOpen(open);
+        }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Regenerate Payroll</AlertDialogTitle>
-            <AlertDialogDescription>
-              Regenerate payroll for {selectedPayrollTargets.length} selected
-              employee(s)? This replaces existing payroll snapshots for each
-              selected employee month.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={regenerateMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRegenerate}
-              disabled={regenerateMutation.isPending}
-              className="bg-primary text-white hover:bg-primary/90"
-            >
-              {regenerateMutation.isPending ? (
-                <>
-                  <Spinner className={styles.smallSpinner} />
-                  Regenerate
-                </>
-              ) : (
-                "Regenerate"
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Regenerate Payroll</DialogTitle>
+            <DialogDescription>
+              {regenerateMutation.isPending
+                ? "Regenerating payroll, please wait…"
+                : regenerateSummary
+                  ? "Regeneration complete"
+                  : `Regenerate payroll for ${selectedPayrollTargets.length} selected employee(s)? This replaces existing payroll snapshots for each selected employee month.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {regenerateMutation.isPending ? (
+            <div className={styles.progressSection}>
+              <div className={styles.progressHeader}>
+                <span className={styles.progressCount}>
+                  {regenerateProgress.processed} / {regenerateProgress.total} employees
+                </span>
+                <span className={styles.progressPercent}>
+                  {regenerateProgress.percent}%
+                </span>
+              </div>
+              <Progress value={regenerateProgress.percent} className={styles.progressBar} />
+              {regenerateProgress.currentEmployee && (
+                <div className={styles.progressEmployee}>
+                  Processing:{" "}
+                  <span className={styles.progressEmployeeName}>
+                    {regenerateProgress.currentEmployee}
+                  </span>
+                </div>
               )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </div>
+          ) : regenerateSummary ? (
+            <div className={styles.summarySection}>
+              <div className={styles.summaryStats}>
+                <div className={styles.summaryStat}>
+                  <span className={styles.summaryStatValue}>
+                    {regenerateSummary.total}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Total</span>
+                </div>
+                <div className={`${styles.summaryStat} ${styles.summaryStatSuccess}`}>
+                  <span className={styles.summaryStatValue}>
+                    {regenerateSummary.success}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Generated</span>
+                </div>
+                <div className={`${styles.summaryStat} ${regenerateSummary.failed.length > 0 ? styles.summaryStatFailed : ""}`}>
+                  <span className={styles.summaryStatValue}>
+                    {regenerateSummary.failed.length}
+                  </span>
+                  <span className={styles.summaryStatLabel}>Failed</span>
+                </div>
+              </div>
+
+              {regenerateSummary.failed.length > 0 && (
+                <ScrollArea className={styles.summaryErrorScroll}>
+                  <div className={styles.summaryErrorList}>
+                    {regenerateSummary.failed.map((item, index) => (
+                      <div key={index} className={styles.summaryErrorItem}>
+                        <div className={styles.summaryErrorName}>
+                          {item.employeeName}
+                        </div>
+                        <div className={styles.summaryErrorReason}>
+                          {item.error}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            {regenerateSummary ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRegenerateSummary(null);
+                  setSelectedPayrollIds([]);
+                  setRegenerateDialogOpen(false);
+                }}
+              >
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setRegenerateDialogOpen(false)}
+                  disabled={regenerateMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmRegenerate}
+                  disabled={regenerateMutation.isPending}
+                >
+                  {regenerateMutation.isPending ? (
+                    <>
+                      <Spinner className={styles.smallSpinner} />
+                      Regenerating…
+                    </>
+                  ) : (
+                    "Regenerate"
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

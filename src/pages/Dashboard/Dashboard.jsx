@@ -264,7 +264,7 @@ const Dashboard = () => {
           </div>
         ),
       },
-      { key: "actions", label: "Active actions", render: (row) => <Badge variant="destructive">{row.activeActions}</Badge> },
+      { key: "actions", label: "Active actions", render: (row) => <Badge variant="secondary">{row.activeActions}</Badge> },
     ],
     [],
   );
@@ -408,18 +408,18 @@ const Dashboard = () => {
           ) : null}
         </div>
         {data?.period?.label ? (
-          <Badge variant="outline" className="ml-auto">{data.period.label}</Badge>
+          <Badge variant="secondary" className="ml-auto">{data.period.label}</Badge>
         ) : null}
       </section>
 
       <section className={styles.metricGrid}>
-        <MetricCard title="Today's attendance" value={todayAttendanceTotal} subtitle={todayAttendanceSummary} icon={CalendarCheckIcon} badge={{ variant: "outline", label: "Daily" }} />
-        <MetricCard title="On leave today" value={data?.overview?.workforce?.onLeaveToday || 0} subtitle="Approved leave coverage for today" icon={CalendarCheckIcon} badge={{ variant: "outline", label: "Staffing" }} />
-        <MetricCard title="Active contracts" value={data?.overview?.contracts?.activeContracts || 0} subtitle="External labor commitments" icon={BriefcaseBusinessIcon} badge={{ variant: "outline", label: "Contracts" }} />
-        <MetricCard title="Pending leaves" value={data?.overview?.approvals?.pendingLeaves || 0} subtitle="Requests awaiting review" icon={ClipboardListIcon} badge={{ variant: (data?.overview?.approvals?.pendingLeaves || 0) > 0 ? "secondary" : "outline", label: "Approvals" }} />
-        <MetricCard title="Workforce" value={workforceTotal} subtitle={workforceSummary} icon={LayoutGridIcon} badge={{ variant: "outline", label: "Mix" }} />
-        <MetricCard title="Compliance risk" value={data?.overview?.compliance?.activeActions || 0} subtitle="Active disciplinary actions" icon={ShieldAlertIcon} badge={{ variant: (data?.overview?.compliance?.activeActions || 0) > 0 ? "secondary" : "outline", label: "Compliance" }} />
-        <MetricCard title="Work progress" value={progressTotal} subtitle={progressSummary} icon={ClipboardListIcon} badge={{ variant: "outline", label: "Tasks" }} />
+        <MetricCard title="Today's attendance" value={todayAttendanceTotal} subtitle={todayAttendanceSummary} icon={CalendarCheckIcon} badge={{ variant: "secondary", label: "Daily" }} />
+        <MetricCard title="On leave today" value={data?.overview?.workforce?.onLeaveToday || 0} subtitle="Approved leave coverage for today" icon={CalendarCheckIcon} badge={{ variant: "secondary", label: "Staffing" }} />
+        <MetricCard title="Active contracts" value={data?.overview?.contracts?.activeContracts || 0} subtitle="External labor commitments" icon={BriefcaseBusinessIcon} badge={{ variant: "secondary", label: "Contracts" }} />
+        <MetricCard title="Pending leaves" value={data?.overview?.approvals?.pendingLeaves || 0} subtitle="Requests awaiting review" icon={ClipboardListIcon} badge={{ variant: "secondary", label: "Approvals" }} />
+        <MetricCard title="Workforce" value={workforceTotal} subtitle={workforceSummary} icon={LayoutGridIcon} badge={{ variant: "secondary", label: "Mix" }} />
+        <MetricCard title="Compliance risk" value={data?.overview?.compliance?.activeActions || 0} subtitle="Active disciplinary actions" icon={ShieldAlertIcon} badge={{ variant: "secondary", label: "Compliance" }} />
+        <MetricCard title="Work progress" value={progressTotal} subtitle={progressSummary} icon={ClipboardListIcon} badge={{ variant: "secondary", label: "Tasks" }} />
       </section>
 
       <section className={styles.analyticsGrid}>

@@ -182,6 +182,129 @@
   font-size: 14px;
 }
 
+/* Progress section inside generate dialog */
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.progressCount {
+  color: var(--foreground);
+}
+
+.progressPercent {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.progressBar {
+  height: 8px;
+}
+
+.progressEmployee {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progressEmployeeName {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Summary view inside generate dialog */
+.summarySection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summaryStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.summaryStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.summaryStatSuccess {
+  border-color: color-mix(in srgb, var(--success, #16a34a) 30%, transparent);
+  background-color: color-mix(in srgb, var(--success, #16a34a) 6%, transparent);
+}
+
+.summaryStatFailed {
+  border-color: color-mix(in srgb, var(--destructive) 30%, transparent);
+  background-color: color-mix(in srgb, var(--destructive) 6%, transparent);
+}
+
+.summaryStatValue {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.summaryStatLabel {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summaryErrorScroll {
+  max-height: 200px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.summaryErrorList {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summaryErrorItem {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--destructive) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 20%, transparent);
+}
+
+.summaryErrorName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.summaryErrorReason {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+  word-break: break-word;
+}
+
 .errorDialog {
   max-width: 760px;
 }

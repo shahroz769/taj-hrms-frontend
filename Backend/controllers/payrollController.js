@@ -698,87 +698,129 @@ export const previewPayrollGeneration = async (req, res, next) => {
   }
 };
 
-// @description     Generate payroll for all eligible employees in selected month
+// @description     Generate payroll for all eligible employees in selected month (SSE streaming)
 // @route           POST /api/payrolls/generate
 // @access          Admin
 export const generatePayrolls = async (req, res, next) => {
   try {
     const { year, month, forceReplace = false } = req.body || {};
+
+    // Validate before setting SSE headers so HTTP errors work correctly
     const { parsedYear, parsedMonth } = validateYearMonth(year, month, res);
 
-    const employeeIds = await getEligibleEmployeeIds({
-      year: parsedYear,
-      month: parsedMonth,
+    // Set Server-Sent Events headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    let clientDisconnected = false;
+    req.on("close", () => {
+      clientDisconnected = true;
     });
 
-    const employees = await Employee.find({ _id: { $in: employeeIds } })
-      .populate({
-        path: "position",
-        select: "name department",
-        populate: { path: "department", select: "name" },
-      })
-      .populate({
-        path: "allowancePolicy",
-        populate: { path: "components.allowanceComponent", select: "name" },
+    const sendEvent = (data) => {
+      if (clientDisconnected) return;
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      const employeeIds = await getEligibleEmployeeIds({
+        year: parsedYear,
+        month: parsedMonth,
       });
 
-    const errors = [];
-    const generatedPayrolls = [];
-
-    for (const employee of employees) {
-      try {
-        const existingPayroll = await Payroll.findOne({
-          employee: employee._id,
-          year: parsedYear,
-          month: parsedMonth,
+      const employees = await Employee.find({ _id: { $in: employeeIds } })
+        .populate({
+          path: "position",
+          select: "name department",
+          populate: { path: "department", select: "name" },
+        })
+        .populate({
+          path: "allowancePolicy",
+          populate: { path: "components.allowanceComponent", select: "name" },
         });
 
-        if (existingPayroll && !forceReplace) {
+      const total = employees.length;
+      const errors = [];
+      const generatedPayrolls = [];
+
+      for (let i = 0; i < employees.length; i++) {
+        if (clientDisconnected) break;
+
+        const employee = employees[i];
+
+        sendEvent({
+          type: "processing",
+          processed: i,
+          total,
+          percent: Math.round((i / Math.max(total, 1)) * 100),
+          currentEmployee: employee.fullName,
+        });
+
+        try {
+          const existingPayroll = await Payroll.findOne({
+            employee: employee._id,
+            year: parsedYear,
+            month: parsedMonth,
+          });
+
+          if (existingPayroll && !forceReplace) {
+            errors.push(
+              buildPayrollError(
+                employee,
+                parsedYear,
+                parsedMonth,
+                "PAYROLL_EXISTS",
+                "Payroll already exists for this employee and month",
+              ),
+            );
+            continue;
+          }
+
+          const created = await runPayrollMutationForEmployee({
+            employee,
+            year: parsedYear,
+            month: parsedMonth,
+            generatedBy: req.user?._id || null,
+            mode: forceReplace ? "force" : "normal",
+          });
+
+          generatedPayrolls.push(created);
+        } catch (error) {
           errors.push(
             buildPayrollError(
               employee,
               parsedYear,
               parsedMonth,
-              "PAYROLL_EXISTS",
-              "Payroll already exists for this employee and month",
+              "GENERATION_FAILED",
+              error.message || "Failed to generate payroll",
             ),
           );
-          continue;
         }
-
-        const created = await runPayrollMutationForEmployee({
-          employee,
-          year: parsedYear,
-          month: parsedMonth,
-          generatedBy: req.user?._id || null,
-          mode: forceReplace ? "force" : "normal",
-        });
-
-        generatedPayrolls.push(created);
-      } catch (error) {
-        errors.push(
-          buildPayrollError(
-            employee,
-            parsedYear,
-            parsedMonth,
-            "GENERATION_FAILED",
-            error.message || "Failed to generate payroll",
-          ),
-        );
       }
+
+      sendEvent({
+        type: "complete",
+        message: "Payroll generation completed",
+        year: parsedYear,
+        month: parsedMonth,
+        summary: {
+          totalEligible: employees.length,
+          generated: generatedPayrolls.length,
+          failed: errors.length,
+        },
+        errors,
+      });
+    } catch (innerError) {
+      sendEvent({
+        type: "error",
+        message: innerError.message || "Payroll generation failed",
+      });
     }
 
-    res.json({
-      message: "Payroll generation completed",
-      year: parsedYear,
-      month: parsedMonth,
-      summary: {
-        totalEligible: employees.length,
-        generated: generatedPayrolls.length,
-        failed: errors.length,
-      },
-      errors,
-    });
+    res.end();
   } catch (error) {
     next(error);
   }

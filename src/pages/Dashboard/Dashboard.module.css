@@ -21,7 +21,6 @@
   padding: 0.75rem 1rem;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--muted);
 }
 
 .filterLabel {
@@ -90,8 +89,14 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 0.9rem;
-  background: #ecfdf3;
+  background: color-mix(in srgb, var(--primary) 12%, var(--card));
   color: var(--primary);
+}
+
+.metricBadge {
+  background: var(--secondary) !important;
+  color: var(--secondary-foreground) !important;
+  border-color: transparent !important;
 }
 
 .metricContent {
@@ -201,8 +206,8 @@
 
 .quickActionLink:hover {
   transform: translateY(-1px);
-  border-color: #bbf7d0;
-  background: #f7fbf8;
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
 }
 
 /* ─── Card overrides inside grids ─── */
@@ -214,7 +219,7 @@
 
 .analyticsGrid :global(.border),
 .actionGrid :global(.border) {
-  border-color: #e5e7eb;
+  border-color: var(--border);
 }
 
 .analyticsGrid :global(.bg-card),

@@ -22,6 +22,17 @@
 .logo {
   display: flex;
   align-items: center;
+  padding: 4px 0;
+}
+
+.logoText {
+  font-family: "Outfit", sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--primary);
+  line-height: 1.3;
+  white-space: normal;
 }
 
 /* Menu Section */

@@ -110,7 +110,7 @@ export function MetricCard({ title, value, subtitle, icon, badge, children, clas
       <CardContent className={styles.metricContent}>
         <div className={styles.metricMetaRow}>
           <span className="text-sm text-muted-foreground">{subtitle}</span>
-          {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : null}
+          {badge ? <Badge variant={badge.variant} className={styles.metricBadge}>{badge.label}</Badge> : null}
         </div>
         {children}
       </CardContent>

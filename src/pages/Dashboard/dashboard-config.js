@@ -173,9 +173,9 @@ export const formatDate = (value) => {
 export const roundRating = (value) => Number(value || 0).toFixed(1);
 
 export const getItemVariant = (tone) => {
-  if (tone === "destructive") return "destructive";
+  if (tone === "destructive") return "secondary";
   if (tone === "warning") return "secondary";
-  return "outline";
+  return "secondary";
 };
 
 export const getQuarterMonthValues = (quarter) => {

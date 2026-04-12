@@ -1,7 +1,7 @@
 import { sidebarItems } from "./sidebarConfig";
 import { useSelector } from "react-redux";
 import styles from "./Sidebar.module.css";
-import logo from "../../assets/taj-logo.png";
+
 import { Link, useLocation } from "react-router";
 import { useState, useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -112,7 +112,7 @@ const Sidebar = () => {
         <div className={styles.sidebarTop}>
           {/* Logo Section */}
           <div className={styles.logo}>
-            <img src={logo} alt="Taj Logo" />
+            <span className={styles.logoText}>Taj Agri Farm & Cattle</span>
           </div>
           {/* Menu Section */}
           <div className={styles.menu}>
