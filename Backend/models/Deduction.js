@@ -63,6 +63,15 @@ const deductionSchema = new mongoose.Schema(
 deductionSchema.index({ employee: 1, date: 1 });
 deductionSchema.index({ date: 1 });
 deductionSchema.index({ employee: 1, status: 1, currentDueYear: 1, currentDueMonth: 1 });
+// Payroll deduction planning also sorts by due year/month, then date/createdAt.
+deductionSchema.index({
+  employee: 1,
+  status: 1,
+  currentDueYear: 1,
+  currentDueMonth: 1,
+  date: 1,
+  createdAt: 1,
+});
 
 const Deduction = mongoose.model("Deduction", deductionSchema);
 

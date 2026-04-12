@@ -831,6 +831,18 @@ export const generatePayrolls = async (req, res, next) => {
           populate: { path: "components.allowanceComponent", select: "name" },
         });
 
+      const existingPayrolls = await Payroll.find({
+        employee: { $in: employeeIds },
+        year: parsedYear,
+        month: parsedMonth,
+      })
+        .select("_id employee isPaid")
+        .lean();
+
+      const existingPayrollMap = new Map(
+        existingPayrolls.map((payroll) => [payroll.employee.toString(), payroll]),
+      );
+
       const total = employees.length;
       const errors = [];
       const generatedPayrolls = [];
@@ -849,11 +861,8 @@ export const generatePayrolls = async (req, res, next) => {
         });
 
         try {
-          const existingPayroll = await Payroll.findOne({
-            employee: employee._id,
-            year: parsedYear,
-            month: parsedMonth,
-          });
+          const existingPayroll =
+            existingPayrollMap.get(employee._id.toString()) || null;
 
           if (existingPayroll && existingPayroll.isPaid) {
             errors.push(

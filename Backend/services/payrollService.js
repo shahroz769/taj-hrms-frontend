@@ -356,6 +356,7 @@ export const calculateEmployeePayroll = async ({
   generatedBy,
   mode = "normal",
   includeArrears = true,
+  includeFinancialAdjustments = true,
   skipArrearsSync = false,
   AllowancePolicyModel,
   session = null,
@@ -382,7 +383,17 @@ export const calculateEmployeePayroll = async ({
       .lean(),
   ]);
 
-  const policyIdsFromHistory = assignmentHistory.flatMap((entry) => [
+  const normalizedSalaryHistory = salaryHistory.map((entry) => ({
+    ...entry,
+    effectiveDate: new Date(entry.effectiveDate),
+  }));
+
+  const normalizedAssignmentHistory = assignmentHistory.map((entry) => ({
+    ...entry,
+    effectiveDate: new Date(entry.effectiveDate),
+  }));
+
+  const policyIdsFromHistory = normalizedAssignmentHistory.flatMap((entry) => [
     entry.fromAllowancePolicy?.toString(),
     entry.toAllowancePolicy?.toString(),
   ]);
@@ -491,19 +502,13 @@ export const calculateEmployeePayroll = async ({
 
     const basicSalaryMonthly = getSalaryFromHistory(
       employee,
-      salaryHistory.map((entry) => ({
-        ...entry,
-        effectiveDate: new Date(entry.effectiveDate),
-      })),
+      normalizedSalaryHistory,
       date,
     );
 
     const policyId = getPolicyIdFromHistory(
       employee,
-      assignmentHistory.map((entry) => ({
-        ...entry,
-        effectiveDate: new Date(entry.effectiveDate),
-      })),
+      normalizedAssignmentHistory,
       date,
     );
 
@@ -572,19 +577,13 @@ export const calculateEmployeePayroll = async ({
 
     const basicSalaryMonthly = getSalaryFromHistory(
       employee,
-      salaryHistory.map((entry) => ({
-        ...entry,
-        effectiveDate: new Date(entry.effectiveDate),
-      })),
+      normalizedSalaryHistory,
       date,
     );
 
     const policyId = getPolicyIdFromHistory(
       employee,
-      assignmentHistory.map((entry) => ({
-        ...entry,
-        effectiveDate: new Date(entry.effectiveDate),
-      })),
+      normalizedAssignmentHistory,
       date,
     );
 
@@ -667,7 +666,8 @@ export const calculateEmployeePayroll = async ({
     });
   }
 
-  const unsettledArrearsEntries = includeArrears
+  const unsettledArrearsEntries =
+    includeArrears && includeFinancialAdjustments
     ? await PayrollArrearsLedger.find({
         employee: employee._id,
         settled: false,
@@ -686,25 +686,27 @@ export const calculateEmployeePayroll = async ({
   );
 
   // ── Manual Deductions ──
-  const deductionRecords = await Deduction.find({
-    employee: employee._id,
-    $and: [
-      {
-        status: "Pending",
-      },
-      {
-        $or: [
-          { currentDueYear: { $lt: Number(year) } },
+  const deductionRecords = includeFinancialAdjustments
+    ? await Deduction.find({
+        employee: employee._id,
+        $and: [
           {
-            currentDueYear: Number(year),
-            currentDueMonth: { $lte: Number(month) },
+            status: "Pending",
+          },
+          {
+            $or: [
+              { currentDueYear: { $lt: Number(year) } },
+              {
+                currentDueYear: Number(year),
+                currentDueMonth: { $lte: Number(month) },
+              },
+            ],
           },
         ],
-      },
-    ],
-  })
-    .sort({ currentDueYear: 1, currentDueMonth: 1, date: 1, createdAt: 1 })
-    .lean();
+      })
+        .sort({ currentDueYear: 1, currentDueMonth: 1, date: 1, createdAt: 1 })
+        .lean()
+    : [];
 
   const salaryBeforeManualDeductions = round2(
     grossSalary - attendanceDeductionAmount + arrearsAmount,
@@ -719,13 +721,19 @@ export const calculateEmployeePayroll = async ({
   const deductionBreakdown = manualDeductionPlan.breakdown;
 
   // ── Loan Deduction ──
-  const activeLoan = await Loan.findOne({
-    employee: employee._id,
-    status: "Approved",
-    "repaymentSchedule.year": year,
-    "repaymentSchedule.month": month,
-    "repaymentSchedule.status": "Pending",
-  }).lean();
+  const activeLoan = includeFinancialAdjustments
+    ? await Loan.findOne({
+        employee: employee._id,
+        status: "Approved",
+        repaymentSchedule: {
+          $elemMatch: {
+            year: Number(year),
+            month: Number(month),
+            status: "Pending",
+          },
+        },
+      }).lean()
+    : null;
   const salaryBeforeLoan = round2(
     grossSalary -
       attendanceDeductionAmount -
@@ -755,10 +763,7 @@ export const calculateEmployeePayroll = async ({
 
   const monthEndPolicyId = getPolicyIdFromHistory(
     employee,
-    assignmentHistory.map((entry) => ({
-      ...entry,
-      effectiveDate: new Date(entry.effectiveDate),
-    })),
+    normalizedAssignmentHistory,
     monthEndDate,
   );
   const monthEndPolicy = monthEndPolicyId
@@ -952,6 +957,7 @@ export const syncArrearsForEmployee = async ({
       generatedBy,
       mode: "regenerate",
       includeArrears: false,
+      includeFinancialAdjustments: false,
       skipArrearsSync: true,
       AllowancePolicyModel,
       session,

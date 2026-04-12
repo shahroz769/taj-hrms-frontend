@@ -117,6 +117,8 @@ const employeeSchema = new mongoose.Schema(
 // status is the most common equality filter across the app (Active/Inactive/etc.)
 // Combined with createdAt covers the default sort in getAllEmployees and payroll batch queries
 employeeSchema.index({ status: 1, createdAt: -1 });
+// Payroll eligibility checks filter active employees by joiningDate before month end.
+employeeSchema.index({ status: 1, joiningDate: 1 });
 // generateEmployeeId() calls findOne().sort({ createdAt: -1 }) with no filter;
 // a standalone index allows this to resolve in a single entry lookup instead of a collection scan
 employeeSchema.index({ createdAt: -1 });

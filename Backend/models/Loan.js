@@ -85,6 +85,14 @@ const loanSchema = new mongoose.Schema(
 );
 
 loanSchema.index({ employee: 1, status: 1 });
+// Payroll searches the approved loan containing a pending installment for a specific year/month.
+loanSchema.index({
+  employee: 1,
+  status: 1,
+  "repaymentSchedule.year": 1,
+  "repaymentSchedule.month": 1,
+  "repaymentSchedule.status": 1,
+});
 loanSchema.index({ createdAt: -1 });
 
 const Loan = mongoose.model("Loan", loanSchema);

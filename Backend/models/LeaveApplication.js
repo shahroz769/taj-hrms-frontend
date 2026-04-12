@@ -74,6 +74,8 @@ const leaveApplicationSchema = new mongoose.Schema(
 
 // Index for efficient queries
 leaveApplicationSchema.index({ employee: 1, status: 1 });
+// Payroll leave lookup filters by employee + approved status + dates range for the target month.
+leaveApplicationSchema.index({ employee: 1, status: 1, dates: 1 });
 leaveApplicationSchema.index({ createdAt: -1 });
 
 const LeaveApplication = mongoose.model(
