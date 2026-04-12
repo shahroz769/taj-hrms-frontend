@@ -161,14 +161,14 @@
 }
 
 .sidebarTop::-webkit-scrollbar-thumb {
-  background-color: var(--primary);
+  background-color: color-mix(in srgb, var(--primary) 25%, var(--accent));
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 8px;
 }
 
 .sidebarTop::-webkit-scrollbar-thumb:hover {
-  background-color: var(--muted-foreground);
+  background-color: color-mix(in srgb, var(--primary) 45%, var(--accent));
 }
 
 .sidebarTop::-webkit-scrollbar-button {
@@ -183,5 +183,5 @@
 /* === FIREFOX === */
 .sidebarTop {
   scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
+  scrollbar-color: color-mix(in srgb, var(--primary) 25%, var(--accent)) transparent;
 }
