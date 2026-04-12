@@ -1,5 +1,5 @@
 .container {
-  background-color: #ffffff;
+  background-color: var(--card);
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -9,7 +9,7 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 36px;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .header {
@@ -52,7 +52,7 @@
 
 .viewLabel {
   font-size: 12px;
-  color: #667085;
+  color: var(--muted-foreground);
   font-weight: 500;
 }
 
@@ -71,7 +71,7 @@
 .scheduleTitle {
   font-size: 14px;
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
   margin-bottom: 8px;
 }
 
@@ -85,14 +85,14 @@
   text-align: left;
   padding: 6px 10px;
   font-weight: 600;
-  color: #344054;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--foreground);
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
 }
 
 .scheduleTable td {
   padding: 6px 10px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--muted);
   color: #1d2939;
 }
 
@@ -113,7 +113,7 @@
 .breakdownPreviewTitle {
   font-size: 13px;
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
   margin-bottom: 8px;
 }
 
@@ -122,10 +122,10 @@
   justify-content: space-between;
   font-size: 13px;
   padding: 3px 0;
-  color: #344054;
+  color: var(--foreground);
 }
 
 .breakdownPreviewValue {
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
 }

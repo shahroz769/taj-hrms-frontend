@@ -926,12 +926,27 @@ export const syncArrearsForEmployee = async ({
     .sort({ year: 1, month: 1 })
     .lean();
 
+  if (previousPayrolls.length === 0) return;
+
+  // Prefetch all existing ledger entries for the relevant months in one query.
+  // Previously the loop called findOne N times (once per previous payroll, including
+  // already-settled ones). This replaces all those roundtrips with a single find.
+  const existingLedgers = await PayrollArrearsLedger.find({
+    employee: employee._id,
+    $or: [
+      { sourceYear: { $lt: Number(targetYear) } },
+      { sourceYear: Number(targetYear), sourceMonth: { $lt: Number(targetMonth) } },
+    ],
+  })
+    .session(session)
+    .lean();
+
+  const ledgerMap = new Map(
+    existingLedgers.map((l) => [`${l.sourceYear}-${l.sourceMonth}`, l]),
+  );
+
   for (const payroll of previousPayrolls) {
-    const existingLedger = await PayrollArrearsLedger.findOne({
-      employee: employee._id,
-      sourceYear: payroll.year,
-      sourceMonth: payroll.month,
-    }).session(session);
+    const existingLedger = ledgerMap.get(`${payroll.year}-${payroll.month}`) || null;
 
     if (existingLedger?.settled) {
       continue;
@@ -972,11 +987,14 @@ export const syncArrearsForEmployee = async ({
     }
 
     if (existingLedger) {
-      existingLedger.amount = diff;
-      existingLedger.reason = "Backdated effective date adjustment";
-      existingLedger.createdBy = generatedBy || existingLedger.createdBy;
-      existingLedger.$session(session);
-      await existingLedger.save();
+      // Re-fetch the live Mongoose document so we can call .save() on it
+      const liveLedger = await PayrollArrearsLedger.findById(existingLedger._id).session(session);
+      if (liveLedger) {
+        liveLedger.amount = diff;
+        liveLedger.reason = "Backdated effective date adjustment";
+        liveLedger.createdBy = generatedBy || liveLedger.createdBy;
+        await liveLedger.save();
+      }
     } else {
       await PayrollArrearsLedger.create(
         [

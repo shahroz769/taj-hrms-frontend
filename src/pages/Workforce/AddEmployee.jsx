@@ -608,7 +608,7 @@ const AddEmployee = () => {
                     <img src={cnicFrontPreview} alt="CNIC Front" />
                   ) : (
                     <>
-                      <UploadIcon size={24} color="#667085" />
+                      <UploadIcon size={24} className="text-muted-foreground" />
                       <span>CNIC Front</span>
                     </>
                   )}
@@ -624,7 +624,7 @@ const AddEmployee = () => {
                     <img src={cnicBackPreview} alt="CNIC Back" />
                   ) : (
                     <>
-                      <UploadIcon size={24} color="#667085" />
+                      <UploadIcon size={24} className="text-muted-foreground" />
                       <span>CNIC Back</span>
                     </>
                   )}

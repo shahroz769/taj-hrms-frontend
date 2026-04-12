@@ -40,6 +40,9 @@ leaveBalanceSchema.index(
   { employee: 1, leaveType: 1, year: 1 },
   { unique: true }
 );
+// getEmployeeById fetches leave balances sorted by { year: -1 };
+// the unique index above has year after leaveType so MongoDB can't use it for the sort
+leaveBalanceSchema.index({ employee: 1, year: -1 });
 
 const LeaveBalance = mongoose.model("LeaveBalance", leaveBalanceSchema);
 

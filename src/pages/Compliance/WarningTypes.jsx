@@ -538,7 +538,7 @@ const WarningTypes = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingWarningType
                   ? "Edit Warning Type"
                   : "Add Warning Type"}
@@ -560,7 +560,7 @@ const WarningTypes = () => {
                 <div className="grid gap-3">
                   <Label
                     htmlFor="warning-type-name"
-                    className="text-[#344054]"
+                    className="text-foreground"
                   >
                     Warning Type Name
                   </Label>
@@ -576,7 +576,7 @@ const WarningTypes = () => {
                 </div>
                 {/* Severity Level */}
                 <div className="grid gap-3">
-                  <Label htmlFor="severity" className="text-[#344054]">
+                  <Label htmlFor="severity" className="text-foreground">
                     Severity Level
                   </Label>
                   <Select
@@ -648,7 +648,7 @@ const WarningTypes = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -811,12 +811,12 @@ const WarningTypes = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Warning Type
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the warning type{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingWarningType?.name}"
               </span>
               ? This action cannot be undone.

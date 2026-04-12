@@ -660,7 +660,7 @@ const DisciplinaryActions = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingAction
                   ? "Edit Disciplinary Action"
                   : "Report Disciplinary Action"}
@@ -680,10 +680,10 @@ const DisciplinaryActions = () => {
               <div className="grid gap-4">
                 {/* Employee Search */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">
+                  <Label className="text-foreground">
                     Employee{" "}
                     {selectedEmployees.length > 0 && (
-                      <Badge className="ml-1 bg-[#02542D] text-white text-[10px] h-4 px-1.5">
+                      <Badge className="ml-1 bg-primary text-white text-[10px] h-4 px-1.5">
                         {selectedEmployees.length}
                       </Badge>
                     )}
@@ -796,7 +796,7 @@ const DisciplinaryActions = () => {
 
                 {/* Warning Type Selection */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Warning Type</Label>
+                  <Label className="text-foreground">Warning Type</Label>
                   <Select
                     value={selectedWarningTypeId}
                     onValueChange={(value) => setSelectedWarningTypeId(value)}
@@ -823,7 +823,7 @@ const DisciplinaryActions = () => {
 
                 {/* Action Date */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Action Date</Label>
+                  <Label className="text-foreground">Action Date</Label>
                   <Popover
                     open={datePickerOpen}
                     onOpenChange={setDatePickerOpen}
@@ -861,7 +861,7 @@ const DisciplinaryActions = () => {
 
                 {/* Description */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Description</Label>
+                  <Label className="text-foreground">Description</Label>
                   <Textarea
                     placeholder="Enter description of the disciplinary action..."
                     value={description}
@@ -923,7 +923,7 @@ const DisciplinaryActions = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1085,12 +1085,12 @@ const DisciplinaryActions = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Disciplinary Action
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the disciplinary action for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingAction?.employee?.fullName}"
               </span>
               ? This action cannot be undone.

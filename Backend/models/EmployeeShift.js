@@ -32,6 +32,12 @@ const employeeShiftSchema = new mongoose.Schema(
 // Index for efficient queries by employee and date
 employeeShiftSchema.index({ employee: 1, effectiveDate: -1 });
 employeeShiftSchema.index({ shift: 1, endDate: 1 });
+// Active-shift lookup: find({ employee: id/ids, endDate: null }) — called for every
+// getAllEmployees response to attach the current shift to each employee
+employeeShiftSchema.index({ employee: 1, endDate: 1 });
+// payrollService: getScheduledDatesForPayrollDivisor sorts by { effectiveDate: 1 } (ascending)
+// per employee; an ascending index avoids reverse-traversal of the descending one above
+employeeShiftSchema.index({ employee: 1, effectiveDate: 1 });
 
 const EmployeeShift = mongoose.model("EmployeeShift", employeeShiftSchema);
 

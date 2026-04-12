@@ -585,7 +585,7 @@ const ShiftsSetups = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingShift ? "Edit Shift" : "Add Shift"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -602,7 +602,7 @@ const ShiftsSetups = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="shift-name" className="text-[#344054]">
+                  <Label htmlFor="shift-name" className="text-foreground">
                     Shift Name
                   </Label>
                   <Input
@@ -620,7 +620,7 @@ const ShiftsSetups = () => {
                   <div className="flex flex-col gap-3 flex-1">
                     <Label
                       htmlFor="shift-start-time"
-                      className="text-[#344054]"
+                      className="text-foreground"
                     >
                       Shift Start Time
                     </Label>
@@ -634,7 +634,7 @@ const ShiftsSetups = () => {
                     />
                   </div>
                   <div className="flex flex-col gap-3 flex-1">
-                    <Label htmlFor="shift-end-time" className="text-[#344054]">
+                    <Label htmlFor="shift-end-time" className="text-foreground">
                       Shift End Time
                     </Label>
                     <Input
@@ -649,7 +649,7 @@ const ShiftsSetups = () => {
                 </div>
                 {/* Working Days */}
                 <div className="grid gap-3">
-                  <Label htmlFor="working-days" className="text-[#344054]">
+                  <Label htmlFor="working-days" className="text-foreground">
                     Working days
                   </Label>
                   <ToggleGroup
@@ -660,43 +660,43 @@ const ShiftsSetups = () => {
                   >
                     <ToggleGroupItem
                       value="Monday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Mon
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Tuesday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Tue
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Wednesday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Wed
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Thursday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Thu
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Friday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Fri
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Saturday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Sat
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="Sunday"
-                      className="rounded-full bg-gray-200 hover:bg-[#e6eeea] data-[state=on]:bg-[#e6eeea] data-[state=on]:text-[#02542D] data-[state=off]:text-inherit cursor-pointer"
+                      className="rounded-full bg-gray-200 hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-primary data-[state=off]:text-inherit cursor-pointer"
                     >
                       Sun
                     </ToggleGroupItem>
@@ -709,7 +709,7 @@ const ShiftsSetups = () => {
                 </div>
                 {/* Shift notes */}
                 <div className="grid gap-3">
-                  <Label htmlFor="shift-notes" className="text-[#344054]">
+                  <Label htmlFor="shift-notes" className="text-foreground">
                     Notes
                   </Label>
                   <Textarea
@@ -771,7 +771,7 @@ const ShiftsSetups = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1034,12 +1034,12 @@ const ShiftsSetups = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Shift
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the shift{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingShift?.name}"
               </span>
               ? This action cannot be undone.

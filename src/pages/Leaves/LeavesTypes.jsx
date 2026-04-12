@@ -548,7 +548,7 @@ const LeavesTypes = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingLeaveType ? "Edit Leave Type" : "Add Leave Type"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -566,7 +566,7 @@ const LeavesTypes = () => {
               <div className="grid gap-4">
                 {/* Leave Type Name */}
                 <div className="grid gap-3">
-                  <Label htmlFor="leave-type-name" className="text-[#344054]">
+                  <Label htmlFor="leave-type-name" className="text-foreground">
                     Leave Type Name
                   </Label>
                   <Input
@@ -581,7 +581,7 @@ const LeavesTypes = () => {
                 </div>
                 {/* Nature of Leaves (Paid/Unpaid) */}
                 <div className="grid gap-3">
-                  <Label htmlFor="nature-of-leaves" className="text-[#344054]">
+                  <Label htmlFor="nature-of-leaves" className="text-foreground">
                     Nature of Leaves
                   </Label>
                   <Select
@@ -650,7 +650,7 @@ const LeavesTypes = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -819,12 +819,12 @@ const LeavesTypes = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Leave Type
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the leave type{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingLeaveType?.name}"
               </span>
               ? This action cannot be undone.

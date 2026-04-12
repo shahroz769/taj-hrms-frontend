@@ -18,7 +18,7 @@ const ProtectedRoute = ({ allowedRoles }) => {
           height: "100vh",
         }}
       >
-        <Spinner className="size-15 text-[#02542D]" />
+        <Spinner className="size-15 text-primary" />
       </div>
     );
   }

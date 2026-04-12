@@ -638,7 +638,7 @@ const PositionsSetups = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingPosition ? "Edit Position" : "Add Position"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -655,7 +655,7 @@ const PositionsSetups = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="position-name" className="text-[#344054]">
+                  <Label htmlFor="position-name" className="text-foreground">
                     Position Name
                   </Label>
                   <Input
@@ -670,7 +670,7 @@ const PositionsSetups = () => {
                 </div>
                 {/* Select Department */}
                 <div className="grid gap-3">
-                  <Label htmlFor="department" className="text-[#344054]">
+                  <Label htmlFor="department" className="text-foreground">
                     Department
                   </Label>
                   <Select
@@ -703,7 +703,7 @@ const PositionsSetups = () => {
                 </div>
                 {/* Select Leave Policy */}
                 <div className="grid gap-3">
-                  <Label htmlFor="leavePolicy" className="text-[#344054]">
+                  <Label htmlFor="leavePolicy" className="text-foreground">
                     Leave Policy
                   </Label>
                   <Select
@@ -735,7 +735,7 @@ const PositionsSetups = () => {
                   )}
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="reports-to" className="text-[#344054]">
+                  <Label htmlFor="reports-to" className="text-foreground">
                     Reports To
                   </Label>
                   <InputGroup className={styles.searchInput}>
@@ -759,7 +759,7 @@ const PositionsSetups = () => {
                             setErrors({ ...errors, reportsTo: undefined });
                           }
                         }}
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <p>None</p>
                     </InputGroupAddon>
@@ -771,7 +771,7 @@ const PositionsSetups = () => {
                   )}
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="employee-limit" className="text-[#344054]">
+                  <Label htmlFor="employee-limit" className="text-foreground">
                     Employee Limit
                   </Label>
                   <InputGroup className={styles.searchInput}>
@@ -795,7 +795,7 @@ const PositionsSetups = () => {
                             setErrors({ ...errors, employeeLimit: undefined });
                           }
                         }}
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <p>Unlimited</p>
                     </InputGroupAddon>
@@ -854,7 +854,7 @@ const PositionsSetups = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1137,12 +1137,12 @@ const PositionsSetups = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Position
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the position{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingPosition?.name}"
               </span>
               ? This action cannot be undone.

@@ -5,7 +5,6 @@ const departmentSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, "Department name is required"],
-      unique: true,
       trim: true,
     },
     positionCount: {
@@ -38,6 +37,14 @@ departmentSchema.virtual("positions", {
   localField: "_id",
   foreignField: "department",
 });
+
+// Paginated list always sorts by createdAt desc
+departmentSchema.index({ createdAt: -1 });
+
+// Unique constraint + collation for case-insensitive uniqueness enforcement and
+// for getAllDepartmentsList which sorts by name with collation { locale: "en", strength: 2 }.
+// Defined here (not via field-level unique:true) so both options live in one index.
+departmentSchema.index({ name: 1 }, { unique: true, collation: { locale: "en", strength: 2 } });
 
 const Department = mongoose.model("Department", departmentSchema);
 

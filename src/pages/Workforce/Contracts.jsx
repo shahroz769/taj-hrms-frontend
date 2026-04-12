@@ -574,7 +574,7 @@ const Contracts = () => {
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingContract ? "Edit Contract" : "Create Contract"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -591,7 +591,7 @@ const Contracts = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="contract-name" className="text-[#344054]">
+                  <Label htmlFor="contract-name" className="text-foreground">
                     Contract Name
                   </Label>
                   <Input
@@ -608,7 +608,7 @@ const Contracts = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="number-of-labors" className="text-[#344054]">
+                  <Label htmlFor="number-of-labors" className="text-foreground">
                     Number of Labors
                   </Label>
                   <Input
@@ -627,7 +627,7 @@ const Contracts = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="contract-amount" className="text-[#344054]">
+                  <Label htmlFor="contract-amount" className="text-foreground">
                     Contract Amount
                   </Label>
                   <Input
@@ -647,7 +647,7 @@ const Contracts = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Start Date</Label>
+                  <Label className="text-foreground">Start Date</Label>
                   <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -686,7 +686,7 @@ const Contracts = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">End Date</Label>
+                  <Label className="text-foreground">End Date</Label>
                   <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -727,7 +727,7 @@ const Contracts = () => {
                 {/* Status - Only show when editing */}
                 {editingContract && (
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">Status</Label>
+                    <Label className="text-foreground">Status</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select status" />
@@ -789,7 +789,7 @@ const Contracts = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1031,12 +1031,12 @@ const Contracts = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Contract
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the contract{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingContract?.contractName}"
               </span>
               ? This action cannot be undone.

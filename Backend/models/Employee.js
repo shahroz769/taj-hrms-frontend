@@ -31,7 +31,7 @@ const employeeSchema = new mongoose.Schema(
 
     // --- Personal Information ---
     fullName: { type: String, required: true },
-    employeeID: { type: String, unique: true },
+    employeeID: { type: String, unique: true, sparse: true },
     gender: { type: String, enum: ["Male", "Female"], required: true },
     fatherName: String,
     husbandName: String,
@@ -113,6 +113,13 @@ const employeeSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// status is the most common equality filter across the app (Active/Inactive/etc.)
+// Combined with createdAt covers the default sort in getAllEmployees and payroll batch queries
+employeeSchema.index({ status: 1, createdAt: -1 });
+// generateEmployeeId() calls findOne().sort({ createdAt: -1 }) with no filter;
+// a standalone index allows this to resolve in a single entry lookup instead of a collection scan
+employeeSchema.index({ createdAt: -1 });
 
 const Employee = mongoose.model("Employee", employeeSchema);
 

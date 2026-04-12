@@ -542,7 +542,7 @@ const ContractPayments = () => {
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingPayment ? "Edit Payment" : "Add Payment"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -559,7 +559,7 @@ const ContractPayments = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Payment Date</Label>
+                  <Label className="text-foreground">Payment Date</Label>
                   <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -593,7 +593,7 @@ const ContractPayments = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="amount-paid" className="text-[#344054]">
+                  <Label htmlFor="amount-paid" className="text-foreground">
                     Amount Paid
                   </Label>
                   <Input
@@ -614,7 +614,7 @@ const ContractPayments = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="payment-note" className="text-[#344054]">
+                  <Label htmlFor="payment-note" className="text-foreground">
                     Payment Note (Optional)
                   </Label>
                   <Textarea
@@ -983,17 +983,17 @@ const ContractPayments = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Payment
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the payment record for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 {deletingPayment?.paymentDate &&
                   formatDate(deletingPayment.paymentDate)}
               </span>{" "}
               with amount{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 {deletingPayment?.amountPaid &&
                   formatNumber(deletingPayment.amountPaid)}
               </span>

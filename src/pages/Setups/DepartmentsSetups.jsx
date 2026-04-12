@@ -425,7 +425,7 @@ const DepartmentsSetups = () => {
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingDepartment ? "Edit Department" : "Add Department"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -442,7 +442,7 @@ const DepartmentsSetups = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="department-name" className="text-[#344054]">
+                  <Label htmlFor="department-name" className="text-foreground">
                     Department Name
                   </Label>
                   <Input
@@ -456,7 +456,7 @@ const DepartmentsSetups = () => {
                   )}
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="position-limits" className="text-[#344054]">
+                  <Label htmlFor="position-limits" className="text-foreground">
                     Position Limits
                   </Label>
                   <InputGroup className={styles.searchInput}>
@@ -480,7 +480,7 @@ const DepartmentsSetups = () => {
                             setErrors({ ...errors, positionCount: undefined });
                           }
                         }}
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <p>Unlimited</p>
                     </InputGroupAddon>
@@ -538,7 +538,7 @@ const DepartmentsSetups = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -705,12 +705,12 @@ const DepartmentsSetups = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Department
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the department{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingDepartment?.name}"
               </span>
               ? This action cannot be undone.

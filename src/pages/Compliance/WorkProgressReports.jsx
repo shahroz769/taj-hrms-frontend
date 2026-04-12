@@ -430,7 +430,7 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
     >
       <DialogContent className="sm:max-w-175 max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-0">
-          <DialogTitle className="text-[#02542D] text-center text-lg">
+          <DialogTitle className="text-primary text-center text-lg">
             Task Details
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -667,12 +667,12 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
               {/* Close Task Section */}
               {canClose && showCloseSection && (
                 <div className="border rounded-md p-4 space-y-3 bg-gray-50">
-                  <h4 className="font-semibold text-sm text-[#02542D]">
+                  <h4 className="font-semibold text-sm text-primary">
                     Close Task
                   </h4>
                   <div className="grid gap-3">
                     <div>
-                      <Label className="text-[#344054] text-sm">
+                      <Label className="text-foreground text-sm">
                         Final / Closing Remarks
                       </Label>
                       <Textarea
@@ -684,7 +684,7 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
                       />
                     </div>
                     <div>
-                      <Label className="text-[#344054] text-sm">
+                      <Label className="text-foreground text-sm">
                         Rating (out of 5)
                       </Label>
                       <div className="flex items-center gap-3 mt-1">
@@ -745,13 +745,13 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold text-sm text-[#02542D] flex items-center gap-1.5">
+                    <h4 className="font-semibold text-sm text-primary flex items-center gap-1.5">
                       <MessageSquareIcon size={14} />
                       Add Remarks
                     </h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-[#344054] text-sm">Date</Label>
+                        <Label className="text-foreground text-sm">Date</Label>
                         <Popover
                           open={remarksDatePickerOpen}
                           onOpenChange={setRemarksDatePickerOpen}
@@ -809,7 +809,7 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
               {/* Timeline */}
               <Separator />
               <div>
-                <h4 className="font-semibold text-sm text-[#02542D] flex items-center gap-1.5 mb-4">
+                <h4 className="font-semibold text-sm text-primary flex items-center gap-1.5 mb-4">
                   <ClockIcon size={14} />
                   Timeline
                 </h4>
@@ -1456,7 +1456,7 @@ const WorkProgressReports = () => {
             </Button>
             <DialogContent className="sm:max-w-125">
               <DialogHeader>
-                <DialogTitle className="flex justify-center text-[#02542D]">
+                <DialogTitle className="flex justify-center text-primary">
                   {editingReport ? "Edit Task" : "Assign Task"}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
@@ -1474,7 +1474,7 @@ const WorkProgressReports = () => {
                 <div className="grid gap-4">
                   {/* Employee Search */}
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">Employee</Label>
+                    <Label className="text-foreground">Employee</Label>
                     <div className="relative">
                       <div className="flex items-center">
                         <SearchIcon
@@ -1566,7 +1566,7 @@ const WorkProgressReports = () => {
 
                   {/* Assignment Date */}
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">Assignment Date</Label>
+                    <Label className="text-foreground">Assignment Date</Label>
                     <Popover
                       open={assignDatePickerOpen}
                       onOpenChange={setAssignDatePickerOpen}
@@ -1603,7 +1603,7 @@ const WorkProgressReports = () => {
 
                   {/* Deadline Date */}
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">Deadline</Label>
+                    <Label className="text-foreground">Deadline</Label>
                     <Popover
                       open={deadlineDatePickerOpen}
                       onOpenChange={setDeadlineDatePickerOpen}
@@ -1643,7 +1643,7 @@ const WorkProgressReports = () => {
 
                   {/* Days for Completion */}
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">
+                    <Label className="text-foreground">
                       Days for Completion
                     </Label>
                     <Input
@@ -1662,7 +1662,7 @@ const WorkProgressReports = () => {
 
                   {/* Task Description */}
                   <div className="grid gap-3">
-                    <Label className="text-[#344054]">Task Description</Label>
+                    <Label className="text-foreground">Task Description</Label>
                     <Textarea
                       placeholder="Enter task description..."
                       value={taskDescription}
@@ -1725,7 +1725,7 @@ const WorkProgressReports = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1886,7 +1886,7 @@ const WorkProgressReports = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Task
             </AlertDialogTitle>
             <AlertDialogDescription>

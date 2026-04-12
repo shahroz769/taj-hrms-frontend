@@ -628,7 +628,7 @@ const AllowancePolicies = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingAllowancePolicy
                   ? "Edit Allowance Policy"
                   : "Add Allowance Policy"}
@@ -649,7 +649,7 @@ const AllowancePolicies = () => {
                 <div className="grid gap-3">
                   <Label
                     htmlFor="allowance-policy-name"
-                    className="text-[#344054]"
+                    className="text-foreground"
                   >
                     Allowance Policy Name
                   </Label>
@@ -681,7 +681,7 @@ const AllowancePolicies = () => {
                         <div key={component._id} className="grid gap-2">
                           <Label
                             htmlFor={`component-amount-${component._id}`}
-                            className="text-[#344054] text-sm"
+                            className="text-foreground text-sm"
                           >
                             {component.name}
                           </Label>
@@ -708,7 +708,7 @@ const AllowancePolicies = () => {
                     <div className="grid gap-3">
                       <Label
                         htmlFor="compensation-effective-date"
-                        className="text-[#344054]"
+                        className="text-foreground"
                       >
                         Compensation Effective Date
                       </Label>
@@ -728,7 +728,7 @@ const AllowancePolicies = () => {
                     <div className="grid gap-3">
                       <Label
                         htmlFor="compensation-change-reason"
-                        className="text-[#344054]"
+                        className="text-foreground"
                       >
                         Compensation Change Reason
                       </Label>
@@ -788,7 +788,7 @@ const AllowancePolicies = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}

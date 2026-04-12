@@ -37,6 +37,10 @@ const positionSchema = new mongoose.Schema(
 // Compound index to ensure position name is unique within a department
 positionSchema.index({ name: 1, department: 1 }, { unique: true });
 
+// Main list filters by department (equality) then sorts by createdAt desc;
+// the unique index above leads with name so it can't serve department-only filters efficiently
+positionSchema.index({ department: 1, createdAt: -1 });
+
 // Virtual to get current hired count from Employee collection
 // positionSchema.virtual("hiredCount", {
 //   ref: "Employee",

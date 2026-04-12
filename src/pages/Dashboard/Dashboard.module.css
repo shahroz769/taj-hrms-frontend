@@ -7,7 +7,7 @@
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
-  background-color: #ffffff;
+  background-color: var(--card);
   overflow: hidden;
 }
 
@@ -19,9 +19,9 @@
   gap: 1rem;
   flex-wrap: wrap;
   padding: 0.75rem 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #f9fafb;
+  background: var(--muted);
 }
 
 .filterLabel {
@@ -32,7 +32,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #02542d;
+  color: var(--primary);
   white-space: nowrap;
 }
 
@@ -48,14 +48,14 @@
 .loadingSpinner {
   width: 2rem;
   height: 2rem;
-  color: #02542d;
+  color: var(--primary);
 }
 
 /* ─── Metric cards ─── */
 
 .metricCard {
   border-radius: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   box-shadow: none;
 }
 
@@ -79,7 +79,7 @@
   margin-top: 0.5rem;
   font-size: clamp(1.75rem, 2vw, 2.25rem);
   line-height: 1;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .metricIconWrap,
@@ -91,7 +91,7 @@
   height: 2.75rem;
   border-radius: 0.9rem;
   background: #ecfdf3;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .metricContent {
@@ -153,7 +153,7 @@
 
 .compactSelect {
   min-width: 8.5rem;
-  background: #ffffff;
+  background: var(--card);
 }
 
 .payrollFooterMetric {
@@ -193,9 +193,9 @@
   align-items: center;
   gap: 0.875rem;
   padding: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 1rem;
-  background: #ffffff;
+  background: var(--card);
   transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
 }
 
@@ -219,7 +219,7 @@
 
 .analyticsGrid :global(.bg-card),
 .actionGrid :global(.bg-card) {
-  background-color: #ffffff;
+  background-color: var(--card);
 }
 
 /* ─── Responsive: large screens ─── */

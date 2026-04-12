@@ -1,5 +1,5 @@
 .container {
-  background-color: #ffffff;
+  background-color: var(--card);
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -9,7 +9,7 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 36px;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .header {
@@ -57,20 +57,20 @@
   align-items: center;
   padding: 8px 12px;
   border-radius: 8px;
-  background-color: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background-color: var(--muted);
+  border: 1px solid var(--border);
 }
 
 .balanceItemName {
   font-size: 13px;
-  color: #344054;
+  color: var(--foreground);
   font-weight: 500;
 }
 
 .balanceItemDays {
   font-size: 13px;
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .dateRangeRow {

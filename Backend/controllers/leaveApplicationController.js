@@ -346,7 +346,73 @@ export const getAllLeaveApplications = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    const pipeline = [
+    // When there is no search filter, sort and paginate BEFORE the $lookup stages so
+    // MongoDB can use the { createdAt: -1 } index and avoid joining the full collection.
+    // When a search filter is present the join is unavoidable (filtering on joined fields).
+    let pipeline;
+    if (!searchText.trim()) {
+      // Count is the total collection size — no joins needed
+      const countResult = await LeaveApplication.countDocuments();
+      const totalApplications = countResult;
+
+      pipeline = [
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "employees",
+            localField: "employee",
+            foreignField: "_id",
+            as: "employee",
+          },
+        },
+        { $unwind: "$employee" },
+        {
+          $lookup: {
+            from: "leavetypes",
+            localField: "leaveType",
+            foreignField: "_id",
+            as: "leaveType",
+          },
+        },
+        { $unwind: "$leaveType" },
+        {
+          $project: {
+            _id: 1,
+            "employee._id": 1,
+            "employee.fullName": 1,
+            "employee.employeeID": 1,
+            "leaveType._id": 1,
+            "leaveType.name": 1,
+            dateRanges: 1,
+            dates: 1,
+            daysCount: 1,
+            reason: 1,
+            status: 1,
+            appliedBy: 1,
+            approvedBy: 1,
+            createdBy: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ];
+
+      const applications = await LeaveApplication.aggregate(pipeline);
+      return res.json({
+        leaveApplications: applications,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalApplications / limit),
+          totalApplications,
+          limit,
+        },
+      });
+    }
+
+    // Search path: join first, then match on joined fields
+    pipeline = [
       {
         $lookup: {
           from: "employees",
@@ -365,34 +431,16 @@ export const getAllLeaveApplications = async (req, res, next) => {
         },
       },
       { $unwind: "$leaveType" },
-    ];
-
-    if (searchText.trim()) {
-      pipeline.push({
+      {
         $match: {
           $or: [
-            {
-              "employee.fullName": {
-                $regex: searchText.trim(),
-                $options: "i",
-              },
-            },
-            {
-              "employee.employeeID": {
-                $regex: searchText.trim(),
-                $options: "i",
-              },
-            },
-            {
-              "leaveType.name": {
-                $regex: searchText.trim(),
-                $options: "i",
-              },
-            },
+            { "employee.fullName": { $regex: searchText.trim(), $options: "i" } },
+            { "employee.employeeID": { $regex: searchText.trim(), $options: "i" } },
+            { "leaveType.name": { $regex: searchText.trim(), $options: "i" } },
           ],
         },
-      });
-    }
+      },
+    ];
 
     // Count total
     const countPipeline = [...pipeline, { $count: "total" }];

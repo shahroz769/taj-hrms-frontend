@@ -40,6 +40,9 @@ const allowancePolicyHistorySchema = new mongoose.Schema(
 
 // Index for efficient queries by employee
 allowancePolicyHistorySchema.index({ employee: 1, changedAt: -1 });
+// payrollService queries by employee + effectiveDate range and sorts ascending;
+// without this index, every payroll run does an in-memory sort per employee
+allowancePolicyHistorySchema.index({ employee: 1, effectiveDate: 1 });
 
 const AllowancePolicyHistory = mongoose.model(
   "AllowancePolicyHistory",

@@ -384,7 +384,7 @@ const EmployeeProgressReports = () => {
       label: "Tasks Completed",
       fontWeight: "medium",
       render: (row) => (
-        <span className="font-semibold text-[#02542D]">
+        <span className="font-semibold text-primary">
           {row.tasksCompleted}
         </span>
       ),
@@ -598,7 +598,7 @@ const EmployeeProgressReports = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}

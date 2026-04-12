@@ -838,7 +838,7 @@ const Payroll = () => {
             )}
             Regenerate
             {selectedPayrollTargets.length > 0 && (
-              <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
+              <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-primary text-white text-[11px] font-semibold">
                 {selectedPayrollTargets.length}
               </Badge>
             )}
@@ -881,7 +881,7 @@ const Payroll = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={() => {
               setSearchValue("");
               setDebouncedSearch("");
@@ -1627,7 +1627,7 @@ const Payroll = () => {
                             </span>
                           )}
                         </span>
-                        <span className={styles.payslipBreakdownAmount} style={{ color: "#dc2626" }}>
+                        <span className={styles.payslipBreakdownAmount} style={{ color: "var(--destructive)" }}>
                           -{currency(
                             payslipData?.payslip?.calculations?.latePenaltyAmount,
                           )}
@@ -1652,7 +1652,7 @@ const Payroll = () => {
                                   </span>
                                   <span
                                     className={styles.payslipAllowanceAmount}
-                                    style={{ color: "#dc2626" }}
+                                    style={{ color: "var(--destructive)" }}
                                   >
                                     -{currency(item.amount)}
                                   </span>
@@ -1665,7 +1665,7 @@ const Payroll = () => {
                             <span className={styles.payslipBreakdownLabel}>
                               Manual Deductions
                             </span>
-                            <span className={styles.payslipBreakdownAmount} style={{ color: "#dc2626" }}>
+                            <span className={styles.payslipBreakdownAmount} style={{ color: "var(--destructive)" }}>
                               -{currency(
                                 payslipData?.payslip?.calculations?.manualDeductionAmount,
                               )}
@@ -1726,7 +1726,7 @@ const Payroll = () => {
             <AlertDialogAction
               onClick={confirmRegenerate}
               disabled={regenerateMutation.isPending}
-              className="bg-[#02542D] text-white hover:bg-[#02542D]/90"
+              className="bg-primary text-white hover:bg-primary/90"
             >
               {regenerateMutation.isPending ? (
                 <>

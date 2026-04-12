@@ -354,10 +354,10 @@ const MarkAttendanceModal = ({
           {/* ---------------------------------------------------------------- */}
           {!hasPreSelected && (
             <div className="grid gap-2">
-              <Label className="text-[#344054]">
+              <Label className="text-foreground">
                 Employees{" "}
                 {selectedEmployeeIds.length > 0 && (
-                  <Badge className="ml-1 bg-[#02542D] text-white text-[10px] h-4 px-1.5">
+                  <Badge className="ml-1 bg-primary text-white text-[10px] h-4 px-1.5">
                     {selectedEmployeeIds.length}
                   </Badge>
                 )}
@@ -450,7 +450,7 @@ const MarkAttendanceModal = ({
           {/* ---------------------------------------------------------------- */}
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[#344054]">
+              <Label className="text-foreground">
                 Date Range(s)
                 {totalDays > 0 && (
                   <span className="ml-2 text-xs text-muted-foreground font-normal">
@@ -463,7 +463,7 @@ const MarkAttendanceModal = ({
                 variant="ghost"
                 size="sm"
                 onClick={addDateRange}
-                className="h-7 text-xs text-[#02542D] hover:text-[#02542D] hover:bg-green-50"
+                className="h-7 text-xs text-primary hover:text-primary hover:bg-green-50"
               >
                 <PlusIcon size={12} className="mr-1" />
                 Add Range
@@ -598,7 +598,7 @@ const MarkAttendanceModal = ({
           {/* Fallback Shift                                                    */}
           {/* ---------------------------------------------------------------- */}
           <div className="grid gap-2">
-            <Label className="text-[#344054]">
+            <Label className="text-foreground">
               Shift{" "}
               <span className="text-muted-foreground font-normal text-xs">
                 (employees without an assigned shift will use this)
@@ -643,7 +643,7 @@ const MarkAttendanceModal = ({
           {/* Options                                                           */}
           {/* ---------------------------------------------------------------- */}
           <div className="grid gap-3">
-            <Label className="text-[#344054]">Options</Label>
+            <Label className="text-foreground">Options</Label>
 
             {/* Force Apply Shift */}
             <div className="flex items-start gap-3">

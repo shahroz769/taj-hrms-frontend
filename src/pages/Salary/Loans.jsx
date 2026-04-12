@@ -751,7 +751,7 @@ const Loans = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1060,7 +1060,7 @@ const Loans = () => {
       >
         <DialogContent className="sm:max-w-125">
           <DialogHeader>
-            <DialogTitle className="flex justify-center text-[#02542D]">
+            <DialogTitle className="flex justify-center text-primary">
               Apply for Loan
             </DialogTitle>
             <DialogDescription className="sr-only">
@@ -1076,10 +1076,10 @@ const Loans = () => {
             <div className="grid gap-4">
               {/* Employee Multi-select */}
               <div className="grid gap-3">
-                <Label className="text-[#344054]">
+                <Label className="text-foreground">
                   Employee{" "}
                   {selectedEmployees.length > 0 && (
-                    <Badge className="ml-1 bg-[#02542D] text-white text-[10px] h-4 px-1.5">
+                    <Badge className="ml-1 bg-primary text-white text-[10px] h-4 px-1.5">
                       {selectedEmployees.length}
                     </Badge>
                   )}
@@ -1205,7 +1205,7 @@ const Loans = () => {
 
               {/* Loan Amount */}
               <div className="grid gap-3">
-                <Label className="text-[#344054]">Loan Amount (PKR)</Label>
+                <Label className="text-foreground">Loan Amount (PKR)</Label>
                 <Input
                   type="number"
                   step="1"
@@ -1221,7 +1221,7 @@ const Loans = () => {
 
               {/* Repayment Type */}
               <div className="grid gap-3">
-                <Label className="text-[#344054]">Repayment Type</Label>
+                <Label className="text-foreground">Repayment Type</Label>
                 <Select value={repaymentType} onValueChange={setRepaymentType}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select repayment type" />
@@ -1250,7 +1250,7 @@ const Loans = () => {
               {/* Fixed Amount — Monthly Installment */}
               {repaymentType === "fixed_amount" && (
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">
+                  <Label className="text-foreground">
                     Monthly Installment (PKR)
                   </Label>
                   <Input
@@ -1272,7 +1272,7 @@ const Loans = () => {
               {/* Fixed Months — Number of months */}
               {repaymentType === "fixed_months" && (
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Number of Months</Label>
+                  <Label className="text-foreground">Number of Months</Label>
                   <Input
                     type="number"
                     step="1"
@@ -1291,7 +1291,7 @@ const Loans = () => {
 
               {/* Reason */}
               <div className="grid gap-3">
-                <Label className="text-[#344054]">Reason (optional)</Label>
+                <Label className="text-foreground">Reason (optional)</Label>
                 <Textarea
                   placeholder="Enter reason for the loan..."
                   value={loanReason}
@@ -1377,7 +1377,7 @@ const Loans = () => {
       >
         <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[#02542D]">Loan Details</DialogTitle>
+            <DialogTitle className="text-primary">Loan Details</DialogTitle>
             <DialogDescription className="sr-only">
               View details for this loan
             </DialogDescription>
@@ -1615,16 +1615,16 @@ const Loans = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Loan
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the loan of{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 {currency(deletingLoan?.loanAmount)}
               </span>{" "}
               for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 &quot;{deletingLoan?.employee?.fullName}&quot;
               </span>
               ? This action cannot be undone.
@@ -1667,13 +1667,13 @@ const Loans = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Early Settlement
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to settle this loan early? The remaining
               balance of{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 {currency(settlingLoan?.remainingBalance)}
               </span>{" "}
               will be marked as settled and future scheduled installments will be
@@ -1690,7 +1690,7 @@ const Loans = () => {
             <AlertDialogAction
               onClick={confirmSettle}
               disabled={settleMutation.isPending}
-              className="bg-[#02542D] text-white hover:bg-[#02542D]/80 cursor-pointer"
+              className="bg-primary text-white hover:bg-primary/80 cursor-pointer"
             >
               {settleMutation.isPending ? (
                 <>

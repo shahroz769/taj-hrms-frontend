@@ -515,7 +515,7 @@ const ContractAttendance = () => {
           </DialogTrigger>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingAttendance ? "Edit Attendance" : "Add Attendance"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -532,7 +532,7 @@ const ContractAttendance = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Date</Label>
+                  <Label className="text-foreground">Date</Label>
                   <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -568,7 +568,7 @@ const ContractAttendance = () => {
                 </div>
 
                 <div className="grid gap-3">
-                  <Label htmlFor="laborers-present" className="text-[#344054]">
+                  <Label htmlFor="laborers-present" className="text-foreground">
                     Laborers Present
                   </Label>
                   <Input
@@ -931,12 +931,12 @@ const ContractAttendance = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Attendance
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the attendance record for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 {deletingAttendance?.date &&
                   formatDate(deletingAttendance.date)}
               </span>

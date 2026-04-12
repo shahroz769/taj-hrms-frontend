@@ -130,7 +130,7 @@ const Sidebar = () => {
                     }`}
                   >
                     <div className={styles.menuItemTitleLeft}>
-                      {item.icon && <item.icon size={20} color="#344054" />}
+                      {item.icon && <item.icon size={20} color="var(--primary)" />}
                       <p className={styles.menuItemLabel}>{item.label}</p>
                     </div>
                   </Link>
@@ -141,7 +141,7 @@ const Sidebar = () => {
                     style={{ cursor: item.collapsible ? "pointer" : "default" }}
                   >
                     <div className={styles.menuItemTitleLeft}>
-                      {item.icon && <item.icon size={20} color="#344054" />}
+                      {item.icon && <item.icon size={20} color="var(--primary)" />}
                       <p className={styles.menuItemLabel}>{item.label}</p>
                     </div>
                     <div className={styles.menuItemTitleRight}>
@@ -151,7 +151,7 @@ const Sidebar = () => {
                           transition={chevronTransition}
                           style={{ display: "inline-flex" }}
                         >
-                          <item.collapseIcon size={20} color="#344054" />
+                          <item.collapseIcon size={20} color="var(--primary)" />
                         </MotionSpan>
                       )}
                     </div>
@@ -197,7 +197,7 @@ const Sidebar = () => {
                 <div className="flex items-center">
                   <Button
                     variant="ghost"
-                    className="relative flex items-center justify-center w-9 h-9 bg-[#e6eeea] rounded-full"
+                    className="relative flex items-center justify-center w-9 h-9 bg-accent rounded-full"
                   >
                     {firstInitial}
                   </Button>

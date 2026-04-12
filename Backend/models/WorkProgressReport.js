@@ -132,6 +132,13 @@ const workProgressReportSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Default list sort — getAllWorkProgressReports paginates by { createdAt: -1 }
+workProgressReportSchema.index({ createdAt: -1 });
+
+// getEmployeeProgressReports aggregate: $match on employees array (multikey),
+// status equality ($in), and updatedAt range — ESR order: equality → sort → range
+workProgressReportSchema.index({ employees: 1, status: 1, updatedAt: 1 });
+
 const WorkProgressReport = mongoose.model(
   "WorkProgressReport",
   workProgressReportSchema,

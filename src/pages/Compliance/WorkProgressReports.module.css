@@ -1,5 +1,5 @@
 .container {
-  background-color: #ffffff;
+  background-color: var(--card);
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -9,7 +9,7 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 36px;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .header {

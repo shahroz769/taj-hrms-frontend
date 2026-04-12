@@ -426,7 +426,7 @@ const AttendanceRecords = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? (
@@ -536,7 +536,7 @@ const AttendanceRecords = () => {
                         Failed to load attendance data.{" "}
                         <button
                           onClick={() => refetch()}
-                          className="text-[#02542D] underline"
+                          className="text-primary underline"
                         >
                           Retry
                         </button>
@@ -588,7 +588,7 @@ const AttendanceRecords = () => {
                           {isCellLoading ? (
                             <LoaderCircleIcon
                               size={16}
-                              className="mx-auto text-[#02542D] animate-spin"
+                              className="mx-auto text-primary animate-spin"
                             />
                           ) : (
                             renderBadge(record)

@@ -530,7 +530,7 @@ const AllowanceComponents = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingAllowanceComponent
                   ? "Edit Allowance Component"
                   : "Add Allowance Component"}
@@ -552,7 +552,7 @@ const AllowanceComponents = () => {
                 <div className="grid gap-3">
                   <Label
                     htmlFor="allowance-component-name"
-                    className="text-[#344054]"
+                    className="text-foreground"
                   >
                     Allowance Component Name
                   </Label>
@@ -614,7 +614,7 @@ const AllowanceComponents = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -877,12 +877,12 @@ const AllowanceComponents = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Allowance Component
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the allowance component{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingAllowanceComponent?.name}"
               </span>
               ? This action cannot be undone.

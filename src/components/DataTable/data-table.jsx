@@ -76,7 +76,7 @@ const DataTable = ({
                 <Checkbox
                   checked={someSelected ? "indeterminate" : allSelected}
                   onCheckedChange={handleSelectAll}
-                  className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
               </th>
             )}
@@ -140,7 +140,7 @@ const DataTable = ({
                         onCheckedChange={(checked) =>
                           handleRowSelect(rowId, checked)
                         }
-                        className="data-[state=checked]:bg-[#02542D] data-[state=checked]:border-[#02542D]"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                     </td>
                   )}

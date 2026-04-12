@@ -1,5 +1,5 @@
 .container {
-  background-color: #ffffff;
+  background-color: var(--card);
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -22,16 +22,16 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 36px;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .breadcrumb {
   font-size: 0.875rem;
-  color: #667085;
+  color: var(--muted-foreground);
 }
 
 .breadcrumb a {
-  color: #02542d;
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -41,12 +41,12 @@
 
 .formContainer {
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
 }
 
 .section {
   padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 .section:last-child {
@@ -63,7 +63,7 @@
 .sectionTitle {
   font-size: 1rem;
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
 }
 
 .formGrid {
@@ -91,26 +91,26 @@
 .label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #344054;
+  color: var(--foreground);
 }
 
 .error {
   font-size: 0.75rem;
-  color: #ef4444;
+  color: var(--destructive);
   margin-top: 0.25rem;
 }
 
 .serverError {
   padding: 0.75rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent);
   border-radius: 0.375rem;
   margin-bottom: 1rem;
 }
 
 .serverError p {
   font-size: 0.875rem;
-  color: #dc2626;
+  color: var(--destructive);
 }
 
 .dynamicEntry {
@@ -126,7 +126,7 @@
 
 .dynamicEntry:not(:last-child) {
   padding-bottom: 1rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--muted);
 }
 
 .dynamicEntryFields {
@@ -180,7 +180,7 @@
 .imagePreview {
   width: 150px;
   height: 100px;
-  border: 2px dashed #e5e7eb;
+  border: 2px dashed var(--border);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -191,7 +191,7 @@
 }
 
 .imagePreview:hover {
-  border-color: #02542d;
+  border-color: var(--primary);
 }
 
 .imagePreview img {
@@ -203,7 +203,7 @@
 
 .imagePreview span {
   font-size: 0.75rem;
-  color: #667085;
+  color: var(--muted-foreground);
   text-align: center;
 }
 

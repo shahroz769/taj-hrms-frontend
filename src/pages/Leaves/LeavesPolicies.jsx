@@ -613,7 +613,7 @@ const LeavesPolicies = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingLeavePolicy ? "Edit Leave Policy" : "Add Leave Policy"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -630,7 +630,7 @@ const LeavesPolicies = () => {
               )}
               <div className="grid gap-4">
                 <div className="grid gap-3">
-                  <Label htmlFor="leave-policy-name" className="text-[#344054]">
+                  <Label htmlFor="leave-policy-name" className="text-foreground">
                     Leave Policy Name
                   </Label>
                   <Input
@@ -661,7 +661,7 @@ const LeavesPolicies = () => {
                         <div key={leaveType._id} className="grid gap-2">
                           <Label
                             htmlFor={`leave-days-${leaveType._id}`}
-                            className="text-[#344054] text-sm"
+                            className="text-foreground text-sm"
                           >
                             {leaveType.name} Leaves
                           </Label>
@@ -729,7 +729,7 @@ const LeavesPolicies = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -898,12 +898,12 @@ const LeavesPolicies = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Leave Policy
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the leave policy{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingLeavePolicy?.name}"
               </span>
               ? This action cannot be undone.

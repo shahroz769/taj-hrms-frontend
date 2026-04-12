@@ -53,7 +53,11 @@ payrollArrearsLedgerSchema.index(
   { unique: true }
 );
 payrollArrearsLedgerSchema.index({ employee: 1, settled: 1 });
-
+// payrollService sorts unsettled arrears by { sourceYear: 1, sourceMonth: 1 } per employee;
+// extending the index to cover the sort eliminates an in-memory sort on every payroll run
+payrollArrearsLedgerSchema.index({ employee: 1, settled: 1, sourceYear: 1, sourceMonth: 1 });// getEligibleEmployeeIds: distinct("employee", { settled: false })
+// leading with settled lets MongoDB scan only the settled:false partition
+payrollArrearsLedgerSchema.index({ settled: 1, employee: 1 });
 const PayrollArrearsLedger = mongoose.model(
   "PayrollArrearsLedger",
   payrollArrearsLedgerSchema

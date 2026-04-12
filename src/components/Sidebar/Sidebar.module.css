@@ -1,12 +1,12 @@
 .sidebarParent {
-  background-color: #fff;
+  background-color: var(--card);
   width: 100%;
   max-width: 290px;
   height: 100vh;
   display: flex;
   flex-direction: column;
   position: relative;
-  border-right: 1px solid #e4e7ec;
+  border-right: 1px solid var(--border);
 }
 
 .sidebarTop {
@@ -46,18 +46,18 @@
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  color: #345435;
+  color: var(--primary);
   justify-content: space-between;
   font-size: 14px;
   user-select: none;
 }
 
 .menuItemTitle:hover {
-  background-color: #e6eeea;
+  background-color: var(--accent);
 }
 
 .menuItemTitleActive {
-  background-color: #e6eeea;
+  background-color: var(--accent);
   font-weight: 500;
 }
 
@@ -76,7 +76,7 @@
 .subMenu {
   display: flex;
   flex-direction: column;
-  color: #345435;
+  color: var(--primary);
   font-size: 14px;
   gap: 2px;
   overflow: hidden;
@@ -91,16 +91,16 @@
 }
 
 .subMenuItem:hover {
-  background-color: #e6eeea;
+  background-color: var(--accent);
 }
 
 .subMenuItemActive {
-  background-color: #e6eeea;
+  background-color: var(--accent);
   font-weight: 500;
 }
 
 .subMenuItemActive:hover {
-  background-color: #e6eeea;
+  background-color: var(--accent);
 }
 
 /* Footer */
@@ -112,10 +112,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: #ffffff;
+  background-color: var(--card);
   width: 90%;
   padding: 12px 20px;
-  color: #344054;
+  color: var(--foreground);
   font-size: 16px;
 }
 
@@ -123,7 +123,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #eff4fa;
+  background-color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,13 +151,13 @@
 
 /* Scrollbar thumb (moving part) */
 .sidebarTop::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--muted-foreground);
   border-radius: 4px;
 }
 
 /* Hover effect (optional) */
 .sidebarTop::-webkit-scrollbar-thumb:hover {
-  background: #a0a0a0;
+  background: var(--foreground);
 }
 
 /* Remove arrows (top/bottom buttons) */
@@ -174,5 +174,5 @@
 /* === FIREFOX === */
 .sidebarTop {
   scrollbar-width: thin; /* auto | thin | none */
-  scrollbar-color: #c1c1c1 transparent; /* thumb | track */
+  scrollbar-color: var(--muted-foreground) transparent; /* thumb | track */
 }

@@ -52,6 +52,12 @@ const shiftSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Paginated list sorts by createdAt desc
+shiftSchema.index({ createdAt: -1 });
+
+// getShiftsList (dropdown): find({ status: "Approved" }).sort({ name: 1 })
+shiftSchema.index({ status: 1, name: 1 });
+
 const Shift = mongoose.model("Shift", shiftSchema);
 
 export default Shift;

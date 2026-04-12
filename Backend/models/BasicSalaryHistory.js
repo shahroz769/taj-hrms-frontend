@@ -40,6 +40,9 @@ const basicSalaryHistorySchema = new mongoose.Schema(
 
 basicSalaryHistorySchema.index({ employee: 1, effectiveDate: 1 });
 basicSalaryHistorySchema.index({ employee: 1, changedAt: -1 });
+// getEmployeeCompensationHistory sorts by { effectiveDate: -1, changedAt: -1 };
+// the ascending effectiveDate index above cannot serve a descending sort
+basicSalaryHistorySchema.index({ employee: 1, effectiveDate: -1, changedAt: -1 });
 
 const BasicSalaryHistory = mongoose.model(
   "BasicSalaryHistory",

@@ -65,4 +65,7 @@ const contractSchema = new mongoose.Schema(
   }
 );
 
+// Main list filters by status (equality) then sorts by createdAt desc
+contractSchema.index({ status: 1, createdAt: -1 });
+
 export default mongoose.model("Contract", contractSchema);

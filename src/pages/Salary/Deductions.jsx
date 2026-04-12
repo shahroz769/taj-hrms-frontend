@@ -673,7 +673,7 @@ const Deductions = () => {
           </Button>
           <DialogContent className="sm:max-w-125">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingDeduction ? "Edit Deduction" : "Apply Deduction"}
               </DialogTitle>
               <DialogDescription className="sr-only">
@@ -691,10 +691,10 @@ const Deductions = () => {
               <div className="grid gap-4">
                 {/* Employee Multi-select — Command Combobox */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">
+                  <Label className="text-foreground">
                     Employee{" "}
                     {selectedEmployees.length > 0 && (
-                      <Badge className="ml-1 bg-[#02542D] text-white text-[10px] h-4 px-1.5">
+                      <Badge className="ml-1 bg-primary text-white text-[10px] h-4 px-1.5">
                         {selectedEmployees.length}
                       </Badge>
                     )}
@@ -811,7 +811,7 @@ const Deductions = () => {
 
                 {/* Amount */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Amount (PKR)</Label>
+                  <Label className="text-foreground">Amount (PKR)</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -829,7 +829,7 @@ const Deductions = () => {
 
                 {/* Date */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Deduction Date</Label>
+                  <Label className="text-foreground">Deduction Date</Label>
                   <Popover
                     open={datePickerOpen}
                     onOpenChange={setDatePickerOpen}
@@ -873,7 +873,7 @@ const Deductions = () => {
 
                 {/* Reason */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Reason</Label>
+                  <Label className="text-foreground">Reason</Label>
                   <Textarea
                     placeholder="Enter reason for the deduction..."
                     value={deductionReason}
@@ -935,7 +935,7 @@ const Deductions = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1247,16 +1247,16 @@ const Deductions = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Deduction
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the deduction of{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 PKR {Number(deletingDeduction?.amount || 0).toLocaleString()}
               </span>{" "}
               for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 "{deletingDeduction?.employee?.fullName}"
               </span>
               ? This action cannot be undone.

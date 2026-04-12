@@ -3,7 +3,7 @@
    ========================================================================== */
 
 .container {
-  background-color: #ffffff;
+  background-color: var(--card);
   margin: 16px;
   padding: 20px;
   border-radius: 16px;
@@ -20,7 +20,7 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 36px;
-  color: #02542d;
+  color: var(--primary);
 }
 
 /* --------------------------------------------------------------------------
@@ -58,7 +58,7 @@
   font-family: "Outfit", sans-serif;
   font-weight: 600;
   font-size: 16px;
-  color: #02542d;
+  color: var(--primary);
   min-width: 140px;
   text-align: center;
   user-select: none;
@@ -70,7 +70,7 @@
 
 .tableContainer {
   margin-top: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -89,11 +89,11 @@
 
 /* --- Head --- */
 .tableHead {
-  background-color: #f9fafb;
+  background-color: var(--muted);
 }
 
 .tableHeadRow {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Sticky employee column header */
@@ -101,15 +101,15 @@
   position: sticky;
   left: 0;
   z-index: 10;
-  background-color: #f9fafb;
+  background-color: var(--muted);
   padding: 12px 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #02542d;
+  color: var(--primary);
   text-align: left;
   white-space: nowrap;
   min-width: 200px;
-  border-right: 2px solid #e5e7eb;
+  border-right: 2px solid var(--border);
 }
 
 /* Date column headers */
@@ -117,7 +117,7 @@
   padding: 8px 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #667085;
+  color: var(--muted-foreground);
   text-align: center;
   min-width: 44px;
   white-space: nowrap;
@@ -125,7 +125,7 @@
 
 .dateHeaderToday {
   composes: dateHeader;
-  color: #02542d;
+  color: var(--primary);
   background-color: #ecfdf5;
 }
 
@@ -139,22 +139,22 @@
 .summaryHeader {
   position: sticky;
   z-index: 10;
-  background-color: #f9fafb;
+  background-color: var(--muted);
   padding: 8px 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #667085;
+  color: var(--muted-foreground);
   text-align: center;
   min-width: 50px;
   width: 50px;
   box-sizing: border-box;
   white-space: nowrap;
-  border-left: 2px solid #e5e7eb;
+  border-left: 2px solid var(--border);
 }
 
 /* --- Body --- */
 .tableBody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--muted);
 }
 
 .tableBody tr:last-child {
@@ -166,9 +166,9 @@
   position: sticky;
   left: 0;
   z-index: 5;
-  background-color: #ffffff;
+  background-color: var(--card);
   padding: 10px 16px;
-  border-right: 2px solid #e5e7eb;
+  border-right: 2px solid var(--border);
   min-width: 200px;
   transition: background-color 0.15s;
 }
@@ -176,7 +176,7 @@
 .employeeName {
   font-size: 14px;
   font-weight: 500;
-  color: #1f2937;
+  color: var(--foreground);
   white-space: nowrap;
 }
 
@@ -192,7 +192,7 @@
 .summaryCell {
   position: sticky;
   z-index: 5;
-  background-color: #ffffff;
+  background-color: var(--card);
   padding: 8px 6px;
   text-align: center;
   vertical-align: middle;
@@ -201,7 +201,7 @@
   min-width: 50px;
   width: 50px;
   box-sizing: border-box;
-  border-left: 2px solid #e5e7eb;
+  border-left: 2px solid var(--border);
   transition: background-color 0.15s;
 }
 
@@ -242,7 +242,7 @@
 .summaryCell.summaryHD,
 .summaryCell.summaryOff,
 .summaryCell.summaryWD {
-  color: #475467;
+  color: var(--muted-foreground);
 }
 
 /* --- Status Badges --- */
@@ -330,14 +330,14 @@
 
 .stateText {
   font-size: 16px;
-  color: #667085;
+  color: var(--muted-foreground);
   margin: 0;
 }
 
 .loader {
   width: 40px;
   height: 40px;
-  color: #02542d;
+  color: var(--primary);
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
 }
@@ -367,7 +367,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #667085;
+  color: var(--muted-foreground);
 }
 
 .legendDot {

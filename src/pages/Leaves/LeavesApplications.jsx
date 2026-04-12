@@ -756,7 +756,7 @@ const LeavesApplications = () => {
           </Button>
           <DialogContent className="sm:max-w-140 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex justify-center text-[#02542D]">
+              <DialogTitle className="flex justify-center text-primary">
                 {editingApplication
                   ? "Edit Leave Application"
                   : "Apply for Leave"}
@@ -776,7 +776,7 @@ const LeavesApplications = () => {
               <div className="grid gap-4">
                 {/* Employee Selection (Combobox) */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Employee</Label>
+                  <Label className="text-foreground">Employee</Label>
                   <Popover
                     open={employeeComboboxOpen}
                     onOpenChange={setEmployeeComboboxOpen}
@@ -866,7 +866,7 @@ const LeavesApplications = () => {
 
                 {/* Leave Type Selection */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Leave Type</Label>
+                  <Label className="text-foreground">Leave Type</Label>
                   <Select
                     value={selectedLeaveTypeId}
                     onValueChange={(value) => setSelectedLeaveTypeId(value)}
@@ -918,7 +918,7 @@ const LeavesApplications = () => {
 
                 {/* Date Ranges */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Date Selection</Label>
+                  <Label className="text-foreground">Date Selection</Label>
 
                   <Select
                     value={dateSelectionMode}
@@ -1131,7 +1131,7 @@ const LeavesApplications = () => {
 
                 {/* Reason */}
                 <div className="grid gap-3">
-                  <Label className="text-[#344054]">Reason (Optional)</Label>
+                  <Label className="text-foreground">Reason (Optional)</Label>
                   <Textarea
                     placeholder="Enter reason for leave..."
                     value={reason}
@@ -1180,7 +1180,7 @@ const LeavesApplications = () => {
               <div className={styles.balanceSection}>
                 <Separator className="my-4" />
                 <div>
-                  <h3 className="text-sm font-semibold text-[#02542D] mb-1">
+                  <h3 className="text-sm font-semibold text-primary mb-1">
                     Leave Balance
                   </h3>
                   {balanceData?.employee?.fullName && (
@@ -1238,7 +1238,7 @@ const LeavesApplications = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}
@@ -1401,12 +1401,12 @@ const LeavesApplications = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#02542D]">
+            <AlertDialogTitle className="text-primary">
               Delete Leave Application
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the leave application for{" "}
-              <span className="font-semibold text-[#02542D]">
+              <span className="font-semibold text-primary">
                 &quot;{deletingApplication?.employee?.fullName}&quot;
               </span>
               ? This action cannot be undone.

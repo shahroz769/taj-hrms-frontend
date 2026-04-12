@@ -62,7 +62,7 @@ const Header = () => {
         </InputGroupAddon>
         <InputGroupAddon
           align="inline-end"
-          className="cursor-pointer hover:text-[#02542D]"
+          className="cursor-pointer hover:text-primary"
         >
           <CircleXIcon />
         </InputGroupAddon>

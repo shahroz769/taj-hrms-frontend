@@ -551,7 +551,7 @@ const AllEmployees = () => {
             <CalendarIcon size={16} />
             Mark Attendance
             {selectedEmployeeIds.length > 0 && (
-              <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
+              <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-primary text-white text-[11px] font-semibold">
                 {selectedEmployeeIds.length}
               </Badge>
             )}
@@ -570,7 +570,7 @@ const AllEmployees = () => {
                 <CalendarIcon size={16} />
                 Assign Shift
                 {selectedEmployeeIds.length > 0 && (
-                  <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-[#02542D] text-white text-[11px] font-semibold">
+                  <Badge className="ml-1.5 h-5 min-w-5 px-1.5 bg-primary text-white text-[11px] font-semibold">
                     {selectedEmployeeIds.length}
                   </Badge>
                 )}
@@ -685,7 +685,7 @@ const AllEmployees = () => {
           </InputGroupAddon>
           <InputGroupAddon
             align="inline-end"
-            className="cursor-pointer hover:text-[#02542D]"
+            className="cursor-pointer hover:text-primary"
             onClick={handleClearSearch}
           >
             {isFetching && debouncedSearch ? <Spinner /> : <CircleXIcon />}

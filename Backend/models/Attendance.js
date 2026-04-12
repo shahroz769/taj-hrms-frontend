@@ -66,11 +66,18 @@ const attendanceSchema = new mongoose.Schema(
 );
 
 // Compound unique index: one record per employee per date
+// Also serves all employee-equality + date-range queries (ascending and descending)
 attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
 
-// Index for monthly queries
-attendanceSchema.index({ employee: 1, date: -1 });
+// Date+status index — used by date-range/status based queries (e.g. payroll reporting)
 attendanceSchema.index({ date: 1, status: 1 });
+
+// removeApprovedLeaveAttendance: find({ employee, linkedLeaveApplication, lockReason })
+// called on every leave rejection/revert — sparse because most records don't have this field
+attendanceSchema.index(
+  { employee: 1, linkedLeaveApplication: 1 },
+  { sparse: true },
+);
 
 const Attendance = mongoose.model("Attendance", attendanceSchema);
 
