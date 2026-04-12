@@ -473,9 +473,6 @@ const Loans = () => {
         <EyeIcon
           size={18}
           className="text-muted-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
         />
       ),
       renderDelete: (row) => {

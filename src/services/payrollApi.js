@@ -1,6 +1,19 @@
 import API from "./api";
 import { store } from "@/redux/store";
 
+export const fetchPayrollMonthlySummary = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  year = "",
+  month = "",
+}) => {
+  const response = await API.get("/api/payrolls/monthly-summary", {
+    params: { page, limit, search, year, month },
+  });
+  return response.data;
+};
+
 export const fetchPayrolls = async ({
   page = 1,
   limit = 10,
@@ -124,5 +137,10 @@ export const downloadPayslipPdf = async (id) => {
     responseType: "blob",
   });
 
+  return response.data;
+};
+
+export const markPayrollAsPaid = async (id) => {
+  const response = await API.patch(`/api/payrolls/${id}/mark-paid`);
   return response.data;
 };

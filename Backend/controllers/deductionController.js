@@ -144,6 +144,12 @@ export const getDeductions = async (req, res, next) => {
         amount: 1,
         date: 1,
         reason: 1,
+        status: 1,
+        originalDueYear: 1,
+        originalDueMonth: 1,
+        currentDueYear: 1,
+        currentDueMonth: 1,
+        deductedAt: 1,
         createdBy: 1,
         createdAt: 1,
         updatedAt: 1,
@@ -258,11 +264,18 @@ export const createDeduction = async (req, res, next) => {
 
     const createdDeductions = [];
     for (const empId of employees) {
+      const dueYear = Number(formatInTimeZone(deductionDate, PAKISTAN_TZ, "yyyy"));
+      const dueMonth = Number(formatInTimeZone(deductionDate, PAKISTAN_TZ, "M"));
       const newDeduction = new Deduction({
         employee: empId,
         amount: parsedAmount,
         date: deductionDate,
         reason: reason.trim(),
+        status: "Pending",
+        originalDueYear: dueYear,
+        originalDueMonth: dueMonth,
+        currentDueYear: dueYear,
+        currentDueMonth: dueMonth,
         createdBy: req.user?._id || null,
       });
       const saved = await newDeduction.save();
@@ -322,6 +335,18 @@ export const updateDeduction = async (req, res, next) => {
 
     if (date) {
       deduction.date = new Date(date);
+      if (deduction.status !== "Deducted") {
+        const dueYear = Number(
+          formatInTimeZone(deduction.date, PAKISTAN_TZ, "yyyy"),
+        );
+        const dueMonth = Number(
+          formatInTimeZone(deduction.date, PAKISTAN_TZ, "M"),
+        );
+        deduction.originalDueYear = dueYear;
+        deduction.originalDueMonth = dueMonth;
+        deduction.currentDueYear = dueYear;
+        deduction.currentDueMonth = dueMonth;
+      }
     }
 
     if (reason !== undefined) {

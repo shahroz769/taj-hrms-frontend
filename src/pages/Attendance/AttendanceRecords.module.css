@@ -73,6 +73,18 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  position: relative;
+}
+
+.fetchingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  border-radius: 12px;
 }
 
 .tableScrollArea {

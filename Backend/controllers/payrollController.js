@@ -8,6 +8,7 @@ import Payroll from "../models/Payroll.js";
 import PayrollArrearsLedger from "../models/PayrollArrearsLedger.js";
 import AllowancePolicy from "../models/AllowancePolicy.js";
 import Loan from "../models/Loan.js";
+import Deduction from "../models/Deduction.js";
 import {
   isMonthClosedInPakistanTime,
   getMonthStartEndUtcForPakistan,
@@ -98,83 +99,15 @@ const resolveFullAllowanceAmount = (payroll) =>
   sumAmounts(payroll?.allowanceBreakdown || []) ||
   Number(payroll?.calculations?.fullAllowanceAmount || 0);
 
-const resolveEmploymentAdjustment = ({
-  payroll,
-  fullBasicSalaryAmount,
-  fullAllowanceAmount,
-}) => {
-  const joiningDate = payroll?.employeeSnapshot?.joiningDate
-    ? new Date(payroll.employeeSnapshot.joiningDate)
-    : null;
-  const resignationDate = payroll?.employeeSnapshot?.resignationDate
-    ? new Date(payroll.employeeSnapshot.resignationDate)
-    : null;
-  const payslipYear = Number(payroll?.year || 0);
-  const payslipMonth = Number(payroll?.month || 0);
-  const monthEndDate =
-    payslipYear > 0 && payslipMonth > 0
-      ? new Date(payslipYear, payslipMonth, 0)
-      : null;
-  const isMidJoin =
-    joiningDate &&
-    joiningDate.getFullYear() === payslipYear &&
-    joiningDate.getMonth() + 1 === payslipMonth &&
-    joiningDate.getDate() > 1;
-  const isMidLeft =
-    resignationDate &&
-    resignationDate.getFullYear() === payslipYear &&
-    resignationDate.getMonth() + 1 === payslipMonth &&
-    monthEndDate &&
-    resignationDate.getDate() < monthEndDate.getDate();
-
-  const totalScheduledDays = Number(payroll?.workingDays?.totalScheduled || 0);
-  const employmentScheduledDays =
-    Number(payroll?.workingDays?.present || 0) +
-    Number(payroll?.workingDays?.late || 0) +
-    Number(payroll?.workingDays?.halfDay || 0) +
-    Number(payroll?.workingDays?.paidLeaves || 0) +
-    Number(payroll?.workingDays?.unpaidLeaves || 0) +
-    Number(payroll?.workingDays?.absences || 0);
-  const outOfEmploymentScheduledDays = Math.max(
-    0,
-    totalScheduledDays - employmentScheduledDays,
-  );
-  const basicPerScheduledDay =
-    totalScheduledDays > 0 ? fullBasicSalaryAmount / totalScheduledDays : 0;
-  const allowancePerScheduledDay =
-    totalScheduledDays > 0 ? fullAllowanceAmount / totalScheduledDays : 0;
-
-  const basicAmount =
-    isMidJoin || isMidLeft
-      ? Number((basicPerScheduledDay * outOfEmploymentScheduledDays).toFixed(2))
-      : 0;
-  const allowanceAmount =
-    isMidJoin || isMidLeft
-      ? Number(
-          (allowancePerScheduledDay * outOfEmploymentScheduledDays).toFixed(2),
-        )
-      : 0;
-
+const resolveEmploymentAdjustment = () => {
   return {
-    isMidJoin,
-    isMidLeft,
-    label:
-      isMidJoin && isMidLeft
-        ? "Mid Join / Mid Left Adjustment"
-        : isMidJoin
-          ? "Mid Join Adjustment"
-          : "Mid Left Adjustment",
-    meta:
-      isMidJoin && isMidLeft
-        ? `Salary is prorated because the employee joined on ${formatDisplayDate(joiningDate)} and left on ${formatDisplayDate(resignationDate)}.`
-        : isMidJoin
-          ? `Salary is prorated because the employee joined on ${formatDisplayDate(joiningDate)}.`
-          : isMidLeft
-            ? `Salary is prorated because the employee left on ${formatDisplayDate(resignationDate)}.`
-            : "",
-    basicAmount,
-    allowanceAmount,
-    totalAmount: Number((basicAmount + allowanceAmount).toFixed(2)),
+    isMidJoin: false,
+    isMidLeft: false,
+    label: "",
+    meta: "",
+    basicAmount: 0,
+    allowanceAmount: 0,
+    totalAmount: 0,
   };
 };
 
@@ -195,7 +128,11 @@ const resolveAttendanceDeductionBreakdown = ({
     }));
   }
 
-  const totalScheduledDays = Number(payroll?.workingDays?.totalScheduled || 0);
+  const totalScheduledDays = Number(
+    payroll?.calculations?.calendarDaysInMonth ||
+      payroll?.workingDays?.totalScheduled ||
+      0,
+  );
   const basicPerScheduledDay =
     totalScheduledDays > 0 ? fullBasicSalaryAmount / totalScheduledDays : 0;
   const allowancePerScheduledDay =
@@ -487,6 +424,27 @@ const runPayrollMutationForEmployee = async ({
         overwrittenPayrollId = existingPayroll._id;
         await rollbackArrearsSettledByPayroll(existingPayroll._id, session);
 
+        if (existingPayroll.deductionBreakdown?.length > 0) {
+          for (const deductionEntry of existingPayroll.deductionBreakdown) {
+            if (!deductionEntry.deduction) continue;
+            const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
+            if (!deduction) continue;
+
+            deduction.status = "Pending";
+            deduction.deductedAt = null;
+            deduction.deductedByPayroll = null;
+            deduction.currentDueYear =
+              deductionEntry.sourceDueYear ||
+              deduction.originalDueYear ||
+              year;
+            deduction.currentDueMonth =
+              deductionEntry.sourceDueMonth ||
+              deduction.originalDueMonth ||
+              month;
+            await deduction.save({ session });
+          }
+        }
+
         // Reverse previous loan deduction if any
         if (existingPayroll.loanDeductionBreakdown?.length > 0) {
           for (const loanEntry of existingPayroll.loanDeductionBreakdown) {
@@ -543,6 +501,42 @@ const runPayrollMutationForEmployee = async ({
         session,
       });
 
+      if (payload.deductionBreakdown?.length > 0) {
+        for (const deductionEntry of payload.deductionBreakdown) {
+          if (!deductionEntry.deduction) continue;
+          const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
+          if (!deduction) continue;
+
+          if (deductionEntry.status === "deducted") {
+            deduction.status = "Deducted";
+            deduction.deductedAt = new Date();
+            deduction.deductedByPayroll = createdPayroll._id;
+            deduction.currentDueYear =
+              deductionEntry.sourceDueYear ||
+              deduction.currentDueYear ||
+              year;
+            deduction.currentDueMonth =
+              deductionEntry.sourceDueMonth ||
+              deduction.currentDueMonth ||
+              month;
+          } else {
+            deduction.status = "Pending";
+            deduction.deductedAt = null;
+            deduction.deductedByPayroll = null;
+            deduction.currentDueYear =
+              deductionEntry.deferredToYear ||
+              deduction.currentDueYear ||
+              year;
+            deduction.currentDueMonth =
+              deductionEntry.deferredToMonth ||
+              deduction.currentDueMonth ||
+              month;
+          }
+
+          await deduction.save({ session });
+        }
+      }
+
       // Update loan balance after payroll creation
       if (payload.loanDeductionBreakdown?.length > 0) {
         for (const loanEntry of payload.loanDeductionBreakdown) {
@@ -562,11 +556,8 @@ const runPayrollMutationForEmployee = async ({
                 loanEntry.installmentAmount >= scheduled ? "Paid" : "Partial";
             }
 
-            // For next_salary partial: if remaining > 0 and no future Pending entry, add one
-            if (
-              loan.repaymentType === "next_salary" &&
-              loan.remainingBalance > 0
-            ) {
+            // Carry any unpaid remainder forward if the schedule has no future pending installment.
+            if (loan.remainingBalance > 0) {
               const hasFuturePending = loan.repaymentSchedule.some(
                 (e) =>
                   e.status === "Pending" &&
@@ -602,6 +593,104 @@ const runPayrollMutationForEmployee = async ({
     return createdPayroll;
   } finally {
     await session.endSession();
+  }
+};
+
+// @description     Monthly payroll summary (aggregated by year+month)
+// @route           GET /api/payrolls/monthly-summary
+// @access          Admin, Supervisor
+export const getPayrollMonthlySummary = async (req, res, next) => {
+  try {
+    const { page, limit } = parsePagination(req);
+    const skip = (page - 1) * limit;
+    const search = (req.query.search || "").trim();
+    const year = Number(req.query.year || 0);
+    const month = Number(req.query.month || 0);
+
+    const matchStage = {};
+    if (year) matchStage.year = year;
+    if (month) matchStage.month = month;
+    if (search) {
+      matchStage.$or = [
+        { "employeeSnapshot.fullName": { $regex: search, $options: "i" } },
+        { "employeeSnapshot.employeeID": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const pipeline = [];
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage });
+    }
+
+    pipeline.push(
+      {
+        $group: {
+          _id: { year: "$year", month: "$month" },
+          totalEmployees: { $sum: 1 },
+          totalGrossSalary: { $sum: "$calculations.grossSalary" },
+          totalNetSalary: { $sum: "$calculations.netSalary" },
+          paidCount: {
+            $sum: { $cond: [{ $eq: ["$isPaid", true] }, 1, 0] },
+          },
+          unpaidCount: {
+            $sum: { $cond: [{ $ne: ["$isPaid", true] }, 1, 0] },
+          },
+          totalPaidAmount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$isPaid", true] },
+                "$calculations.netSalary",
+                0,
+              ],
+            },
+          },
+          totalUnpaidAmount: {
+            $sum: {
+              $cond: [
+                { $ne: ["$isPaid", true] },
+                "$calculations.netSalary",
+                0,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { "_id.year": -1, "_id.month": -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: "total" }],
+          data: [{ $skip: skip }, { $limit: limit }],
+        },
+      },
+    );
+
+    const rows = await Payroll.aggregate(pipeline);
+    const facetResult = rows[0] || { metadata: [], data: [] };
+    const total = facetResult.metadata[0]?.total || 0;
+    const summaries = facetResult.data.map((r) => ({
+      year: r._id.year,
+      month: r._id.month,
+      monthLabel: MONTH_NAMES[r._id.month - 1] || "-",
+      totalEmployees: r.totalEmployees,
+      totalGrossSalary: r.totalGrossSalary,
+      totalNetSalary: r.totalNetSalary,
+      paidCount: r.paidCount,
+      unpaidCount: r.unpaidCount,
+      totalPaidAmount: r.totalPaidAmount,
+      totalUnpaidAmount: r.totalUnpaidAmount,
+    }));
+
+    res.json({
+      summaries,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -766,6 +855,19 @@ export const generatePayrolls = async (req, res, next) => {
             month: parsedMonth,
           });
 
+          if (existingPayroll && existingPayroll.isPaid) {
+            errors.push(
+              buildPayrollError(
+                employee,
+                parsedYear,
+                parsedMonth,
+                "PAYROLL_PAID",
+                "Cannot regenerate a paid payroll",
+              ),
+            );
+            continue;
+          }
+
           if (existingPayroll && !forceReplace) {
             errors.push(
               buildPayrollError(
@@ -855,6 +957,17 @@ export const regenerateEmployeePayroll = async (req, res, next) => {
     if (!employee) {
       res.status(404);
       throw new Error("Employee not found");
+    }
+
+    const existingPayroll = await Payroll.findOne({
+      employee: employeeId,
+      year: parsedYear,
+      month: parsedMonth,
+    });
+
+    if (existingPayroll && existingPayroll.isPaid) {
+      res.status(400);
+      throw new Error("Cannot regenerate a paid payroll");
     }
 
     const created = await runPayrollMutationForEmployee({
@@ -1013,6 +1126,12 @@ export const downloadPayslipPdf = async (req, res, next) => {
       Number(payroll.calculations?.attendanceDeductionAmount || 0) ||
       sumAmounts(attendanceDeductionBreakdown, "totalAmount");
     const latePenaltyAmount = Number(payroll.calculations?.latePenaltyAmount || 0);
+    const deductedManualBreakdown = (payroll.deductionBreakdown || []).filter(
+      (item) => item.status === "deducted",
+    );
+    const pendingManualBreakdown = (payroll.deductionBreakdown || []).filter(
+      (item) => item.status === "pending",
+    );
     const manualDeductionAmount = Number(
       payroll.calculations?.manualDeductionAmount || 0,
     );
@@ -1116,10 +1235,18 @@ export const downloadPayslipPdf = async (req, res, next) => {
           ]
         : []),
       {
-        label: "Gross Before Deductions",
+        label: "Gross Salary",
         value: formatCurrency(fullBasicSalaryAmount + fullAllowanceAmount),
         emphasis: true,
       },
+      ...(Number(payroll.calculations?.perDaySalary || 0) > 0
+        ? [
+            {
+              label: "Per Day Salary",
+              value: formatCurrency(payroll.calculations?.perDaySalary || 0),
+            },
+          ]
+        : []),
       ...(Number(payroll.calculations?.arrearsAmount || 0) !== 0
         ? [
             {
@@ -1171,8 +1298,8 @@ export const downloadPayslipPdf = async (req, res, next) => {
             },
           ]
         : []),
-      ...(manualDeductionAmount > 0 && payroll.deductionBreakdown?.length
-        ? payroll.deductionBreakdown.map((item) => ({
+      ...(manualDeductionAmount > 0 && deductedManualBreakdown.length
+        ? deductedManualBreakdown.map((item) => ({
             label: item.reason || "Manual Deduction",
             value: `-${formatCurrency(item.amount)}`,
             negative: true,
@@ -1186,6 +1313,13 @@ export const downloadPayslipPdf = async (req, res, next) => {
               },
             ]
           : []),
+      ...(pendingManualBreakdown.length
+        ? pendingManualBreakdown.map((item) => ({
+            label: `Pending Manual Deduction`,
+            meta: `${item.reason || "Manual Deduction"} moved to ${MONTH_NAMES[(item.deferredToMonth || 1) - 1] || "-"} ${item.deferredToYear || "-"}`,
+            value: formatCurrency(item.amount),
+          }))
+        : []),
       ...(loanDeductionAmount > 0 && payroll.loanDeductionBreakdown?.length
         ? payroll.loanDeductionBreakdown.map((entry) => ({
             label: `Loan Repayment (${entry.installmentNumber} of ${entry.totalInstallments})`,
@@ -1241,6 +1375,37 @@ export const downloadPayslipPdf = async (req, res, next) => {
     doc.y = netSalaryY + 30;
 
     doc.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// @description     Mark payroll as paid
+// @route           PATCH /api/payrolls/:id/mark-paid
+// @access          Admin
+export const markPayrollAsPaid = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error('Payroll not found');
+    }
+
+    const payroll = await Payroll.findById(id);
+
+    if (!payroll) {
+      res.status(404);
+      throw new Error('Payroll not found');
+    }
+
+    payroll.isPaid = true;
+    payroll.paidAt = new Date();
+    payroll.paidBy = req.user?._id || null;
+    await payroll.save();
+
+    res.json({ success: true, isPaid: payroll.isPaid, paidAt: payroll.paidAt });
   } catch (error) {
     next(error);
   }

@@ -13,6 +13,12 @@ import {
   PAKISTAN_TZ,
 } from "../utils/timezone.js";
 import { formatInTimeZone } from "date-fns-tz";
+import {
+  calculateAttendanceDeductionFromCounts,
+  calculateManualDeductionPlan,
+  calculateLoanDeductionForPayroll,
+  getCalendarDaysInMonth,
+} from "./payrollCalculationUtils.js";
 
 const DAY_NAMES = [
   "Sunday",
@@ -429,11 +435,15 @@ export const calculateEmployeePayroll = async ({
     }),
   ]);
 
-  const totalScheduledDays = scheduledDates.length;
+  const monthDates = getAllDatesInRange(monthStartUtc, nextMonthStartUtc);
+  const calendarDaysInMonth = getCalendarDaysInMonth(year, month);
   const employmentBounds = {
     joiningDate: normalizeUtcDate(employee.joiningDate),
     resignationDate: normalizeUtcDate(employee.resignationDate),
   };
+  const totalScheduledDays = scheduledDates.filter(
+    (date) => !isOutsideEmploymentWindow(date, employmentBounds),
+  ).length;
 
   let present = 0;
   let absences = 0;
@@ -444,11 +454,10 @@ export const calculateEmployeePayroll = async ({
   let late = 0;
 
   const salarySegmentsMap = new Map();
-  const lateDayRates = [];
   let payableDayUnitsTotal = 0;
 
-  let basicSalaryAmount = 0;
-  let allowanceAmount = 0;
+  let payableBasicSalaryAmount = 0;
+  let payableAllowanceAmount = 0;
   let fullBasicSalaryAmount = 0;
   let fullAllowanceAmount = 0;
   const attendanceDeductionTracker = {
@@ -475,28 +484,10 @@ export const calculateEmployeePayroll = async ({
     },
   };
 
-  for (const date of scheduledDates) {
+  for (const date of monthDates) {
     if (isOutsideEmploymentWindow(date, employmentBounds)) {
       continue;
     }
-
-    const dateKey = keyByPKDate(date);
-    const attendance = attendanceMap.get(dateKey);
-
-    const dayState = classifyDay({ attendance, leaveMap, dateKey });
-
-    if (dayState.type === "present") present += 1;
-    if (dayState.type === "absent") absences += 1;
-    if (dayState.type === "paidLeave") {
-      leaves += 1;
-      paidLeaves += 1;
-    }
-    if (dayState.type === "unpaidLeave") {
-      leaves += 1;
-      unpaidLeaves += 1;
-    }
-    if (dayState.type === "halfDay") halfDay += 1;
-    if (dayState.type === "late") late += 1;
 
     const basicSalaryMonthly = getSalaryFromHistory(
       employee,
@@ -523,45 +514,14 @@ export const calculateEmployeePayroll = async ({
       date,
     });
 
-    const divisor = totalScheduledDays || 1;
+    const divisor = calendarDaysInMonth || 1;
     const basicPerDay = Number(basicSalaryMonthly || 0) / divisor;
     const allowancePerDay = Number(policyComponentsInfo.amount || 0) / divisor;
 
     fullBasicSalaryAmount += basicPerDay;
     fullAllowanceAmount += allowancePerDay;
 
-    const payableFactor = dayState.payableFactor;
-    payableDayUnitsTotal += payableFactor;
-
-    basicSalaryAmount += basicPerDay * payableFactor;
-    allowanceAmount += allowancePerDay * payableFactor;
-
-    if (dayState.type === "absent") {
-      attendanceDeductionTracker.absent.count += 1;
-      attendanceDeductionTracker.absent.basicAmount += basicPerDay;
-      attendanceDeductionTracker.absent.allowanceAmount += allowancePerDay;
-    }
-
-    if (dayState.type === "unpaidLeave") {
-      attendanceDeductionTracker.unpaidLeave.count += 1;
-      attendanceDeductionTracker.unpaidLeave.basicAmount += basicPerDay;
-      attendanceDeductionTracker.unpaidLeave.allowanceAmount +=
-        allowancePerDay;
-    }
-
-    if (dayState.type === "halfDay") {
-      attendanceDeductionTracker.halfDay.count += 1;
-      attendanceDeductionTracker.halfDay.basicAmount += basicPerDay * 0.5;
-      attendanceDeductionTracker.halfDay.allowanceAmount +=
-        allowancePerDay * 0.5;
-    }
-
-    if (dayState.type === "late") {
-      lateDayRates.push({ basicPerDay, allowancePerDay });
-    }
-
     const segmentKey = [
-      keyByPKDate(date),
       Number(basicSalaryMonthly || 0),
       policyId || "none",
       round2(policyComponentsInfo.amount || 0),
@@ -582,14 +542,78 @@ export const calculateEmployeePayroll = async ({
 
     const segment = salarySegmentsMap.get(segmentKey);
     segment.endDate = date;
-    segment.payableDayUnits += payableFactor;
-    segment.segmentBasicAmount += basicPerDay * payableFactor;
-    segment.segmentAllowanceAmount += allowancePerDay * payableFactor;
+    segment.payableDayUnits += 1;
+    segment.segmentBasicAmount += basicPerDay;
+    segment.segmentAllowanceAmount += allowancePerDay;
   }
 
-  const latePenaltyInfo = calculateLatePenalty(lateDayRates);
-  const latePenaltyAmount = latePenaltyInfo.totalPenaltyAmount;
-  const grossSalary = round2(basicSalaryAmount + allowanceAmount);
+  for (const date of scheduledDates) {
+    if (isOutsideEmploymentWindow(date, employmentBounds)) {
+      continue;
+    }
+
+    const dateKey = keyByPKDate(date);
+    const attendance = attendanceMap.get(dateKey);
+    const dayState = classifyDay({ attendance, leaveMap, dateKey });
+
+    if (dayState.type === "present") present += 1;
+    if (dayState.type === "absent") absences += 1;
+    if (dayState.type === "paidLeave") {
+      leaves += 1;
+      paidLeaves += 1;
+    }
+    if (dayState.type === "unpaidLeave") {
+      leaves += 1;
+      unpaidLeaves += 1;
+    }
+    if (dayState.type === "halfDay") halfDay += 1;
+    if (dayState.type === "late") late += 1;
+    payableDayUnitsTotal += dayState.payableFactor;
+
+    const basicSalaryMonthly = getSalaryFromHistory(
+      employee,
+      salaryHistory.map((entry) => ({
+        ...entry,
+        effectiveDate: new Date(entry.effectiveDate),
+      })),
+      date,
+    );
+
+    const policyId = getPolicyIdFromHistory(
+      employee,
+      assignmentHistory.map((entry) => ({
+        ...entry,
+        effectiveDate: new Date(entry.effectiveDate),
+      })),
+      date,
+    );
+
+    const policy = policyId ? policiesMap.get(policyId) : null;
+    const policyComponentsInfo = getPolicyComponentsForDate({
+      policy,
+      amountHistory: amountHistoryMap.get(policyId) || [],
+      date,
+    });
+
+    const dayDeduction = calculateAttendanceDeductionFromCounts({
+      basicSalaryMonthly,
+      allowanceMonthly: policyComponentsInfo.amount,
+      calendarDaysInMonth,
+      absences: dayState.type === "absent" ? 1 : 0,
+      unpaidLeaves: dayState.type === "unpaidLeave" ? 1 : 0,
+      halfDays: dayState.type === "halfDay" ? 1 : 0,
+    });
+
+    for (const item of dayDeduction.breakdown) {
+      const tracker = attendanceDeductionTracker[item.key];
+      if (!tracker) continue;
+      tracker.count += Number(item.count || 0);
+      tracker.basicAmount += Number(item.basicAmount || 0);
+      tracker.allowanceAmount += Number(item.allowanceAmount || 0);
+    }
+  }
+
+  const grossSalary = round2(fullBasicSalaryAmount + fullAllowanceAmount);
   const roundedFullBasicSalaryAmount = round2(fullBasicSalaryAmount);
   const roundedFullAllowanceAmount = round2(fullAllowanceAmount);
   const attendanceDeductionBreakdown = Object.values(
@@ -614,10 +638,22 @@ export const calculateEmployeePayroll = async ({
     ),
   );
   const basicSalaryDeductionAmount = round2(
-    roundedFullBasicSalaryAmount - round2(basicSalaryAmount),
+    attendanceDeductionBreakdown.reduce(
+      (sum, item) => sum + Number(item.basicAmount || 0),
+      0,
+    ),
   );
   const allowanceDeductionAmount = round2(
-    roundedFullAllowanceAmount - round2(allowanceAmount),
+    attendanceDeductionBreakdown.reduce(
+      (sum, item) => sum + Number(item.allowanceAmount || 0),
+      0,
+    ),
+  );
+  payableBasicSalaryAmount = round2(
+    roundedFullBasicSalaryAmount - basicSalaryDeductionAmount,
+  );
+  payableAllowanceAmount = round2(
+    roundedFullAllowanceAmount - allowanceDeductionAmount,
   );
 
   if (!skipArrearsSync) {
@@ -650,30 +686,39 @@ export const calculateEmployeePayroll = async ({
   );
 
   // ── Manual Deductions ──
-  const { monthStartUtc: deductionMonthStart, nextMonthStartUtc: deductionMonthEnd } =
-    getMonthStartEndUtcForPakistan(year, month);
-
   const deductionRecords = await Deduction.find({
     employee: employee._id,
-    date: { $gte: deductionMonthStart, $lt: deductionMonthEnd },
+    $and: [
+      {
+        status: "Pending",
+      },
+      {
+        $or: [
+          { currentDueYear: { $lt: Number(year) } },
+          {
+            currentDueYear: Number(year),
+            currentDueMonth: { $lte: Number(month) },
+          },
+        ],
+      },
+    ],
   })
-    .sort({ date: 1 })
+    .sort({ currentDueYear: 1, currentDueMonth: 1, date: 1, createdAt: 1 })
     .lean();
 
-  const manualDeductionAmount = round2(
-    deductionRecords.reduce((sum, d) => sum + Number(d.amount || 0), 0),
+  const salaryBeforeManualDeductions = round2(
+    grossSalary - attendanceDeductionAmount + arrearsAmount,
   );
-
-  const deductionBreakdown = deductionRecords.map((d) => ({
-    reason: d.reason || "Deduction",
-    amount: Number(d.amount || 0),
-    date: d.date,
-  }));
+  const manualDeductionPlan = calculateManualDeductionPlan({
+    deductions: deductionRecords,
+    salaryAvailable: salaryBeforeManualDeductions,
+    payrollYear: Number(year),
+    payrollMonth: Number(month),
+  });
+  const manualDeductionAmount = round2(manualDeductionPlan.deductedAmount);
+  const deductionBreakdown = manualDeductionPlan.breakdown;
 
   // ── Loan Deduction ──
-  let loanDeductionAmount = 0;
-  const loanDeductionBreakdown = [];
-
   const activeLoan = await Loan.findOne({
     employee: employee._id,
     status: "Approved",
@@ -681,44 +726,29 @@ export const calculateEmployeePayroll = async ({
     "repaymentSchedule.month": month,
     "repaymentSchedule.status": "Pending",
   }).lean();
+  const salaryBeforeLoan = round2(
+    grossSalary -
+      attendanceDeductionAmount -
+      manualDeductionAmount +
+      arrearsAmount,
+  );
+  const { loanDeductionAmount, loanDeductionBreakdown } =
+    calculateLoanDeductionForPayroll({
+      activeLoan,
+      year: Number(year),
+      month: Number(month),
+      salaryAvailable: salaryBeforeLoan,
+    });
 
-  if (activeLoan) {
-    const scheduleIndex = activeLoan.repaymentSchedule.findIndex(
-      (entry) => entry.year === year && entry.month === month && entry.status === "Pending",
-    );
-
-    if (scheduleIndex !== -1) {
-      const entry = activeLoan.repaymentSchedule[scheduleIndex];
-      const salaryBeforeLoan = round2(
-        grossSalary - latePenaltyAmount - manualDeductionAmount + arrearsAmount,
-      );
-
-      if (activeLoan.repaymentType === "next_salary") {
-        // For next_salary: deduct as much as possible from available net salary
-        const deductible = Math.max(0, Math.floor(salaryBeforeLoan));
-        loanDeductionAmount = Math.min(activeLoan.remainingBalance, deductible);
-      } else {
-        // For fixed_amount / fixed_months: deduct scheduled amount (whole numbers)
-        loanDeductionAmount = Math.min(entry.amount, activeLoan.remainingBalance);
-      }
-
-      // Count installment number (how many Paid/Partial before this one + 1)
-      const paidBefore = activeLoan.repaymentSchedule.filter(
-        (e) => e.status === "Paid" || e.status === "Partial",
-      ).length;
-      const totalInstallments = activeLoan.repaymentSchedule.length;
-
-      loanDeductionBreakdown.push({
-        loan: activeLoan._id,
-        installmentAmount: round2(loanDeductionAmount),
-        installmentNumber: paidBefore + 1,
-        totalInstallments,
-        remainingBalance: round2(activeLoan.remainingBalance - loanDeductionAmount),
-      });
-    }
-  }
-
-  const totalSalary = round2(grossSalary - latePenaltyAmount - manualDeductionAmount - loanDeductionAmount + arrearsAmount);
+  const latePenaltyInfo = calculateLatePenalty([]);
+  const latePenaltyAmount = 0;
+  const totalSalary = round2(
+    grossSalary -
+      attendanceDeductionAmount -
+      manualDeductionAmount -
+      loanDeductionAmount +
+      arrearsAmount,
+  );
 
   const monthEndDate = new Date(nextMonthStartUtc);
   monthEndDate.setUTCDate(monthEndDate.getUTCDate() - 1);
@@ -777,14 +807,21 @@ export const calculateEmployeePayroll = async ({
     })),
     calculations: {
       grossSalary,
+      calculationVersion: "v2",
+      calendarDaysInMonth,
       fullBasicSalaryAmount: roundedFullBasicSalaryAmount,
       fullAllowanceAmount: roundedFullAllowanceAmount,
-      basicSalaryAmount: round2(basicSalaryAmount),
-      allowanceAmount: round2(allowanceAmount),
+      basicSalaryAmount: payableBasicSalaryAmount,
+      allowanceAmount: payableAllowanceAmount,
       basicSalaryDeductionAmount,
       allowanceDeductionAmount,
       attendanceDeductionAmount,
-      allowanceRatio: round2(payableDayUnitsTotal / (totalScheduledDays || 1)),
+      attendanceDeductionDayUnits: round2(
+        Number(absences || 0) + Number(unpaidLeaves || 0) + Number(halfDay || 0) * 0.5,
+      ),
+      allowanceRatio: round2(
+        grossSalary > 0 ? payableAllowanceAmount / grossSalary : 0,
+      ),
       payableDayUnits: round2(payableDayUnitsTotal),
       latePenaltyBasicAmount: latePenaltyInfo.basicPenaltyAmount,
       latePenaltyAllowanceAmount: latePenaltyInfo.allowancePenaltyAmount,
@@ -794,63 +831,19 @@ export const calculateEmployeePayroll = async ({
       arrearsAmount,
       totalSalary,
       perDaySalary: round2(
-        Number(
-          getSalaryFromHistory(
-            employee,
-            salaryHistory.map((entry) => ({
-              ...entry,
-              effectiveDate: new Date(entry.effectiveDate),
-            })),
-            new Date(nextMonthStartUtc.getTime() - 86400000),
-          ) || 0,
-        ) / (totalScheduledDays || 1),
+        grossSalary / (calendarDaysInMonth || 1),
       ),
-      scheduledDays: totalScheduledDays,
+      scheduledDays: calendarDaysInMonth,
       earnedBasic: round2(
-        (Number(
-          getSalaryFromHistory(
-            employee,
-            salaryHistory.map((entry) => ({
-              ...entry,
-              effectiveDate: new Date(entry.effectiveDate),
-            })),
-            new Date(nextMonthStartUtc.getTime() - 86400000),
-          ) || 0,
-        ) /
-          (totalScheduledDays || 1)) *
-          present,
+        roundedFullBasicSalaryAmount - basicSalaryDeductionAmount,
       ),
-      paidLeaveAmount: round2(
-        (Number(
-          getSalaryFromHistory(
-            employee,
-            salaryHistory.map((entry) => ({
-              ...entry,
-              effectiveDate: new Date(entry.effectiveDate),
-            })),
-            new Date(nextMonthStartUtc.getTime() - 86400000),
-          ) || 0,
-        ) /
-          (totalScheduledDays || 1)) *
-          paidLeaves,
-      ),
+      paidLeaveAmount: round2(0),
       halfDayDeduction: round2(
-        (Number(
-          getSalaryFromHistory(
-            employee,
-            salaryHistory.map((entry) => ({
-              ...entry,
-              effectiveDate: new Date(entry.effectiveDate),
-            })),
-            new Date(nextMonthStartUtc.getTime() - 86400000),
-          ) || 0,
-        ) /
-          (totalScheduledDays || 1)) *
-          halfDay *
-          0.5,
+        attendanceDeductionBreakdown.find((item) => item.key === "halfDay")
+          ?.totalAmount || 0,
       ),
       lateCount: late,
-      latePenaltyGroups: Math.floor(late / 3),
+      latePenaltyGroups: 0,
       netSalary: totalSalary,
     },
     attendanceDeductionBreakdown,
@@ -966,11 +959,13 @@ export const syncArrearsForEmployee = async ({
 
     const expectedWithoutArrears = round2(
       Number(recomputed.calculations.grossSalary || 0) -
+        Number(recomputed.calculations.attendanceDeductionAmount || 0) -
         Number(recomputed.calculations.latePenaltyAmount || 0),
     );
 
     const existingWithoutArrears = round2(
       Number(payroll.calculations?.grossSalary || 0) -
+        Number(payroll.calculations?.attendanceDeductionAmount || 0) -
         Number(payroll.calculations?.latePenaltyAmount || 0),
     );
 

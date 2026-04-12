@@ -1,5 +1,5 @@
 // React
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // React Router
 import { useSearchParams } from "react-router";
@@ -413,9 +413,26 @@ const Deductions = () => {
         `PKR ${Number(row.amount || 0).toLocaleString()}`,
     },
     {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <Badge variant={row.status === "Deducted" ? "default" : "secondary"}>
+          {row.status || "Pending"}
+        </Badge>
+      ),
+    },
+    {
       key: "date",
       label: "Date",
       render: (row) => (row.date ? formatDate(row.date) : "-"),
+    },
+    {
+      key: "dueMonth",
+      label: "Current Due",
+      render: (row) =>
+        row.currentDueYear && row.currentDueMonth
+          ? `${MONTHS.find((item) => Number(item.value) === Number(row.currentDueMonth))?.label || row.currentDueMonth} ${row.currentDueYear}`
+          : "-",
     },
     {
       key: "reason",

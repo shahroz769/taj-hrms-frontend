@@ -22,31 +22,43 @@ const DataTable = ({
   selectable = false,
   selectedIds = [],
   onSelectionChange,
+  isRowSelectable,
 }) => {
   // Calculate total columns including checkbox column
   const totalColumns = selectable ? columns.length + 1 : columns.length;
 
   // Memoize selection state calculations
-  const { allSelected, someSelected } = useMemo(() => {
-    const all = data && data.length > 0 && selectedIds.length === data.length;
+  const { selectableData, allSelected, someSelected } = useMemo(() => {
+    const filteredData = isRowSelectable
+      ? (data || []).filter((row) => isRowSelectable(row))
+      : data || [];
+    const all =
+      filteredData.length > 0 &&
+      filteredData.every((row) =>
+        selectedIds.includes(row._id || row.id),
+      );
     const some =
-      selectedIds.length > 0 && selectedIds.length < (data?.length || 0);
-    return { allSelected: all, someSelected: some };
-  }, [data, selectedIds]);
+      selectedIds.length > 0 &&
+      !all &&
+      filteredData.some((row) =>
+        selectedIds.includes(row._id || row.id),
+      );
+    return { selectableData: filteredData, allSelected: all, someSelected: some };
+  }, [data, selectedIds, isRowSelectable]);
 
   // Memoized handler for select all toggle
   const handleSelectAll = useCallback(
     (checked) => {
       if (onSelectionChange) {
         if (checked) {
-          const allIds = data.map((row) => row._id || row.id);
+          const allIds = selectableData.map((row) => row._id || row.id);
           onSelectionChange(allIds);
         } else {
           onSelectionChange([]);
         }
       }
     },
-    [data, onSelectionChange],
+    [selectableData, onSelectionChange],
   );
 
   // Memoized handler for individual row toggle
@@ -128,6 +140,8 @@ const DataTable = ({
             data.map((row) => {
               const rowId = row._id || row.id;
               const isSelected = selectedIds.includes(rowId);
+              const rowSelectable =
+                !isRowSelectable || isRowSelectable(row);
               return (
                 <tr key={rowId} className={styles.tableRow}>
                   {selectable && (
@@ -140,6 +154,7 @@ const DataTable = ({
                         onCheckedChange={(checked) =>
                           handleRowSelect(rowId, checked)
                         }
+                        disabled={!rowSelectable}
                         className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                     </td>

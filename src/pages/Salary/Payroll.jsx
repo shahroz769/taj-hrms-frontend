@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import EyeIcon from "lucide-react/dist/esm/icons/eye";
 import RefreshCcwIcon from "lucide-react/dist/esm/icons/refresh-ccw";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
 import SlidersHorizontalIcon from "lucide-react/dist/esm/icons/sliders-horizontal";
-import WalletCardsIcon from "lucide-react/dist/esm/icons/wallet-cards";
 import { toast } from "sonner";
 
 import DataTable from "@/components/DataTable/data-table";
@@ -60,8 +59,7 @@ import {
   downloadPayslipPdf,
   fetchPayslip,
   fetchPayrolls,
-  generatePayrolls,
-  previewPayrollGeneration,
+  markPayrollAsPaid,
   regenerateEmployeePayroll,
 } from "@/services/payrollApi";
 
@@ -98,10 +96,8 @@ const sumAmounts = (items = []) =>
     if (typeof item === "number") return sum + Number(item || 0);
     return sum + Number(item?.amount || 0);
   }, 0);
-const PAYROLL_GENERATION_ENABLED =
-  import.meta.env.VITE_ENABLE_PAYROLL_GENERATION !== "false";
-
 const Payroll = () => {
+  const { year: routeYear, month: routeMonth } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
@@ -120,35 +116,16 @@ const Payroll = () => {
   const [filterPosition, setFilterPosition] = useState(
     searchParams.get("position") || "",
   );
-  const [filterYear, setFilterYear] = useState(searchParams.get("year") || "");
-  const [filterMonth, setFilterMonth] = useState(
-    searchParams.get("month") || "",
-  );
+  const filterYear = routeYear || "";
+  const filterMonth = routeMonth || "";
 
   const [tempFilterDepartment, setTempFilterDepartment] = useState("");
   const [tempFilterPosition, setTempFilterPosition] = useState("");
-  const [tempFilterYear, setTempFilterYear] = useState("");
-  const [tempFilterMonth, setTempFilterMonth] = useState("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [isFiltersLoading, setIsFiltersLoading] = useState(false);
 
-  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
-  const [isOpeningGenerateDialog, setIsOpeningGenerateDialog] = useState(false);
-  const [generateYear, setGenerateYear] = useState(String(CURRENT_YEAR));
-  const [generateMonth, setGenerateMonth] = useState(
-    String(new Date().getMonth() + 1),
-  );
-  const [forceReplace, setForceReplace] = useState(false);
-
-  const [generationErrors, setGenerationErrors] = useState([]);
+  const generationErrors = [];
   const [errorModalOpen, setErrorModalOpen] = useState(false);
-  const [generationSummary, setGenerationSummary] = useState(null);
-  const [generationProgress, setGenerationProgress] = useState({
-    processed: 0,
-    total: 0,
-    percent: 0,
-    currentEmployee: "",
-  });
 
   const [selectedPayslipId, setSelectedPayslipId] = useState(null);
   const [payslipDialogOpen, setPayslipDialogOpen] = useState(false);
@@ -177,8 +154,6 @@ const Payroll = () => {
     if (debouncedSearch) params.search = debouncedSearch;
     if (filterDepartment) params.department = filterDepartment;
     if (filterPosition) params.position = filterPosition;
-    if (filterYear) params.year = filterYear;
-    if (filterMonth) params.month = filterMonth;
 
     setSearchParams(params, { replace: true });
   }, [
@@ -187,8 +162,6 @@ const Payroll = () => {
     debouncedSearch,
     filterDepartment,
     filterPosition,
-    filterYear,
-    filterMonth,
     setSearchParams,
   ]);
 
@@ -242,47 +215,22 @@ const Payroll = () => {
     enabled: false,
   });
 
-  const { data: generationPreview, isFetching: isPreviewFetching } = useQuery({
-    queryKey: ["payrollPreview", generateYear, generateMonth],
-    queryFn: () =>
-      previewPayrollGeneration({
-        year: Number(generateYear),
-        month: Number(generateMonth),
-      }),
-    enabled:
-      generateDialogOpen && Boolean(generateYear) && Boolean(generateMonth),
-  });
-
-  const { data: payslipData, isFetching: isPayslipFetching } = useQuery({
+  const { data: payslipData } = useQuery({
     queryKey: ["payslip", selectedPayslipId],
     queryFn: () => fetchPayslip(selectedPayslipId),
     enabled: Boolean(selectedPayslipId) && payslipDialogOpen,
   });
 
-  const generateMutation = useMutation({
-    mutationFn: ({ year, month, forceReplace }) =>
-      generatePayrolls({
-        year,
-        month,
-        forceReplace,
-        onProgress: (event) => {
-          if (event.type === "processing") {
-            setGenerationProgress({
-              processed: event.processed,
-              total: event.total,
-              percent: event.percent,
-              currentEmployee: event.currentEmployee || "",
-            });
-          }
-        },
-      }),
-    onSuccess: (response) => {
+  const markAsPaidMutation = useMutation({
+    mutationFn: (id) => markPayrollAsPaid(id),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-      setGenerationProgress({ processed: 0, total: 0, percent: 0, currentEmployee: "" });
-      setGenerationSummary(response);
+      queryClient.invalidateQueries({ queryKey: ["payrollMonthlySummary"] });
+      queryClient.invalidateQueries({ queryKey: ["payslip", selectedPayslipId] });
+      toast.success("Payroll marked as paid");
     },
     onError: (error) => {
-      toast.error(error.message || error.response?.data?.message || "Payroll generation failed");
+      toast.error(error?.response?.data?.message || "Failed to mark as paid");
     },
   });
 
@@ -323,6 +271,7 @@ const Payroll = () => {
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollMonthlySummary"] });
       setRegenerateProgress({ processed: 0, total: 0, percent: 0, currentEmployee: "" });
       setRegenerateSummary(response);
     },
@@ -341,8 +290,6 @@ const Payroll = () => {
     debouncedSearch,
     filterDepartment,
     filterPosition,
-    filterYear,
-    filterMonth,
   ]);
 
   const selectedPayrollTargets = useMemo(() => {
@@ -350,6 +297,7 @@ const Payroll = () => {
 
     return payrollRows
       .filter((row) => selectedPayrollIds.includes(row._id || row.id))
+      .filter((row) => !row.isPaid)
       .map((row) => ({
         employeeId: row.employee,
         employeeName: row.employeeSnapshot?.fullName,
@@ -378,8 +326,6 @@ const Payroll = () => {
       await Promise.all([fetchDepartments(), fetchPositions()]);
       setTempFilterDepartment(filterDepartment);
       setTempFilterPosition(filterPosition);
-      setTempFilterYear(filterYear);
-      setTempFilterMonth(filterMonth);
       setFilterPopoverOpen(true);
     } catch {
       toast.error("Failed to load filters");
@@ -391,8 +337,6 @@ const Payroll = () => {
   const applyFilters = () => {
     setFilterDepartment(tempFilterDepartment);
     setFilterPosition(tempFilterPosition);
-    setFilterYear(tempFilterYear);
-    setFilterMonth(tempFilterMonth);
     setPage(1);
     setFilterPopoverOpen(false);
   };
@@ -400,59 +344,10 @@ const Payroll = () => {
   const resetFilters = () => {
     setTempFilterDepartment("");
     setTempFilterPosition("");
-    setTempFilterYear("");
-    setTempFilterMonth("");
     setFilterDepartment("");
     setFilterPosition("");
-    setFilterYear("");
-    setFilterMonth("");
     setPage(1);
     setFilterPopoverOpen(false);
-  };
-
-  const handleOpenGenerateDialog = async () => {
-    if (!PAYROLL_GENERATION_ENABLED) {
-      toast.error("Payroll generation is disabled by feature flag");
-      return;
-    }
-
-    if (isOpeningGenerateDialog) {
-      return;
-    }
-
-    const defaultYear = filterYear || String(CURRENT_YEAR);
-    const defaultMonth = filterMonth || String(new Date().getMonth() + 1);
-
-    setIsOpeningGenerateDialog(true);
-    try {
-      await queryClient.fetchQuery({
-        queryKey: ["payrollPreview", defaultYear, defaultMonth],
-        queryFn: () =>
-          previewPayrollGeneration({
-            year: Number(defaultYear),
-            month: Number(defaultMonth),
-          }),
-      });
-
-      setGenerateYear(defaultYear);
-      setGenerateMonth(defaultMonth);
-      setForceReplace(false);
-      setGenerateDialogOpen(true);
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message || "Failed to load eligible employees",
-      );
-    } finally {
-      setIsOpeningGenerateDialog(false);
-    }
-  };
-
-  const handleGeneratePayroll = () => {
-    generateMutation.mutate({
-      year: Number(generateYear),
-      month: Number(generateMonth),
-      forceReplace,
-    });
   };
 
   const openPayslip = async (payrollRow) => {
@@ -594,9 +489,19 @@ const Payroll = () => {
         return amount(
           attendanceDeductions +
             Number(row.calculations?.latePenaltyAmount || 0) +
-            Number(row.calculations?.manualDeductionAmount || 0),
+            Number(row.calculations?.manualDeductionAmount || 0) +
+            Number(row.calculations?.loanDeductionAmount || 0),
         );
       },
+    },
+    {
+      key: "isPaid",
+      label: "Paid",
+      render: (row) => (
+        <Badge variant={row.isPaid ? "default" : "secondary"}>
+          {row.isPaid ? "Yes" : "No"}
+        </Badge>
+      ),
     },
     {
       key: "salarySlip",
@@ -641,7 +546,12 @@ const Payroll = () => {
     Number(payslip?.calculations?.basicSalaryAmount || 0);
   const storedAttendanceDeductionBreakdown =
     payslip?.attendanceDeductionBreakdown || [];
-  const manualDeductionBreakdown = payslip?.deductionBreakdown || [];
+  const manualDeductionBreakdown = (payslip?.deductionBreakdown || []).filter(
+    (item) => item.status === "deducted",
+  );
+  const pendingManualDeductionBreakdown = (
+    payslip?.deductionBreakdown || []
+  ).filter((item) => item.status === "pending");
   const totalManualDeduction = Number(
     payslip?.calculations?.manualDeductionAmount || 0,
   );
@@ -664,7 +574,11 @@ const Payroll = () => {
   const displayedLatePenaltyGroups =
     Number(payslip?.calculations?.latePenaltyGroups || 0) ||
     Math.floor(displayedLateCount / 3);
-  const totalScheduledDays = Number(payslip?.workingDays?.totalScheduled || 0);
+  const totalScheduledDays = Number(
+    payslip?.calculations?.calendarDaysInMonth ||
+      payslip?.workingDays?.totalScheduled ||
+      0,
+  );
   const basicPerScheduledDay =
     totalScheduledDays > 0 ? fullBasicSalaryAmount / totalScheduledDays : 0;
   const allowancePerScheduledDay =
@@ -741,71 +655,13 @@ const Payroll = () => {
     storedAttendanceBasicBreakdownAmount || inferredAttendanceBasicAmount;
   const displayedAllowanceAttendanceDeduction =
     storedAttendanceAllowanceBreakdownAmount || inferredAttendanceAllowanceAmount;
-  const joiningDate = payslip?.employeeSnapshot?.joiningDate
-    ? new Date(payslip.employeeSnapshot.joiningDate)
-    : null;
-  const resignationDate = payslip?.employeeSnapshot?.resignationDate
-    ? new Date(payslip.employeeSnapshot.resignationDate)
-    : null;
-  const payslipYear = Number(payslip?.year || 0);
-  const payslipMonth = Number(payslip?.month || 0);
-  const monthEndDate =
-    payslipYear > 0 && payslipMonth > 0
-      ? new Date(payslipYear, payslipMonth, 0)
-      : null;
-  const isMidJoin =
-    joiningDate &&
-    joiningDate.getFullYear() === payslipYear &&
-    joiningDate.getMonth() + 1 === payslipMonth &&
-    joiningDate.getDate() > 1;
-  const isMidLeft =
-    resignationDate &&
-    resignationDate.getFullYear() === payslipYear &&
-    resignationDate.getMonth() + 1 === payslipMonth &&
-    monthEndDate &&
-    resignationDate.getDate() < monthEndDate.getDate();
-  const hasEmploymentPeriodAdjustment = Boolean(isMidJoin || isMidLeft);
-  const employmentScheduledDays =
-    Number(payslip?.workingDays?.present || 0) +
-    Number(payslip?.workingDays?.late || 0) +
-    Number(payslip?.workingDays?.halfDay || 0) +
-    Number(payslip?.workingDays?.paidLeaves || 0) +
-    Number(payslip?.workingDays?.unpaidLeaves || 0) +
-    Number(payslip?.workingDays?.absences || 0);
-  const outOfEmploymentScheduledDays = Math.max(
-    0,
-    totalScheduledDays - employmentScheduledDays,
-  );
-  const employmentAdjustmentBasicAmount =
-    hasEmploymentPeriodAdjustment && totalScheduledDays > 0
-      ? Number((basicPerScheduledDay * outOfEmploymentScheduledDays).toFixed(2))
-      : 0;
-  const employmentAdjustmentAllowanceAmount =
-    hasEmploymentPeriodAdjustment && totalScheduledDays > 0
-      ? Number(
-          (allowancePerScheduledDay * outOfEmploymentScheduledDays).toFixed(2),
-        )
-      : 0;
+  const hasEmploymentPeriodAdjustment = false;
+  const employmentAdjustmentBasicAmount = 0;
+  const employmentAdjustmentAllowanceAmount = 0;
   const employmentAdjustmentAmount =
     employmentAdjustmentBasicAmount + employmentAdjustmentAllowanceAmount;
-  const employmentAdjustmentLabel = isMidJoin && isMidLeft
-    ? "Mid Join / Mid Left Adjustment"
-    : isMidJoin
-      ? "Mid Join Adjustment"
-      : "Mid Left Adjustment";
-  const formatAdjustmentDate = (value) =>
-    value
-      ? value.toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "";
-  const employmentAdjustmentMeta = isMidJoin && isMidLeft
-    ? `Salary is prorated because the employee joined on ${formatAdjustmentDate(joiningDate)} and left on ${formatAdjustmentDate(resignationDate)}.`
-    : isMidJoin
-      ? `Salary is prorated because the employee joined on ${formatAdjustmentDate(joiningDate)}.`
-      : `Salary is prorated because the employee left on ${formatAdjustmentDate(resignationDate)}.`;
+  const employmentAdjustmentLabel = "";
+  const employmentAdjustmentMeta = "";
   const displayedBasicDeduction =
     displayedBasicAttendanceDeduction +
     latePenaltyBasicAmount +
@@ -824,11 +680,14 @@ const Payroll = () => {
     loanDeductionAmount +
     employmentAdjustmentAmount;
   const displayedTotalDeductions = totalDeductions;
+  const showLegacyDeductionSection = false;
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Payroll</h1>
+        <h1 className={styles.title}>
+          {monthLabel(filterMonth)} {filterYear} — Payroll
+        </h1>
         <div className={styles.headerActions}>
           <Button
             variant="outline"
@@ -851,28 +710,8 @@ const Payroll = () => {
               </Badge>
             )}
           </Button>
-
-          <Button
-            variant="green"
-            className="cursor-pointer"
-            onClick={handleOpenGenerateDialog}
-            disabled={!PAYROLL_GENERATION_ENABLED || isOpeningGenerateDialog}
-          >
-            {isOpeningGenerateDialog ? (
-              <Spinner className={styles.buttonSpinner} />
-            ) : (
-              <WalletCardsIcon className={styles.buttonIcon} />
-            )}
-            Generate Payroll
-          </Button>
         </div>
       </div>
-
-      {!PAYROLL_GENERATION_ENABLED && (
-        <div className={styles.previewSubtext}>
-          Payroll generation is currently disabled by feature flag.
-        </div>
-      )}
 
       <div className={styles.controls}>
         <InputGroup className={styles.tableSearchInput}>
@@ -1011,56 +850,6 @@ const Payroll = () => {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label htmlFor="year">Year</Label>
-                    <Select
-                      value={tempFilterYear || "all"}
-                      onValueChange={(value) =>
-                        setTempFilterYear(value === "all" ? "" : value)
-                      }
-                    >
-                      <SelectTrigger className="w-full col-span-2">
-                        <SelectValue placeholder="All years" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="all">All Years</SelectItem>
-                          {YEARS.map((yearOption) => (
-                            <SelectItem key={yearOption} value={yearOption}>
-                              {yearOption}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-3 items-center gap-4">
-                    <Label htmlFor="month">Month</Label>
-                    <Select
-                      value={tempFilterMonth || "all"}
-                      onValueChange={(value) =>
-                        setTempFilterMonth(value === "all" ? "" : value)
-                      }
-                    >
-                      <SelectTrigger className="w-full col-span-2">
-                        <SelectValue placeholder="All months" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="all">All Months</SelectItem>
-                          {MONTHS.map((monthOption) => (
-                            <SelectItem
-                              key={monthOption.value}
-                              value={monthOption.value}
-                            >
-                              {monthOption.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -1094,6 +883,7 @@ const Payroll = () => {
         selectable={true}
         selectedIds={selectedPayrollIds}
         onSelectionChange={setSelectedPayrollIds}
+        isRowSelectable={(row) => !row.isPaid}
       />
 
       <Pagination className={styles.paginationWrap}>
@@ -1146,190 +936,6 @@ const Payroll = () => {
           </PaginationItem>
         </PaginationContent>
       </Pagination>
-
-      <Dialog
-        open={generateDialogOpen}
-        onOpenChange={(open) => {
-          if (generateMutation.isPending) return;
-          if (!open) setGenerationSummary(null);
-          setGenerateDialogOpen(open);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Generate Payroll</DialogTitle>
-            <DialogDescription>
-              {generateMutation.isPending
-                ? "Generating payroll, please wait…"
-                : generationSummary
-                  ? `${monthLabel(generationSummary.month)} ${generationSummary.year} — generation complete`
-                  : "Select year and month to generate payroll for eligible employees."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {generateMutation.isPending ? (
-            <div className={styles.progressSection}>
-              <div className={styles.progressHeader}>
-                <span className={styles.progressCount}>
-                  {generationProgress.processed} / {generationProgress.total} employees
-                </span>
-                <span className={styles.progressPercent}>
-                  {generationProgress.percent}%
-                </span>
-              </div>
-              <Progress value={generationProgress.percent} className={styles.progressBar} />
-              {generationProgress.currentEmployee && (
-                <div className={styles.progressEmployee}>
-                  Processing:{" "}
-                  <span className={styles.progressEmployeeName}>
-                    {generationProgress.currentEmployee}
-                  </span>
-                </div>
-              )}
-            </div>
-          ) : generationSummary ? (
-            <div className={styles.summarySection}>
-              <div className={styles.summaryStats}>
-                <div className={styles.summaryStat}>
-                  <span className={styles.summaryStatValue}>
-                    {generationSummary.summary?.totalEligible || 0}
-                  </span>
-                  <span className={styles.summaryStatLabel}>Eligible</span>
-                </div>
-                <div className={`${styles.summaryStat} ${styles.summaryStatSuccess}`}>
-                  <span className={styles.summaryStatValue}>
-                    {generationSummary.summary?.generated || 0}
-                  </span>
-                  <span className={styles.summaryStatLabel}>Generated</span>
-                </div>
-                <div className={`${styles.summaryStat} ${generationSummary.summary?.failed > 0 ? styles.summaryStatFailed : ""}`}>
-                  <span className={styles.summaryStatValue}>
-                    {generationSummary.summary?.failed || 0}
-                  </span>
-                  <span className={styles.summaryStatLabel}>Failed</span>
-                </div>
-              </div>
-
-              {(generationSummary.errors || []).length > 0 && (
-                <ScrollArea className={styles.summaryErrorScroll}>
-                  <div className={styles.summaryErrorList}>
-                    {generationSummary.errors.map((item, index) => (
-                      <div
-                        key={`${item.employeeId}-${index}`}
-                        className={styles.summaryErrorItem}
-                      >
-                        <div className={styles.summaryErrorName}>
-                          {item.employeeName}
-                        </div>
-                        <div className={styles.summaryErrorReason}>
-                          {item.reasonMessage}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className={styles.dialogGrid}>
-                <div className={styles.dialogField}>
-                  <Label>Year</Label>
-                  <Select value={generateYear} onValueChange={setGenerateYear}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {YEARS.map((yearOption) => (
-                        <SelectItem key={yearOption} value={yearOption}>
-                          {yearOption}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className={styles.dialogField}>
-                  <Label>Month</Label>
-                  <Select value={generateMonth} onValueChange={setGenerateMonth}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTHS.map((monthOption) => (
-                        <SelectItem
-                          key={monthOption.value}
-                          value={monthOption.value}
-                        >
-                          {monthOption.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className={styles.previewBox}>
-                {isPreviewFetching ? (
-                  <div className={styles.previewLoading}>
-                    <Spinner className={styles.smallSpinner} />
-                    Loading eligible count
-                  </div>
-                ) : (
-                  <div>
-                    <div>
-                      Eligible employees:{" "}
-                      {generationPreview?.eligibleEmployeesCount || 0}
-                    </div>
-                    <div className={styles.previewSubtext}>
-                      Generation allowed only when selected month is fully closed.
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.forceToggleRow}>
-                <Checkbox
-                  checked={forceReplace}
-                  onCheckedChange={(checked) => setForceReplace(Boolean(checked))}
-                />
-                <Label className={styles.checkboxLabel}>
-                  Force replace existing payrolls for selected month
-                </Label>
-              </div>
-            </>
-          )}
-
-          <DialogFooter>
-            {generationSummary ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setGenerationSummary(null);
-                  setGenerateDialogOpen(false);
-                }}
-              >
-                Close
-              </Button>
-            ) : (
-              <Button
-                variant="green"
-                onClick={handleGeneratePayroll}
-                disabled={generateMutation.isPending}
-              >
-                {generateMutation.isPending ? (
-                  <>
-                    <Spinner className={styles.buttonSpinner} />
-                    Generating…
-                  </>
-                ) : (
-                  "Generate Payroll"
-                )}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={errorModalOpen} onOpenChange={setErrorModalOpen}>
         <DialogContent className={`sm:max-w-2xl ${styles.payslipDialogContent}`}>
@@ -1523,13 +1129,23 @@ const Payroll = () => {
                   </>
                 )}
                 <div className={styles.payslipBreakdownRow}>
-                  <span className={styles.payslipBreakdownLabel}>
-                    Gross Before Deductions
-                  </span>
-                  <span className={styles.payslipBreakdownAmount}>
-                    {currency(fullBasicSalaryAmount + fullAllowanceAmount)}
-                  </span>
-                </div>
+                    <span className={styles.payslipBreakdownLabel}>
+                    Gross Salary
+                    </span>
+                    <span className={styles.payslipBreakdownAmount}>
+                      {currency(fullBasicSalaryAmount + fullAllowanceAmount)}
+                    </span>
+                  </div>
+                {Number(payslip?.calculations?.perDaySalary || 0) > 0 && (
+                  <div className={styles.payslipBreakdownRow}>
+                    <span className={styles.payslipBreakdownLabel}>
+                      Per Day Salary
+                    </span>
+                    <span className={styles.payslipBreakdownAmount}>
+                      {currency(payslip?.calculations?.perDaySalary)}
+                    </span>
+                  </div>
+                )}
                 {Number(payslip?.calculations?.arrearsAmount || 0) !== 0 && (
                   <div className={styles.payslipBreakdownRow}>
                     <span className={styles.payslipBreakdownLabel}>
@@ -1655,6 +1271,32 @@ const Payroll = () => {
                       )}
                     </>
                   )}
+                  {pendingManualDeductionBreakdown.length > 0 && (
+                    <>
+                      <div className={styles.payslipAllowanceHeader}>
+                        Pending Manual Deductions
+                      </div>
+                      {pendingManualDeductionBreakdown.map((item, index) => (
+                        <div
+                          key={`pending-deduction-${index}`}
+                          className={styles.payslipBreakdownDetailRow}
+                        >
+                          <div>
+                            <div className={styles.payslipBreakdownLabel}>
+                              {item.reason || "Manual Deduction"}
+                            </div>
+                            <div className={styles.payslipBreakdownMeta}>
+                              Moved to {monthLabel(item.deferredToMonth)}{" "}
+                              {item.deferredToYear}
+                            </div>
+                          </div>
+                          <span className={styles.payslipBreakdownAmount}>
+                            {currency(item.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
                   {loanDeductionAmount > 0 && (
                     <>
                       <div className={styles.payslipAllowanceHeader}>
@@ -1701,12 +1343,12 @@ const Payroll = () => {
                 </div>
               </>
 
-              {false && totalDeductions > 0 && (
+              {showLegacyDeductionSection && totalDeductions > 0 && (
                 <>
                 </>
               )}
 
-              {false && (
+              {showLegacyDeductionSection && (
                 <>
                   <div className={styles.payslipSectionTitle}>Deductions</div>
                   <div className={styles.payslipBreakdownWrap}>
@@ -1787,6 +1429,22 @@ const Payroll = () => {
               </div>
 
               <div className={styles.payslipFooter}>
+                {!payslip?.isPaid && (
+                  <Button
+                    variant="outline"
+                    onClick={() => markAsPaidMutation.mutate(selectedPayslipId)}
+                    disabled={markAsPaidMutation.isPending}
+                  >
+                    {markAsPaidMutation.isPending ? (
+                      <>
+                        <Spinner className={styles.smallSpinner} />
+                        Marking...
+                      </>
+                    ) : (
+                      "Mark as Paid"
+                    )}
+                  </Button>
+                )}
                 <Button variant="green" onClick={handleDownloadPayslip}>
                   {isDownloadingPayslip ? (
                     <>

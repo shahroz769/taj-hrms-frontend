@@ -95,6 +95,8 @@ const payrollSchema = new mongoose.Schema(
       default: [],
     },
     calculations: {
+      calculationVersion: { type: String, default: "v1" },
+      calendarDaysInMonth: { type: Number, default: 0 },
       grossSalary: { type: Number, default: 0 },
       fullBasicSalaryAmount: { type: Number, default: 0 },
       fullAllowanceAmount: { type: Number, default: 0 },
@@ -103,6 +105,7 @@ const payrollSchema = new mongoose.Schema(
       basicSalaryDeductionAmount: { type: Number, default: 0 },
       allowanceDeductionAmount: { type: Number, default: 0 },
       attendanceDeductionAmount: { type: Number, default: 0 },
+      attendanceDeductionDayUnits: { type: Number, default: 0 },
       allowanceRatio: { type: Number, default: 0 },
       payableDayUnits: { type: Number, default: 0 },
       latePenaltyBasicAmount: { type: Number, default: 0 },
@@ -137,9 +140,23 @@ const payrollSchema = new mongoose.Schema(
     deductionBreakdown: {
       type: [
         {
+          deduction: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Deduction",
+            default: null,
+          },
           reason: String,
           amount: Number,
           date: Date,
+          status: {
+            type: String,
+            enum: ["deducted", "pending"],
+            default: "deducted",
+          },
+          sourceDueYear: Number,
+          sourceDueMonth: Number,
+          deferredToYear: Number,
+          deferredToMonth: Number,
         },
       ],
       default: [],
@@ -208,6 +225,19 @@ const payrollSchema = new mongoose.Schema(
         ref: "User",
         default: null,
       },
+    },
+    isPaid: {
+      type: Boolean,
+      default: false,
+    },
+    paidAt: {
+      type: Date,
+      default: null,
+    },
+    paidBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   { timestamps: true },

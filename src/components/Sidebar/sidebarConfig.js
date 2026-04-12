@@ -70,13 +70,13 @@ export const sidebarItems = [
     children: [
       { label: "Payroll", path: "/salary/payroll" },
       { label: "Deductions", path: "/salary/deductions" },
-      { label: "Loans", path: "/salary/loans" },
+      { label: "Loans/Advances", path: "/salary/loans" },
       { label: "Allowance Components", path: "/allowances/components" },
       { label: "Allowance Policies", path: "/allowances/policies" },
     ],
   },
   {
-    label: "Compliance",
+    label: "Warnings/Compliance",
     icon: MessageSquareWarningIcon,
     roles: [ROLES.admin, ROLES.supervisor],
     collapsible: true,

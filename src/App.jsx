@@ -25,6 +25,7 @@ import WorkProgressReports from "./pages/Compliance/WorkProgressReports";
 import DisciplinaryActions from "./pages/Compliance/DisciplinaryActions";
 import WarningTypes from "./pages/Compliance/WarningTypes";
 import EmployeeProgressReports from "./pages/Compliance/EmployeeProgressReports";
+import PayrollMonths from "./pages/Salary/PayrollMonths";
 import Payroll from "./pages/Salary/Payroll";
 import Deductions from "./pages/Salary/Deductions";
 import Loans from "./pages/Salary/Loans";
@@ -150,7 +151,8 @@ function App() {
                   path="/allowances/policies"
                   element={<AllowancePolicies />}
                 />
-                <Route path="/salary/payroll" element={<Payroll />} />
+                <Route path="/salary/payroll" element={<PayrollMonths />} />
+                <Route path="/salary/payroll/:year/:month" element={<Payroll />} />
                 <Route
                   path="/salary/deductions"
                   element={<Deductions />}

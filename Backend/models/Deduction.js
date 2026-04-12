@@ -21,6 +21,36 @@ const deductionSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    status: {
+      type: String,
+      enum: ["Pending", "Deducted"],
+      default: "Pending",
+    },
+    originalDueYear: {
+      type: Number,
+      default: null,
+    },
+    originalDueMonth: {
+      type: Number,
+      default: null,
+    },
+    currentDueYear: {
+      type: Number,
+      default: null,
+    },
+    currentDueMonth: {
+      type: Number,
+      default: null,
+    },
+    deductedAt: {
+      type: Date,
+      default: null,
+    },
+    deductedByPayroll: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payroll",
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -32,6 +62,7 @@ const deductionSchema = new mongoose.Schema(
 
 deductionSchema.index({ employee: 1, date: 1 });
 deductionSchema.index({ date: 1 });
+deductionSchema.index({ employee: 1, status: 1, currentDueYear: 1, currentDueMonth: 1 });
 
 const Deduction = mongoose.model("Deduction", deductionSchema);
 

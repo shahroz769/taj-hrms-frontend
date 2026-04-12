@@ -38,6 +38,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Pages / Modals
 import AttendanceCellEditModal from "./AttendanceCellEditModal";
@@ -164,6 +170,7 @@ const AttendanceRecords = () => {
     data,
     isLoading,
     isFetching,
+    isPlaceholderData,
     isError,
     refetch,
   } = useQuery({
@@ -483,6 +490,11 @@ const AttendanceRecords = () => {
 
       {/* Attendance Table */}
       <div className={styles.tableContainer}>
+        {isPlaceholderData && (
+          <div className={styles.fetchingOverlay}>
+            <Spinner className={styles.loader} />
+          </div>
+        )}
         <div className={styles.tableScrollArea}>
           <table className={styles.table}>
             {/* Head */}
@@ -505,13 +517,13 @@ const AttendanceRecords = () => {
                   );
                 })}
                 {/* Summary columns */}
-                <th className={`${styles.summaryHeader} ${styles.summaryWD}`}>WD</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryP}`}>P</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryA}`}>A</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryLPaid}`}>LP</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryLUnpaid}`}>LU</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryHD}`}>HD</th>
-                <th className={`${styles.summaryHeader} ${styles.summaryOff}`}>Off</th>
+                <th className={`${styles.summaryHeader} ${styles.summaryWD}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">WD</span></TooltipTrigger><TooltipContent>Working Days</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryP}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">P</span></TooltipTrigger><TooltipContent>Present</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryA}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">A</span></TooltipTrigger><TooltipContent>Absent</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryLPaid}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">LP</span></TooltipTrigger><TooltipContent>Leave Paid</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryLUnpaid}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">LU</span></TooltipTrigger><TooltipContent>Leave Unpaid</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryHD}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">HD</span></TooltipTrigger><TooltipContent>Half Day</TooltipContent></Tooltip></TooltipProvider></th>
+                <th className={`${styles.summaryHeader} ${styles.summaryOff}`}><TooltipProvider><Tooltip><TooltipTrigger asChild><span className="cursor-default">Off</span></TooltipTrigger><TooltipContent>Off Day</TooltipContent></Tooltip></TooltipProvider></th>
               </tr>
             </thead>
 
