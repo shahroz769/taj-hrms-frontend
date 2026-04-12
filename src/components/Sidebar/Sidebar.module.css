@@ -145,45 +145,43 @@
   font-weight: 600;
 }
 
-/* Scrollbar */
+/* Scrollbar  (Coolify-inspired) */
 
 /* === CHROME / EDGE / SAFARI / OPERA === */
 
-/* Width of scrollbar */
 .sidebarTop::-webkit-scrollbar {
-  width: 6px; /* adjust thickness */
+  background-color: transparent;
+  width: 8px;
+  height: 8px;
 }
 
-/* Scrollbar track (background behind thumb) */
 .sidebarTop::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 0;
+  background-color: transparent;
+  border-radius: 8px;
 }
 
-/* Scrollbar thumb (moving part) */
 .sidebarTop::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 4px;
+  background-color: var(--primary);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 8px;
 }
 
-/* Hover effect (optional) */
 .sidebarTop::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground);
+  background-color: var(--muted-foreground);
 }
 
-/* Remove arrows (top/bottom buttons) */
 .sidebarTop::-webkit-scrollbar-button {
-  height: 0;
   display: none;
+  height: 0;
 }
 
-/* Remove corner (bottom-right for both-axis scroll) */
 .sidebarTop::-webkit-scrollbar-corner {
-  background: transparent;
+  background-color: transparent;
 }
 
 /* === FIREFOX === */
 .sidebarTop {
-  scrollbar-width: thin; /* auto | thin | none */
-  scrollbar-color: var(--muted-foreground) transparent; /* thumb | track */
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
 }
