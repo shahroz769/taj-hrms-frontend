@@ -23,7 +23,7 @@ const deductionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Deducted"],
+      enum: ["Pending", "Approved", "Rejected", "Deducted"],
       default: "Pending",
     },
     originalDueYear: {

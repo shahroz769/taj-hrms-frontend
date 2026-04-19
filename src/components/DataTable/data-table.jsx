@@ -161,6 +161,19 @@ const DataTable = ({
                   )}
                   {columns.map((column, index) => {
                     if (column.key === "actions") {
+                      const editAction = column.renderEdit
+                        ? column.renderEdit(row)
+                        : null;
+                      const deleteAction = column.renderDelete
+                        ? column.renderDelete(row)
+                        : null;
+                      const approveAction = column.renderApprove
+                        ? column.renderApprove(row)
+                        : null;
+                      const rejectAction = column.renderReject
+                        ? column.renderReject(row)
+                        : null;
+
                       return (
                         <td
                           key={index}
@@ -177,14 +190,14 @@ const DataTable = ({
                                 : styles.actionsContainer
                             }
                           >
-                            {onEdit && (
+                            {onEdit && editAction && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
                                     className={styles.actionButton}
                                     onClick={() => onEdit(row)}
                                   >
-                                    {column.renderEdit(row)}
+                                    {editAction}
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -192,14 +205,14 @@ const DataTable = ({
                                 </TooltipContent>
                               </Tooltip>
                             )}
-                            {onDelete && (
+                            {onDelete && deleteAction && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
                                     className={styles.actionButton}
                                     onClick={() => onDelete(row)}
                                   >
-                                    {column.renderDelete(row)}
+                                    {deleteAction}
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -207,16 +220,14 @@ const DataTable = ({
                                 </TooltipContent>
                               </Tooltip>
                             )}
-                            {onApprove &&
-                              column.renderApprove &&
-                              column.renderApprove(row) && (
+                            {onApprove && approveAction && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <button
                                       className={styles.actionButton}
                                       onClick={() => onApprove(row)}
                                     >
-                                      {column.renderApprove(row)}
+                                      {approveAction}
                                     </button>
                                   </TooltipTrigger>
                                   <TooltipContent>
@@ -224,16 +235,14 @@ const DataTable = ({
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-                            {onReject &&
-                              column.renderReject &&
-                              column.renderReject(row) && (
+                            {onReject && rejectAction && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <button
                                       className={styles.actionButton}
                                       onClick={() => onReject(row)}
                                     >
-                                      {column.renderReject(row)}
+                                      {rejectAction}
                                     </button>
                                   </TooltipTrigger>
                                   <TooltipContent>

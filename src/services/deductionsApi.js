@@ -32,6 +32,11 @@ export const updateDeduction = async (id, payload) => {
   return res.data;
 };
 
+export const updateDeductionStatus = async (id, payload) => {
+  const res = await API.patch(`/api/deductions/${id}/status`, payload);
+  return res.data;
+};
+
 export const deleteDeduction = async (id) => {
   const res = await API.delete(`/api/deductions/${id}`);
   return res.data;

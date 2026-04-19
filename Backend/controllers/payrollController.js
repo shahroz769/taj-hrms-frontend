@@ -430,7 +430,7 @@ const runPayrollMutationForEmployee = async ({
             const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
             if (!deduction) continue;
 
-            deduction.status = "Pending";
+            deduction.status = "Approved";
             deduction.deductedAt = null;
             deduction.deductedByPayroll = null;
             deduction.currentDueYear =
@@ -520,7 +520,7 @@ const runPayrollMutationForEmployee = async ({
               deduction.currentDueMonth ||
               month;
           } else {
-            deduction.status = "Pending";
+            deduction.status = "Approved";
             deduction.deductedAt = null;
             deduction.deductedByPayroll = null;
             deduction.currentDueYear =

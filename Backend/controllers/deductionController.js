@@ -4,6 +4,18 @@ import Payroll from "../models/Payroll.js";
 import mongoose from "mongoose";
 import { formatInTimeZone } from "date-fns-tz";
 import { PAKISTAN_TZ } from "../utils/timezone.js";
+import { ROLES } from "../utils/roles.js";
+
+const ensureSupervisorCanManagePendingDeduction = (req, deduction, res) => {
+  const isAdmin = req.user?.role === ROLES.admin;
+
+  if (!isAdmin && deduction.status !== "Pending") {
+    res.status(403);
+    throw new Error(
+      "Supervisors can only modify or delete deductions while they are pending approval",
+    );
+  }
+};
 
 // @description     Get all deductions (paginated, with filters)
 // @route           GET /api/deductions
@@ -203,7 +215,7 @@ export const searchEmployeesForDeduction = async (req, res, next) => {
 
 // @description     Create deduction(s)
 // @route           POST /api/deductions
-// @access          Admin
+// @access          Admin, Supervisor
 export const createDeduction = async (req, res, next) => {
   try {
     const { employees, amount, date, reason } = req.body || {};
@@ -262,6 +274,7 @@ export const createDeduction = async (req, res, next) => {
       throw new Error("Reason is required");
     }
 
+    const isAdmin = req.user?.role === ROLES.admin;
     const createdDeductions = [];
     for (const empId of employees) {
       const dueYear = Number(formatInTimeZone(deductionDate, PAKISTAN_TZ, "yyyy"));
@@ -271,7 +284,7 @@ export const createDeduction = async (req, res, next) => {
         amount: parsedAmount,
         date: deductionDate,
         reason: reason.trim(),
-        status: "Pending",
+        status: isAdmin ? "Approved" : "Pending",
         originalDueYear: dueYear,
         originalDueMonth: dueMonth,
         currentDueYear: dueYear,
@@ -284,7 +297,12 @@ export const createDeduction = async (req, res, next) => {
 
     res
       .status(201)
-      .json({ count: createdDeductions.length, message: "Deduction(s) created successfully" });
+      .json({
+        count: createdDeductions.length,
+        message: isAdmin
+          ? "Deduction(s) created successfully"
+          : "Deduction(s) created and submitted for admin approval",
+      });
   } catch (err) {
     console.log(err);
     next(err);
@@ -293,7 +311,7 @@ export const createDeduction = async (req, res, next) => {
 
 // @description     Update deduction
 // @route           PUT /api/deductions/:id
-// @access          Admin
+// @access          Admin, Supervisor
 export const updateDeduction = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -308,6 +326,7 @@ export const updateDeduction = async (req, res, next) => {
       res.status(404);
       throw new Error("Deduction not found");
     }
+    ensureSupervisorCanManagePendingDeduction(req, deduction, res);
 
     const { employee, amount, date, reason } = req.body || {};
 
@@ -388,7 +407,7 @@ export const updateDeduction = async (req, res, next) => {
 
 // @description     Delete deduction
 // @route           DELETE /api/deductions/:id
-// @access          Admin
+// @access          Admin, Supervisor
 export const deleteDeduction = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -407,6 +426,7 @@ export const deleteDeduction = async (req, res, next) => {
       res.status(404);
       throw new Error("Deduction not found");
     }
+    ensureSupervisorCanManagePendingDeduction(req, deduction, res);
 
     // Check if payroll exists for the month of this deduction
     const deductionDate = new Date(deduction.date);
@@ -431,6 +451,55 @@ export const deleteDeduction = async (req, res, next) => {
         employee: deduction.employee?.fullName,
         amount: deduction.amount,
       },
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Update deduction status (Approve/Reject/Reset to Pending)
+// @route           PATCH /api/deductions/:id/status
+// @access          Admin
+export const updateDeductionStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Deduction not found");
+    }
+
+    const deduction = await Deduction.findById(id).populate(
+      "employee",
+      "fullName employeeID",
+    );
+
+    if (!deduction) {
+      res.status(404);
+      throw new Error("Deduction not found");
+    }
+
+    if (deduction.status === "Deducted") {
+      res.status(400);
+      throw new Error("A deducted deduction cannot be manually re-approved or rejected");
+    }
+
+    const validStatuses = ["Pending", "Approved", "Rejected"];
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400);
+      throw new Error(
+        `Invalid status. Valid statuses are: ${validStatuses.join(", ")}`,
+      );
+    }
+
+    deduction.status = status;
+    const updatedDeduction = await deduction.save();
+
+    res.json({
+      message: `Deduction ${status.toLowerCase()} successfully`,
+      deduction: updatedDeduction,
     });
   } catch (err) {
     console.log(err);

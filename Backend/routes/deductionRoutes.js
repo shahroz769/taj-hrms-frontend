@@ -5,6 +5,7 @@ import {
   deleteDeduction,
   getDeductions,
   searchEmployeesForDeduction,
+  updateDeductionStatus,
   updateDeduction,
 } from "../controllers/deductionController.js";
 import { authorize } from "../middleware/rbacMiddleware.js";
@@ -29,12 +30,30 @@ router.get(
 );
 
 // @route           POST /api/deductions
-router.post("/", protect, authorize(ROLES.admin), createDeduction);
+router.post(
+  "/",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  createDeduction,
+);
 
 // @route           PUT /api/deductions/:id
-router.put("/:id", protect, authorize(ROLES.admin), updateDeduction);
+router.put(
+  "/:id",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  updateDeduction,
+);
+
+// @route           PATCH /api/deductions/:id/status
+router.patch("/:id/status", protect, authorize(ROLES.admin), updateDeductionStatus);
 
 // @route           DELETE /api/deductions/:id
-router.delete("/:id", protect, authorize(ROLES.admin), deleteDeduction);
+router.delete(
+  "/:id",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  deleteDeduction,
+);
 
 export default router;

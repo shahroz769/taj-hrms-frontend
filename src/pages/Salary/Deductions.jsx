@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSelector } from "react-redux";
 import CalendarIcon from "lucide-react/dist/esm/icons/calendar";
 import CheckIcon from "lucide-react/dist/esm/icons/check";
 import ChevronsUpDownIcon from "lucide-react/dist/esm/icons/chevrons-up-down";
@@ -91,15 +92,17 @@ import {
   createDeduction,
   deleteDeduction,
   fetchDeductions,
+  searchEmployeesForDeduction,
   updateDeduction,
+  updateDeductionStatus,
 } from "@/services/deductionsApi";
-import { fetchEmployeesList } from "@/services/employeesApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchPositionsFilters } from "@/services/positionsApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
 import { cn } from "@/lib/utils";
+import { ROLES } from "@/utils/roles";
 
 // Styles
 import styles from "./Deductions.module.css";
@@ -136,11 +139,23 @@ const MONTHS = [
   { value: "12", label: "December" },
 ];
 
+const STATUS_BADGE_CLASS = {
+  Pending: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100",
+  Approved: "bg-green-100 text-green-700 hover:bg-green-100",
+  Rejected: "bg-red-100 text-red-700 hover:bg-red-100",
+  Deducted: "bg-blue-100 text-blue-700 hover:bg-blue-100",
+};
+
+const REVIEWABLE_STATUSES = ["Pending", "Approved", "Rejected"];
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
 
 const Deductions = () => {
+  const userRole = useSelector((state) => state.auth.user?.role);
+  const isAdmin = userRole === ROLES.admin;
+
   // ===========================================================================
   // URL SEARCH PARAMS
   // ===========================================================================
@@ -166,6 +181,9 @@ const Deductions = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editingDeduction, setEditingDeduction] = useState(null);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewingDeduction, setReviewingDeduction] = useState(null);
+  const [reviewStatus, setReviewStatus] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingDeduction, setDeletingDeduction] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
@@ -281,13 +299,11 @@ const Deductions = () => {
   // Employee list for combobox
   const { data: employeesList = [], isFetching: isLoadingEmployees } = useQuery({
     queryKey: ["employees-list", debouncedEmployeeQuery],
-    queryFn: () =>
-      fetchEmployeesList({ q: debouncedEmployeeQuery, limit: 10 }),
+    queryFn: () => searchEmployeesForDeduction(debouncedEmployeeQuery),
     enabled:
       dialogOpen &&
       employeeComboboxOpen &&
       debouncedEmployeeQuery.length >= 1,
-    select: (data) => data?.employees || [],
     placeholderData: (previous) => previous,
   });
 
@@ -325,11 +341,11 @@ const Deductions = () => {
   // ---------------------------------------------------------------------------
   const createMutation = useMutation({
     mutationFn: createDeduction,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["deductions"] });
       resetForm();
       setDialogOpen(false);
-      toast.success("Deduction(s) applied successfully");
+      toast.success(response.message || "Deduction(s) applied successfully");
     },
     onError: (error) => {
       const errorMessage =
@@ -345,7 +361,7 @@ const Deductions = () => {
       queryClient.invalidateQueries({ queryKey: ["deductions"] });
       resetForm();
       setDialogOpen(false);
-      toast.success("Deduction updated successfully");
+      toast.success(response.message || "Deduction updated successfully");
       if (response.payrollExists) {
         toast.warning(
           "Payroll exists for this month. Please regenerate payroll to reflect changes.",
@@ -361,13 +377,29 @@ const Deductions = () => {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, payload }) => updateDeductionStatus(id, payload),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["deductions"] });
+      setReviewDialogOpen(false);
+      setReviewingDeduction(null);
+      setReviewStatus("");
+      toast.success(response.message || "Deduction status updated successfully");
+    },
+    onError: (error) => {
+      const errorMessage =
+        error.response?.data?.message || "Failed to update deduction status";
+      toast.error(errorMessage);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: deleteDeduction,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["deductions"] });
       setDeleteDialogOpen(false);
       setDeletingDeduction(null);
-      toast.success("Deduction deleted successfully");
+      toast.success(response.message || "Deduction deleted successfully");
       if (response.payrollExists) {
         toast.warning(
           "Payroll exists for this month. Please regenerate payroll to reflect changes.",
@@ -385,6 +417,10 @@ const Deductions = () => {
   // ===========================================================================
   // TABLE
   // ===========================================================================
+  const canManageDeduction = (row) => isAdmin || row.status === "Pending";
+  const canReviewDeductionStatus = (row) =>
+    isAdmin && REVIEWABLE_STATUSES.includes(row.status);
+
   const columns = [
     {
       key: "employeeName",
@@ -415,11 +451,44 @@ const Deductions = () => {
     {
       key: "status",
       label: "Status",
-      render: (row) => (
-        <Badge variant={row.status === "Deducted" ? "default" : "secondary"}>
-          {row.status || "Pending"}
-        </Badge>
-      ),
+      render: (row) => {
+        const status = row.status || "Pending";
+        const badge = (
+          <Badge
+            className={
+              STATUS_BADGE_CLASS[status] ||
+              "bg-yellow-100 text-yellow-700 hover:bg-yellow-100"
+            }
+          >
+            {status}
+          </Badge>
+        );
+
+        if (!canReviewDeductionStatus(row)) {
+          return badge;
+        }
+
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className={styles.statusButton}
+                onClick={() => {
+                  setReviewingDeduction(row);
+                  setReviewStatus(status);
+                  setReviewDialogOpen(true);
+                }}
+              >
+                {badge}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Update status</p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      },
     },
     {
       key: "date",
@@ -457,8 +526,14 @@ const Deductions = () => {
       key: "actions",
       label: "Actions",
       align: "center",
-      renderEdit: () => <PencilIcon size={18} />,
-      renderDelete: () => <TrashIcon size={18} />,
+      renderEdit: (row) => {
+        if (!canManageDeduction(row)) return null;
+        return <PencilIcon size={18} />;
+      },
+      renderDelete: (row) => {
+        if (!canManageDeduction(row)) return null;
+        return <TrashIcon size={18} />;
+      },
     },
   ];
 
@@ -478,6 +553,13 @@ const Deductions = () => {
   };
 
   const handleEdit = (row) => {
+    if (!canManageDeduction(row)) {
+      toast.error(
+        "Supervisors can only edit deductions while they are pending approval",
+      );
+      return;
+    }
+
     setEditingDeduction(row);
     setSelectedEmployees(
       row.employee
@@ -497,6 +579,13 @@ const Deductions = () => {
   };
 
   const handleDelete = (row) => {
+    if (!canManageDeduction(row)) {
+      toast.error(
+        "Supervisors can only delete deductions while they are pending approval",
+      );
+      return;
+    }
+
     setDeletingDeduction(row);
     setDeleteDialogOpen(true);
   };
@@ -508,7 +597,19 @@ const Deductions = () => {
   };
 
   const handleAddClick = () => {
+    resetForm();
     setDialogOpen(true);
+  };
+
+  const handleReviewStatusSubmit = () => {
+    if (!reviewingDeduction || !reviewStatus) {
+      return;
+    }
+
+    updateStatusMutation.mutate({
+      id: reviewingDeduction._id,
+      payload: { status: reviewStatus },
+    });
   };
 
   // Search
@@ -705,6 +806,15 @@ const Deductions = () => {
                   <p className="text-sm text-red-600">{errors.server}</p>
                 </div>
               )}
+              <div className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                {editingDeduction
+                  ? isAdmin
+                    ? "Admins can update any deduction record directly."
+                    : "Supervisors can only update deductions while they remain pending approval."
+                  : isAdmin
+                    ? "Admin-created deductions are approved immediately."
+                    : "Supervisor-created deductions are submitted as Pending until an admin reviews them."}
+              </div>
               <div className="grid gap-4">
                 {/* Employee Multi-select — Command Combobox */}
                 <div className="grid gap-3">
@@ -938,6 +1048,100 @@ const Deductions = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog
+        open={reviewDialogOpen}
+        onOpenChange={(open) => {
+          setReviewDialogOpen(open);
+          if (!open) {
+            setReviewingDeduction(null);
+            setReviewStatus("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-primary">
+              Review Deduction Status
+            </DialogTitle>
+            <DialogDescription>
+              Update the approval status for this deduction.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-foreground">
+                  {reviewingDeduction?.employee?.fullName || "-"}
+                  {reviewingDeduction?.employee?.employeeID
+                    ? ` (${reviewingDeduction.employee.employeeID})`
+                    : ""}
+                </span>
+                <span className="text-muted-foreground">
+                  Amount: PKR{" "}
+                  {Number(reviewingDeduction?.amount || 0).toLocaleString()}
+                </span>
+                <span className="text-muted-foreground">
+                  Date:{" "}
+                  {reviewingDeduction?.date
+                    ? formatDate(reviewingDeduction.date)
+                    : "-"}
+                </span>
+                <span className="text-muted-foreground">
+                  Reason: {reviewingDeduction?.reason || "-"}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <Label className="text-foreground">Status</Label>
+              <Select value={reviewStatus} onValueChange={setReviewStatus}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {REVIEWABLE_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="cursor-pointer">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              variant="green"
+              className="cursor-pointer"
+              disabled={
+                updateStatusMutation.isPending ||
+                !reviewStatus ||
+                reviewStatus === reviewingDeduction?.status
+              }
+              onClick={handleReviewStatusSubmit}
+            >
+              {updateStatusMutation.isPending ? (
+                <>
+                  <Spinner />
+                  Updating
+                </>
+              ) : (
+                "Save Status"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Controls */}
       <div className={styles.controls}>

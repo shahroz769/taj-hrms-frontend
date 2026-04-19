@@ -25,8 +25,13 @@ const router = express.Router();
 
 // @route           GET /api/employees
 // @description     Get all employees (paginated)
-// @access          Admin
-router.get("/", protect, authorize(ROLES.admin), getAllEmployees);
+// @access          Admin, Supervisor
+router.get(
+  "/",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getAllEmployees,
+);
 
 // @route           GET /api/employees/list
 // @description     Get employees list for dropdowns

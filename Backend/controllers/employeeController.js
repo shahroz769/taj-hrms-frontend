@@ -306,7 +306,7 @@ export const createEmployee = async (req, res, next) => {
 
 // @description     Get all employees
 // @route           GET /api/employees
-// @access          Admin
+// @access          Admin, Supervisor
 export const getAllEmployees = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;

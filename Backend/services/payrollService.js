@@ -691,7 +691,7 @@ export const calculateEmployeePayroll = async ({
         employee: employee._id,
         $and: [
           {
-            status: "Pending",
+            status: "Approved",
           },
           {
             $or: [
