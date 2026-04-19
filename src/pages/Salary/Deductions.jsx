@@ -10,6 +10,7 @@ import { useSelector } from "react-redux";
 import CalendarIcon from "lucide-react/dist/esm/icons/calendar";
 import CheckIcon from "lucide-react/dist/esm/icons/check";
 import ChevronsUpDownIcon from "lucide-react/dist/esm/icons/chevrons-up-down";
+import CircleCheckIcon from "lucide-react/dist/esm/icons/circle-check";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
 import PencilIcon from "lucide-react/dist/esm/icons/pencil";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
@@ -17,6 +18,7 @@ import SearchIcon from "lucide-react/dist/esm/icons/search";
 import SlidersHorizontalIcon from "lucide-react/dist/esm/icons/sliders-horizontal";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import XIcon from "lucide-react/dist/esm/icons/x";
+import XCircleIcon from "lucide-react/dist/esm/icons/x-circle";
 import { toast } from "sonner";
 
 // Components
@@ -146,8 +148,6 @@ const STATUS_BADGE_CLASS = {
   Deducted: "bg-blue-100 text-blue-700 hover:bg-blue-100",
 };
 
-const REVIEWABLE_STATUSES = ["Pending", "Approved", "Rejected"];
-
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -181,9 +181,6 @@ const Deductions = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editingDeduction, setEditingDeduction] = useState(null);
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [reviewingDeduction, setReviewingDeduction] = useState(null);
-  const [reviewStatus, setReviewStatus] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingDeduction, setDeletingDeduction] = useState(null);
   const [searchValue, setSearchValue] = useState(getInitialSearch);
@@ -381,9 +378,6 @@ const Deductions = () => {
     mutationFn: ({ id, payload }) => updateDeductionStatus(id, payload),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["deductions"] });
-      setReviewDialogOpen(false);
-      setReviewingDeduction(null);
-      setReviewStatus("");
       toast.success(response.message || "Deduction status updated successfully");
     },
     onError: (error) => {
@@ -418,8 +412,10 @@ const Deductions = () => {
   // TABLE
   // ===========================================================================
   const canManageDeduction = (row) => isAdmin || row.status === "Pending";
-  const canReviewDeductionStatus = (row) =>
-    isAdmin && REVIEWABLE_STATUSES.includes(row.status);
+  const canApproveDeduction = (row) =>
+    isAdmin && row.status === "Pending";
+  const canRejectDeduction = (row) =>
+    isAdmin && row.status === "Pending";
 
   const columns = [
     {
@@ -453,7 +449,7 @@ const Deductions = () => {
       label: "Status",
       render: (row) => {
         const status = row.status || "Pending";
-        const badge = (
+        return (
           <Badge
             className={
               STATUS_BADGE_CLASS[status] ||
@@ -462,31 +458,6 @@ const Deductions = () => {
           >
             {status}
           </Badge>
-        );
-
-        if (!canReviewDeductionStatus(row)) {
-          return badge;
-        }
-
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className={styles.statusButton}
-                onClick={() => {
-                  setReviewingDeduction(row);
-                  setReviewStatus(status);
-                  setReviewDialogOpen(true);
-                }}
-              >
-                {badge}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p>Update status</p>
-            </TooltipContent>
-          </Tooltip>
         );
       },
     },
@@ -533,6 +504,14 @@ const Deductions = () => {
       renderDelete: (row) => {
         if (!canManageDeduction(row)) return null;
         return <TrashIcon size={18} />;
+      },
+      renderApprove: (row) => {
+        if (!canApproveDeduction(row)) return null;
+        return <CircleCheckIcon size={18} className="text-green-600" />;
+      },
+      renderReject: (row) => {
+        if (!canRejectDeduction(row)) return null;
+        return <XCircleIcon size={18} className="text-red-500" />;
       },
     },
   ];
@@ -601,14 +580,17 @@ const Deductions = () => {
     setDialogOpen(true);
   };
 
-  const handleReviewStatusSubmit = () => {
-    if (!reviewingDeduction || !reviewStatus) {
-      return;
-    }
-
+  const handleApprove = (row) => {
     updateStatusMutation.mutate({
-      id: reviewingDeduction._id,
-      payload: { status: reviewStatus },
+      id: row._id,
+      payload: { status: "Approved" },
+    });
+  };
+
+  const handleReject = (row) => {
+    updateStatusMutation.mutate({
+      id: row._id,
+      payload: { status: "Rejected" },
     });
   };
 
@@ -1049,100 +1031,6 @@ const Deductions = () => {
         </Dialog>
       </div>
 
-      <Dialog
-        open={reviewDialogOpen}
-        onOpenChange={(open) => {
-          setReviewDialogOpen(open);
-          if (!open) {
-            setReviewingDeduction(null);
-            setReviewStatus("");
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-primary">
-              Review Deduction Status
-            </DialogTitle>
-            <DialogDescription>
-              Update the approval status for this deduction.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-foreground">
-                  {reviewingDeduction?.employee?.fullName || "-"}
-                  {reviewingDeduction?.employee?.employeeID
-                    ? ` (${reviewingDeduction.employee.employeeID})`
-                    : ""}
-                </span>
-                <span className="text-muted-foreground">
-                  Amount: PKR{" "}
-                  {Number(reviewingDeduction?.amount || 0).toLocaleString()}
-                </span>
-                <span className="text-muted-foreground">
-                  Date:{" "}
-                  {reviewingDeduction?.date
-                    ? formatDate(reviewingDeduction.date)
-                    : "-"}
-                </span>
-                <span className="text-muted-foreground">
-                  Reason: {reviewingDeduction?.reason || "-"}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-3">
-              <Label className="text-foreground">Status</Label>
-              <Select value={reviewStatus} onValueChange={setReviewStatus}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {REVIEWABLE_STATUSES.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className="cursor-pointer">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button
-              type="button"
-              variant="green"
-              className="cursor-pointer"
-              disabled={
-                updateStatusMutation.isPending ||
-                !reviewStatus ||
-                reviewStatus === reviewingDeduction?.status
-              }
-              onClick={handleReviewStatusSubmit}
-            >
-              {updateStatusMutation.isPending ? (
-                <>
-                  <Spinner />
-                  Updating
-                </>
-              ) : (
-                "Save Status"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Controls */}
       <div className={styles.controls}>
         <InputGroup className={styles.tableSearchInput}>
@@ -1340,6 +1228,9 @@ const Deductions = () => {
         data={data?.deductions || []}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        approveLabel="Approve"
         isLoading={isLoading}
         isError={isError}
         loadingText="Loading deductions..."
