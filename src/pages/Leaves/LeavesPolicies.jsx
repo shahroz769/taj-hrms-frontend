@@ -769,7 +769,7 @@ const LeavesPolicies = () => {
         loadingText="Loading leave policies..."
       />
 
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

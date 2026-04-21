@@ -522,7 +522,7 @@ export const settleLoan = async (req, res, next) => {
         : entry.toObject ? entry.toObject() : entry,
     );
 
-    loan.totalPaid = round2(loan.loanAmount);
+    loan.totalPaid = floorInt(loan.loanAmount);
     loan.remainingBalance = 0;
     loan.status = "Completed";
     loan.completedAt = new Date();

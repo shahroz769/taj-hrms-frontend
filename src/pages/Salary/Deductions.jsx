@@ -411,11 +411,12 @@ const Deductions = () => {
   // ===========================================================================
   // TABLE
   // ===========================================================================
-  const canManageDeduction = (row) => isAdmin || row.status === "Pending";
+  const canManageDeduction = (row) =>
+    row.status !== "Deducted" && (isAdmin || row.status === "Pending");
   const canApproveDeduction = (row) =>
-    isAdmin && row.status === "Pending";
+    isAdmin && row.status !== "Deducted";
   const canRejectDeduction = (row) =>
-    isAdmin && row.status === "Pending";
+    isAdmin && row.status !== "Deducted";
 
   const columns = [
     {
@@ -534,7 +535,9 @@ const Deductions = () => {
   const handleEdit = (row) => {
     if (!canManageDeduction(row)) {
       toast.error(
-        "Supervisors can only edit deductions while they are pending approval",
+        row.status === "Deducted"
+          ? "Paid deductions cannot be edited"
+          : "Supervisors can only edit deductions while they are pending approval",
       );
       return;
     }
@@ -560,7 +563,9 @@ const Deductions = () => {
   const handleDelete = (row) => {
     if (!canManageDeduction(row)) {
       toast.error(
-        "Supervisors can only delete deductions while they are pending approval",
+        row.status === "Deducted"
+          ? "Paid deductions cannot be deleted"
+          : "Supervisors can only delete deductions while they are pending approval",
       );
       return;
     }
@@ -1236,7 +1241,7 @@ const Deductions = () => {
         loadingText="Loading deductions..."
       />
 
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

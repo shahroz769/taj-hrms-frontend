@@ -116,7 +116,7 @@ import styles from "./Loans.module.css";
 // ============================================================================
 
 const currency = (val) =>
-  `PKR ${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  `PKR ${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const REPAYMENT_LABELS = {
   fixed_amount: "Fixed Amount",
@@ -142,13 +142,6 @@ const YEARS = Array.from(
   { length: CURRENT_YEAR - START_YEAR + 2 },
   (_, i) => String(START_YEAR + i),
 );
-
-const truncateReason = (text) => {
-  if (!text) return "-";
-  const words = text.trim().split(/\s+/);
-  if (words.length <= 2) return text;
-  return words.slice(0, 2).join(" ") + "...";
-};
 
 // ============================================================================
 // COMPONENT
@@ -940,6 +933,7 @@ const Loans = () => {
         columns={columns}
         data={data?.loans || []}
         onEdit={handleEdit}
+        editLabel="View"
         onDelete={handleDelete}
         onApprove={handleApprove}
         onReject={handleReject}
@@ -950,7 +944,7 @@ const Loans = () => {
       />
 
       {/* ── Pagination ── */}
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

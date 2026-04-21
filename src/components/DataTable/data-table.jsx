@@ -12,6 +12,7 @@ const DataTable = ({
   columns,
   data,
   onEdit,
+  editLabel = "Edit",
   onDelete,
   onApprove,
   approveLabel = "Approve",
@@ -110,7 +111,7 @@ const DataTable = ({
         </thead>
         <tbody className={styles.tableBody}>
           {isLoading ? (
-            <tr>
+            <tr className={styles.stateRow}>
               <td colSpan={totalColumns} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
                   <Spinner className={styles.loader} />
@@ -119,7 +120,7 @@ const DataTable = ({
               </td>
             </tr>
           ) : isError ? (
-            <tr>
+            <tr className={styles.stateRow}>
               <td colSpan={totalColumns} className={styles.stateCell}>
                 <div className={styles.errorContainer}>
                   <p className={styles.errorText}>
@@ -129,7 +130,7 @@ const DataTable = ({
               </td>
             </tr>
           ) : !data || data.length === 0 ? (
-            <tr>
+            <tr className={styles.stateRow}>
               <td colSpan={totalColumns} className={styles.stateCell}>
                 <div className={styles.stateContainer}>
                   <p className={styles.stateText}>No data found.</p>
@@ -201,7 +202,7 @@ const DataTable = ({
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>Edit</p>
+                                  <p>{editLabel}</p>
                                 </TooltipContent>
                               </Tooltip>
                             )}

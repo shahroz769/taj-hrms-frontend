@@ -1,6 +1,8 @@
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const roundMoney = (value) => Math.round(Number(value) || 0);
+
 export const getCalendarDaysInMonth = (year, month) =>
   new Date(Number(year), Number(month), 0).getDate();
 
@@ -40,17 +42,17 @@ export const calculateAttendanceDeductionFromCounts = ({
       key: "absent",
       label: "Absent",
       count: Number(absences || 0),
-      basicAmount: round2(absentBasicAmount),
-      allowanceAmount: round2(absentAllowanceAmount),
-      totalAmount: round2(absentBasicAmount + absentAllowanceAmount),
+      basicAmount: roundMoney(absentBasicAmount),
+      allowanceAmount: roundMoney(absentAllowanceAmount),
+      totalAmount: roundMoney(absentBasicAmount + absentAllowanceAmount),
     },
     {
       key: "unpaidLeave",
       label: "Unpaid Leave",
       count: Number(unpaidLeaves || 0),
-      basicAmount: round2(unpaidLeaveBasicAmount),
-      allowanceAmount: round2(unpaidLeaveAllowanceAmount),
-      totalAmount: round2(
+      basicAmount: roundMoney(unpaidLeaveBasicAmount),
+      allowanceAmount: roundMoney(unpaidLeaveAllowanceAmount),
+      totalAmount: roundMoney(
         unpaidLeaveBasicAmount + unpaidLeaveAllowanceAmount,
       ),
     },
@@ -58,23 +60,23 @@ export const calculateAttendanceDeductionFromCounts = ({
       key: "halfDay",
       label: "Half Day",
       count: Number(halfDays || 0),
-      basicAmount: round2(halfDayBasicAmount),
-      allowanceAmount: round2(halfDayAllowanceAmount),
-      totalAmount: round2(halfDayBasicAmount + halfDayAllowanceAmount),
+      basicAmount: roundMoney(halfDayBasicAmount),
+      allowanceAmount: roundMoney(halfDayAllowanceAmount),
+      totalAmount: roundMoney(halfDayBasicAmount + halfDayAllowanceAmount),
     },
   ].filter((item) => item.count > 0 || Math.abs(item.totalAmount) > 0.009);
 
   return {
-    basicDeductionAmount: round2(
+    basicDeductionAmount: roundMoney(
       breakdown.reduce((sum, item) => sum + Number(item.basicAmount || 0), 0),
     ),
-    allowanceDeductionAmount: round2(
+    allowanceDeductionAmount: roundMoney(
       breakdown.reduce(
         (sum, item) => sum + Number(item.allowanceAmount || 0),
         0,
       ),
     ),
-    totalDeductionAmount: round2(
+    totalDeductionAmount: roundMoney(
       breakdown.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0),
     ),
     deductionDayUnits: round2(
@@ -108,12 +110,12 @@ export const calculateLoanDeductionForPayroll = ({
   }
 
   const entry = activeLoan.repaymentSchedule[scheduleIndex];
-  const cappedAvailable = Math.max(0, round2(salaryAvailable));
+  const cappedAvailable = Math.max(0, roundMoney(salaryAvailable));
   const scheduledAmount =
     activeLoan.repaymentType === "next_salary"
       ? Number(activeLoan.remainingBalance || 0)
       : Number(entry.amount || 0);
-  const loanDeductionAmount = round2(
+  const loanDeductionAmount = roundMoney(
     Math.min(
       Number(activeLoan.remainingBalance || 0),
       Number(scheduledAmount || 0),
@@ -138,7 +140,7 @@ export const calculateLoanDeductionForPayroll = ({
         installmentAmount: loanDeductionAmount,
         installmentNumber: paidBefore + 1,
         totalInstallments: activeLoan.repaymentSchedule.length,
-        remainingBalance: round2(
+        remainingBalance: roundMoney(
           Number(activeLoan.remainingBalance || 0) - loanDeductionAmount,
         ),
       },
@@ -152,20 +154,20 @@ export const calculateManualDeductionPlan = ({
   payrollYear,
   payrollMonth,
 }) => {
-  const availableSalary = round2(Math.max(0, Number(salaryAvailable || 0)));
+  const availableSalary = roundMoney(Math.max(0, Number(salaryAvailable || 0)));
   let remainingSalary = availableSalary;
   let deductedAmount = 0;
   const breakdown = [];
   const nextDue = getNextYearMonth(payrollYear, payrollMonth);
 
   for (const deduction of deductions) {
-    const amount = round2(Number(deduction.amount || 0));
+    const amount = roundMoney(Number(deduction.amount || 0));
     const sourceDueYear = Number(deduction.currentDueYear || payrollYear);
     const sourceDueMonth = Number(deduction.currentDueMonth || payrollMonth);
 
     if (amount <= remainingSalary) {
       deductedAmount += amount;
-      remainingSalary = round2(remainingSalary - amount);
+      remainingSalary = roundMoney(remainingSalary - amount);
       breakdown.push({
         deduction: deduction._id,
         reason: deduction.reason || "Manual Deduction",
@@ -192,8 +194,8 @@ export const calculateManualDeductionPlan = ({
   }
 
   return {
-    deductedAmount: round2(deductedAmount),
-    remainingSalary: round2(remainingSalary),
+    deductedAmount: roundMoney(deductedAmount),
+    remainingSalary: roundMoney(remainingSalary),
     breakdown,
   };
 };

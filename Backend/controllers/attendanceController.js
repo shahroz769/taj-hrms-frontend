@@ -11,25 +11,6 @@ import LeaveApplication from "../models/LeaveApplication.js";
 // ---------------------------------------------------------------------------
 
 /**
- * Expand an array of { startDate, endDate } into individual Date objects (UTC midnight).
- */
-const expandDateRanges = (dateRanges) => {
-  const dates = [];
-  for (const range of dateRanges) {
-    const start = new Date(range.startDate);
-    const end = new Date(range.endDate);
-    start.setUTCHours(0, 0, 0, 0);
-    end.setUTCHours(0, 0, 0, 0);
-    const current = new Date(start);
-    while (current <= end) {
-      dates.push(new Date(current));
-      current.setUTCDate(current.getUTCDate() + 1);
-    }
-  }
-  return dates;
-};
-
-/**
  * Day-of-week name from a Date (UTC).
  * Returns "Monday", "Tuesday", etc.
  */
@@ -296,14 +277,14 @@ const refreshMonthlySummary = async (employeeId, year, month) => {
 // CONTROLLER FUNCTIONS
 // ---------------------------------------------------------------------------
 
-// @description  Bulk mark attendance for multiple employees over date ranges
+// @description  Bulk mark attendance for multiple employees on a single date
 // @route        POST /api/attendances/bulk-mark
 // @access       Admin
 export const bulkMarkAttendance = async (req, res, next) => {
   try {
     const {
       employeeIds,
-      dateRanges,
+      date,
       fallbackShiftId,
       forceApplyShift,
       overwrite,
@@ -316,20 +297,22 @@ export const bulkMarkAttendance = async (req, res, next) => {
       throw new Error("At least one employee ID is required");
     }
 
-    if (!dateRanges || !Array.isArray(dateRanges) || dateRanges.length === 0) {
+    if (!date) {
       res.status(400);
-      throw new Error("At least one date range is required");
+      throw new Error("Attendance date is required");
     }
 
-    for (const range of dateRanges) {
-      if (!range.startDate || !range.endDate) {
-        res.status(400);
-        throw new Error("Each date range must have startDate and endDate");
-      }
-      if (new Date(range.endDate) < new Date(range.startDate)) {
-        res.status(400);
-        throw new Error("endDate cannot be before startDate in a date range");
-      }
+    if (Array.isArray(req.body.dateRanges) && req.body.dateRanges.length > 0) {
+      res.status(400);
+      throw new Error(
+        "Date ranges are no longer supported. Please select a single attendance date.",
+      );
+    }
+
+    const attendanceDate = normalizeUtcDate(date);
+    if (!attendanceDate) {
+      res.status(400);
+      throw new Error("Invalid attendance date");
     }
 
     // --- Validate employee IDs ---
@@ -384,12 +367,7 @@ export const bulkMarkAttendance = async (req, res, next) => {
       employmentBoundsMap[emp._id.toString()] = getEmploymentBounds(emp);
     }
 
-    // --- Expand date ranges into individual dates ---
-    const allDates = expandDateRanges(dateRanges);
-    if (allDates.length === 0) {
-      res.status(400);
-      throw new Error("No valid dates found in date ranges");
-    }
+    const allDates = [attendanceDate];
 
     // --- Fetch all current active shifts for all employees in one query ---
     const activeShifts = await EmployeeShift.find({
@@ -410,8 +388,7 @@ export const bulkMarkAttendance = async (req, res, next) => {
     // Track which employee-months need summary refresh
     const monthsToRefresh = new Set();
 
-    // Compute earliest date from the expanded dates for EmployeeShift effectiveDate
-    const earliestDate = allDates.length > 0 ? new Date(Math.min(...allDates.map((d) => d.getTime()))) : new Date();
+    const earliestDate = attendanceDate;
 
     for (const employeeId of employeeIds) {
       // Determine the shift to use for this employee

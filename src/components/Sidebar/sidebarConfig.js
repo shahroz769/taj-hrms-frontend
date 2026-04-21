@@ -23,9 +23,15 @@ export const sidebarItems = [
     collapsible: true,
     collapseIcon: ChevronDownIcon,
     children: [
-      { label: "Departments Setup", path: "/setups/departments" },
-      { label: "Positions Setup", path: "/setups/positions" },
-      { label: "Shifts Setup", path: "/setups/shifts" },
+      { label: "Departments", path: "/setups/departments" },
+      { label: "Shifts", path: "/setups/shifts" },
+      { label: "Leave Types", path: "/leaves/types" },
+      { label: "Leave Policies", path: "/leaves/policies" },
+      { label: "Allowance Components", path: "/allowances/components" },
+      { label: "Allowance Policies", path: "/allowances/policies" },
+      { label: "Positions", path: "/setups/positions" },
+      { label: "Warning Types", path: "/compliance/warning-types" },
+      { label: "Employees", path: "/workforce/employees/add" },
     ],
   },
   {
@@ -55,11 +61,7 @@ export const sidebarItems = [
     roles: [ROLES.admin, ROLES.supervisor],
     collapsible: true,
     collapseIcon: ChevronDownIcon,
-    children: [
-      { label: "Leaves Types", path: "/leaves/types" },
-      { label: "Leaves Policies", path: "/leaves/policies" },
-      { label: "Leaves Applications", path: "/leaves/applications" },
-    ],
+    children: [{ label: "Leaves Applications", path: "/leaves/applications" }],
   },
   {
     label: "Salary",
@@ -71,8 +73,6 @@ export const sidebarItems = [
       { label: "Payroll", path: "/salary/payroll" },
       { label: "Deductions", path: "/salary/deductions" },
       { label: "Loans/Advances", path: "/salary/loans" },
-      { label: "Allowance Components", path: "/allowances/components" },
-      { label: "Allowance Policies", path: "/allowances/policies" },
     ],
   },
   {
@@ -82,10 +82,6 @@ export const sidebarItems = [
     collapsible: true,
     collapseIcon: ChevronDownIcon,
     children: [
-      {
-        label: "Warning Types",
-        path: "/compliance/warning-types",
-      },
       {
         label: "Disciplinary Actions",
         path: "/compliance/disciplinary-actions",

@@ -1,5 +1,30 @@
 import { sidebarItems } from "@/components/Sidebar/sidebarConfig";
 
+const MONTH_NAMES = [
+  "",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const formatBreadcrumbLabel = (parts, part, index) => {
+  if (parts[0] === "salary" && parts[1] === "payroll" && index === 3) {
+    const monthNumber = Number(part);
+    return MONTH_NAMES[monthNumber] || part;
+  }
+
+  return part.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+};
+
 export function getBreadcrumbs(currentPath) {
   let result = [];
 
@@ -22,7 +47,7 @@ export function getBreadcrumbs(currentPath) {
   // Fallback
   const parts = currentPath.split("/").filter(Boolean);
   return parts.map((p, idx) => ({
-    label: p.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase()),
+    label: formatBreadcrumbLabel(parts, p, idx),
     path: "/" + parts.slice(0, idx + 1).join("/"),
   }));
 }

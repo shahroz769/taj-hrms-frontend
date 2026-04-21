@@ -688,7 +688,7 @@ const WarningTypes = () => {
         loadingText="Loading warning types..."
       />
 
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

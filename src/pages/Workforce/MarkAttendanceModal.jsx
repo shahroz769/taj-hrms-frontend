@@ -1,13 +1,11 @@
 // React
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CalendarIcon from "lucide-react/dist/esm/icons/calendar";
 import CheckIcon from "lucide-react/dist/esm/icons/check";
 import ChevronsUpDownIcon from "lucide-react/dist/esm/icons/chevrons-up-down";
-import PlusIcon from "lucide-react/dist/esm/icons/plus";
-import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import { toast } from "sonner";
 
 // Components
@@ -17,7 +15,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -57,31 +54,6 @@ import { fetchShiftsList } from "@/services/employeeShiftsApi";
 import { formatDate, formatTimeToAMPM } from "@/utils/dateUtils";
 import { cn } from "@/lib/utils";
 
-// =============================================================================
-// HELPERS
-// =============================================================================
-
-const generateDatesFromRanges = (dateRanges) => {
-  const allDates = [];
-  for (const range of dateRanges) {
-    if (!range.startDate || !range.endDate) continue;
-    const start = new Date(range.startDate);
-    const end = new Date(range.endDate);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-    const current = new Date(start);
-    while (current <= end) {
-      allDates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
-  }
-  return allDates;
-};
-
-// =============================================================================
-// COMPONENT
-// =============================================================================
-
 /**
  * MarkAttendanceModal
  *
@@ -89,9 +61,8 @@ const generateDatesFromRanges = (dateRanges) => {
  *  - open: boolean
  *  - onOpenChange: (open: boolean) => void
  *  - preSelectedEmployeeIds: string[] | null
- *    When provided (from AllEmployees page), employee selection is hidden.
- *    When null/undefined (from AttendanceRecords page), employee multi-select is shown.
- *  - onSuccess: () => void  — callback after successful submission
+ *    When provided, employee selection is hidden and those employees are used.
+ *  - onSuccess: () => void
  */
 const MarkAttendanceModal = ({
   open,
@@ -101,23 +72,16 @@ const MarkAttendanceModal = ({
 }) => {
   const queryClient = useQueryClient();
 
-  // When preSelectedEmployeeIds is provided use it; otherwise manage internally
   const hasPreSelected =
     Array.isArray(preSelectedEmployeeIds) && preSelectedEmployeeIds.length > 0;
 
-  // ---------------------------------------------------------------------------
-  // STATE
-  // ---------------------------------------------------------------------------
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
   const [employeeComboboxOpen, setEmployeeComboboxOpen] = useState(false);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [debouncedEmployeeQuery, setDebouncedEmployeeQuery] = useState("");
 
-  const [dateRanges, setDateRanges] = useState([
-    { startDate: undefined, endDate: undefined },
-  ]);
-  const [datePickerOpenIndex, setDatePickerOpenIndex] = useState(null);
-  const [datePickerType, setDatePickerType] = useState(null); // 'start' | 'end'
+  const [attendanceDate, setAttendanceDate] = useState(undefined);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const [fallbackShiftId, setFallbackShiftId] = useState("");
   const [forceApplyShift, setForceApplyShift] = useState(false);
@@ -127,16 +91,12 @@ const MarkAttendanceModal = ({
   const [errors, setErrors] = useState({});
   const [submissionErrors, setSubmissionErrors] = useState([]);
 
-  // ---------------------------------------------------------------------------
-  // RESET
-  // ---------------------------------------------------------------------------
   const resetForm = useCallback(() => {
     setSelectedEmployeeIds([]);
     setEmployeeSearchQuery("");
     setDebouncedEmployeeQuery("");
-    setDateRanges([{ startDate: undefined, endDate: undefined }]);
-    setDatePickerOpenIndex(null);
-    setDatePickerType(null);
+    setAttendanceDate(undefined);
+    setDatePickerOpen(false);
     setFallbackShiftId("");
     setForceApplyShift(false);
     setMarkAllDaysPresent(false);
@@ -156,12 +116,10 @@ const MarkAttendanceModal = ({
     const timer = setTimeout(() => {
       setDebouncedEmployeeQuery(employeeSearchQuery.trim());
     }, 400);
+
     return () => clearTimeout(timer);
   }, [employeeSearchQuery]);
 
-  // ---------------------------------------------------------------------------
-  // QUERIES
-  // ---------------------------------------------------------------------------
   const { data: employeesList = [], isFetching: isLoadingEmployees } = useQuery({
     queryKey: ["employees-list", debouncedEmployeeQuery],
     queryFn: () =>
@@ -184,30 +142,29 @@ const MarkAttendanceModal = ({
     enabled: open,
   });
 
-  // ---------------------------------------------------------------------------
-  // MUTATION
-  // ---------------------------------------------------------------------------
   const markMutation = useMutation({
     mutationFn: bulkMarkAttendance,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["attendance-monthly"] });
       if (data.errors && data.errors.length > 0) {
-        // Show partial success and keep modal open to display errors
         const msg =
           data.created > 0 || data.skipped > 0
             ? `${data.created} record(s) created, ${data.skipped} skipped.`
             : null;
-        if (msg) toast.success(msg);
+        if (msg) {
+          toast.success(msg);
+        }
         setSubmissionErrors(data.errors);
         onSuccess?.();
-      } else {
-        const msg =
-          data.message ||
-          `Attendance marked: ${data.created} created, ${data.skipped} skipped`;
-        toast.success(msg);
-        handleOpenChange(false);
-        onSuccess?.();
+        return;
       }
+
+      const msg =
+        data.message ||
+        `Attendance marked: ${data.created} created, ${data.skipped} skipped`;
+      toast.success(msg);
+      handleOpenChange(false);
+      onSuccess?.();
     },
     onError: (error) => {
       const msg =
@@ -216,64 +173,18 @@ const MarkAttendanceModal = ({
     },
   });
 
-  // ---------------------------------------------------------------------------
-  // COMPUTED
-  // ---------------------------------------------------------------------------
   const activeEmployeeIds = hasPreSelected
     ? preSelectedEmployeeIds
     : selectedEmployeeIds;
 
-  const totalDays = useMemo(
-    () => generateDatesFromRanges(dateRanges).length,
-    [dateRanges],
-  );
-
-  // ---------------------------------------------------------------------------
-  // DATE RANGE HANDLERS
-  // ---------------------------------------------------------------------------
-  const addDateRange = () => {
-    setDateRanges((prev) => [
-      ...prev,
-      { startDate: undefined, endDate: undefined },
-    ]);
-  };
-
-  const removeDateRange = (index) => {
-    setDateRanges((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateDateRange = (index, field, value) => {
-    setDateRanges((prev) =>
-      prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)),
-    );
-    // Clear end if start changes and end is now before start
-    if (field === "startDate") {
-      setDateRanges((prev) =>
-        prev.map((r, i) => {
-          if (i !== index) return r;
-          if (r.endDate && value && r.endDate < value) {
-            return { ...r, startDate: value, endDate: undefined };
-          }
-          return { ...r, startDate: value };
-        }),
-      );
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // EMPLOYEE SELECTION HANDLERS
-  // ---------------------------------------------------------------------------
-  const toggleEmployee = (empId) => {
-    setSelectedEmployeeIds((prev) =>
-      prev.includes(empId)
-        ? prev.filter((id) => id !== empId)
-        : [...prev, empId],
+  const toggleEmployee = (employeeId) => {
+    setSelectedEmployeeIds((previous) =>
+      previous.includes(employeeId)
+        ? previous.filter((id) => id !== employeeId)
+        : [...previous, employeeId],
     );
   };
 
-  // ---------------------------------------------------------------------------
-  // SUBMIT
-  // ---------------------------------------------------------------------------
   const handleSubmit = () => {
     const newErrors = {};
 
@@ -281,17 +192,8 @@ const MarkAttendanceModal = ({
       newErrors.employees = "Please select at least one employee";
     }
 
-    const hasValidRange = dateRanges.some((r) => r.startDate && r.endDate);
-    if (!hasValidRange) {
-      newErrors.dateRanges = "At least one complete date range is required";
-    }
-
-    for (let i = 0; i < dateRanges.length; i++) {
-      const r = dateRanges[i];
-      if (r.startDate && r.endDate && r.endDate < r.startDate) {
-        newErrors.dateRanges = "End date cannot be before start date";
-        break;
-      }
+    if (!attendanceDate) {
+      newErrors.attendanceDate = "Please select an attendance date";
     }
 
     if (!fallbackShiftId) {
@@ -306,35 +208,19 @@ const MarkAttendanceModal = ({
 
     setErrors({});
 
-    const validRanges = dateRanges
-      .filter((r) => r.startDate && r.endDate)
-      .map((r) => {
-        // Use local date parts to avoid UTC shift stripping the last day
-        const toLocalDateStr = (d) => {
-          const y = d.getFullYear();
-          const mo = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          return `${y}-${mo}-${day}`;
-        };
-        return {
-          startDate: toLocalDateStr(r.startDate),
-          endDate: toLocalDateStr(r.endDate),
-        };
-      });
+    const year = attendanceDate.getFullYear();
+    const month = String(attendanceDate.getMonth() + 1).padStart(2, "0");
+    const day = String(attendanceDate.getDate()).padStart(2, "0");
 
     markMutation.mutate({
       employeeIds: activeEmployeeIds,
-      dateRanges: validRanges,
+      date: `${year}-${month}-${day}`,
       fallbackShiftId: fallbackShiftId || undefined,
       forceApplyShift,
       overwrite,
       markAllDaysPresent,
     });
   };
-
-  // ---------------------------------------------------------------------------
-  // RENDER
-  // ---------------------------------------------------------------------------
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -343,15 +229,12 @@ const MarkAttendanceModal = ({
           <DialogTitle>Mark Attendance</DialogTitle>
           <DialogDescription>
             {hasPreSelected
-              ? `Mark attendance for ${preSelectedEmployeeIds.length} selected employee(s).`
-              : "Select employees and date ranges to mark attendance."}
+              ? `Mark attendance for ${preSelectedEmployeeIds.length} selected employee(s) on one date.`
+              : "Select employees and a single attendance date."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
-          {/* ---------------------------------------------------------------- */}
-          {/* Employee Multi-select (only shown when no preSelectedEmployeeIds) */}
-          {/* ---------------------------------------------------------------- */}
           {!hasPreSelected && (
             <div className="grid gap-2">
               <Label className="text-foreground">
@@ -408,27 +291,27 @@ const MarkAttendanceModal = ({
                         </div>
                       ) : (
                         <CommandGroup>
-                          {employeesList.map((emp) => (
+                          {employeesList.map((employee) => (
                             <CommandItem
-                              key={emp._id}
-                              value={`${emp.fullName} ${emp.employeeID}`}
-                              onSelect={() => toggleEmployee(emp._id)}
+                              key={employee._id}
+                              value={`${employee.fullName} ${employee.employeeID}`}
+                              onSelect={() => toggleEmployee(employee._id)}
                               className="cursor-pointer"
                             >
                               <CheckIcon
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  selectedEmployeeIds.includes(emp._id)
+                                  selectedEmployeeIds.includes(employee._id)
                                     ? "opacity-100"
                                     : "opacity-0",
                                 )}
                               />
                               <div className="flex flex-col">
                                 <span className="font-medium">
-                                  {emp.fullName}
+                                  {employee.fullName}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  {emp.employeeID}
+                                  {employee.employeeID}
                                 </span>
                               </div>
                             </CommandItem>
@@ -445,158 +328,45 @@ const MarkAttendanceModal = ({
             </div>
           )}
 
-          {/* ---------------------------------------------------------------- */}
-          {/* Date Ranges                                                       */}
-          {/* ---------------------------------------------------------------- */}
           <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-foreground">
-                Date Range(s)
-                {totalDays > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground font-normal">
-                    ({totalDays} {totalDays === 1 ? "day" : "days"})
+            <Label className="text-foreground">Attendance Date</Label>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal cursor-pointer",
+                    !attendanceDate && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {attendanceDate
+                      ? formatDate(attendanceDate)
+                      : "Select attendance date"}
                   </span>
-                )}
-              </Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={addDateRange}
-                className="h-7 text-xs text-primary hover:text-primary hover:bg-green-50"
-              >
-                <PlusIcon size={12} className="mr-1" />
-                Add Range
-              </Button>
-            </div>
-
-            {dateRanges.map((range, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className="flex flex-1 gap-2">
-                  {/* Start Date */}
-                  <Popover
-                    open={
-                      datePickerOpenIndex === index &&
-                      datePickerType === "start"
-                    }
-                    onOpenChange={(isOpen) => {
-                      if (isOpen) {
-                        setDatePickerOpenIndex(index);
-                        setDatePickerType("start");
-                      } else {
-                        setDatePickerOpenIndex(null);
-                        setDatePickerType(null);
-                      }
-                    }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "flex-1 justify-start text-left font-normal cursor-pointer",
-                          !range.startDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                        <span className="truncate">
-                          {range.startDate
-                            ? formatDate(range.startDate)
-                            : "Start date"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        captionLayout="dropdown"
-                        selected={range.startDate}
-                        onSelect={(date) => {
-                          updateDateRange(index, "startDate", date);
-                          setDatePickerOpenIndex(null);
-                          setDatePickerType(null);
-                        }}
-                        startMonth={new Date(2020, 0)}
-                        endMonth={new Date(2030, 11)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  {/* End Date */}
-                  <Popover
-                    open={
-                      datePickerOpenIndex === index && datePickerType === "end"
-                    }
-                    onOpenChange={(isOpen) => {
-                      if (isOpen) {
-                        setDatePickerOpenIndex(index);
-                        setDatePickerType("end");
-                      } else {
-                        setDatePickerOpenIndex(null);
-                        setDatePickerType(null);
-                      }
-                    }}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "flex-1 justify-start text-left font-normal cursor-pointer",
-                          !range.endDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                        <span className="truncate">
-                          {range.endDate
-                            ? formatDate(range.endDate)
-                            : "End date"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        captionLayout="dropdown"
-                        selected={range.endDate}
-                        onSelect={(date) => {
-                          updateDateRange(index, "endDate", date);
-                          setDatePickerOpenIndex(null);
-                          setDatePickerType(null);
-                        }}
-                        disabled={(date) =>
-                          range.startDate ? date < range.startDate : false
-                        }
-                        startMonth={new Date(2020, 0)}
-                        endMonth={new Date(2030, 11)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Remove range button (only if more than 1 range) */}
-                {dateRanges.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeDateRange(index)}
-                    className="h-9 w-9 text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
-                  >
-                    <TrashIcon size={15} />
-                  </Button>
-                )}
-              </div>
-            ))}
-
-            {errors.dateRanges && (
-              <p className="text-sm text-red-500">{errors.dateRanges}</p>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  captionLayout="dropdown"
+                  selected={attendanceDate}
+                  onSelect={(date) => {
+                    setAttendanceDate(date);
+                    setDatePickerOpen(false);
+                  }}
+                  startMonth={new Date(2020, 0)}
+                  endMonth={new Date(2030, 11)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {errors.attendanceDate && (
+              <p className="text-sm text-red-500">{errors.attendanceDate}</p>
             )}
           </div>
 
-          {/* ---------------------------------------------------------------- */}
-          {/* Fallback Shift                                                    */}
-          {/* ---------------------------------------------------------------- */}
           <div className="grid gap-2">
             <Label className="text-foreground">
               Shift{" "}
@@ -604,10 +374,7 @@ const MarkAttendanceModal = ({
                 (employees without an assigned shift will use this)
               </span>
             </Label>
-            <Select
-              value={fallbackShiftId}
-              onValueChange={setFallbackShiftId}
-            >
+            <Select value={fallbackShiftId} onValueChange={setFallbackShiftId}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a shift..." />
               </SelectTrigger>
@@ -624,7 +391,7 @@ const MarkAttendanceModal = ({
                   ) : (
                     shiftsList.map((shift) => (
                       <SelectItem key={shift._id} value={shift._id}>
-                        {shift.name} ({formatTimeToAMPM(shift.startTime)} —{" "}
+                        {shift.name} ({formatTimeToAMPM(shift.startTime)} -{" "}
                         {formatTimeToAMPM(shift.endTime)})
                       </SelectItem>
                     ))
@@ -639,13 +406,9 @@ const MarkAttendanceModal = ({
 
           <Separator />
 
-          {/* ---------------------------------------------------------------- */}
-          {/* Options                                                           */}
-          {/* ---------------------------------------------------------------- */}
           <div className="grid gap-3">
             <Label className="text-foreground">Options</Label>
 
-            {/* Force Apply Shift */}
             <div className="flex items-start gap-3">
               <Checkbox
                 id="forceApplyShift"
@@ -661,13 +424,12 @@ const MarkAttendanceModal = ({
                   Force Apply Shift
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Apply the selected shift above to ALL employees, ignoring
-                  their individually assigned shifts.
+                  Apply the selected shift above to all selected employees,
+                  ignoring their individually assigned shifts.
                 </p>
               </div>
             </div>
 
-            {/* Mark Present on All Days */}
             <div className="flex items-start gap-3">
               <Checkbox
                 id="markAllDaysPresent"
@@ -680,16 +442,15 @@ const MarkAttendanceModal = ({
                   htmlFor="markAllDaysPresent"
                   className="text-sm font-medium leading-none cursor-pointer"
                 >
-                  Mark Present on All Days
+                  Mark Present on the Selected Date
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Mark Present even on shift off days (e.g., Fridays). By
-                  default, off days are marked as Off.
+                  Mark Present even if the selected date is an off day for the
+                  applied shift.
                 </p>
               </div>
             </div>
 
-            {/* Overwrite Existing */}
             <div className="flex items-start gap-3">
               <Checkbox
                 id="overwrite"
@@ -705,7 +466,7 @@ const MarkAttendanceModal = ({
                   Overwrite Existing Records
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Replace existing attendance records for the selected dates. By
+                  Replace existing attendance records for the selected date. By
                   default, existing records are preserved.
                 </p>
               </div>
@@ -713,28 +474,28 @@ const MarkAttendanceModal = ({
           </div>
         </div>
 
-        {/* ------------------------------------------------------------------ */}
-        {/* Submission Errors                                                   */}
-        {/* ------------------------------------------------------------------ */}
         {submissionErrors.length > 0 && (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 grid gap-2">
             <p className="text-sm font-medium text-red-700">
-                {submissionErrors.length} entries could not be processed:
+              {submissionErrors.length} entries could not be processed:
             </p>
             <ul className="space-y-1">
-              {submissionErrors.map((err, i) => {
-                const emp = employeesList.find((e) => e._id === err.employeeId);
-                const label = emp
-                  ? `${emp.fullName} (${emp.employeeID})`
-                  : err.employeeId;
+              {submissionErrors.map((errorItem, index) => {
+                const employee = employeesList.find(
+                  (item) => item._id === errorItem.employeeId,
+                );
+                const label = employee
+                  ? `${employee.fullName} (${employee.employeeID})`
+                  : errorItem.employeeId;
+
                 return (
-                  <li key={i} className="text-xs text-red-600">
+                  <li key={index} className="text-xs text-red-600">
                     <span className="font-semibold">{label}</span>
-                    {err.date && (
-                      <span className="text-red-400"> [{err.date}]</span>
+                    {errorItem.date && (
+                      <span className="text-red-400"> [{errorItem.date}]</span>
                     )}
                     {": "}
-                    {err.error}
+                    {errorItem.error}
                   </li>
                 );
               })}
@@ -742,9 +503,6 @@ const MarkAttendanceModal = ({
           </div>
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* Footer                                                              */}
-        {/* ------------------------------------------------------------------ */}
         <DialogFooter>
           <Button
             variant="outline"

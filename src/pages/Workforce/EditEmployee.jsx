@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 // React Router
-import { Link, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
 import UploadIcon from "lucide-react/dist/esm/icons/upload";
-import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
 import ChevronDownIcon from "lucide-react/dist/esm/icons/chevron-down";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -52,6 +51,19 @@ import { employeeSchema } from "@/schemas/employeeSchema";
 // Styles
 import styles from "./AddEmployee.module.css";
 
+const PROVINCES = [
+  "Sindh",
+  "Punjab",
+  "KPK",
+  "Balochistan",
+  "AJK",
+  "Gilgit",
+];
+const CNIC_IMAGE_MAX_SIZE = 1 * 1024 * 1024;
+
+const sanitizeDigits = (value, maxLength) =>
+  value.replace(/\D/g, "").slice(0, maxLength);
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -60,6 +72,7 @@ const EditEmployee = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const formId = "employee-edit-form";
 
   // ===========================================================================
   // STATE
@@ -69,6 +82,10 @@ const EditEmployee = () => {
   const [cnicBackPreview, setCnicBackPreview] = useState(null);
   const [cnicFrontFile, setCnicFrontFile] = useState(null);
   const [cnicBackFile, setCnicBackFile] = useState(null);
+  const [cnicImageErrors, setCnicImageErrors] = useState({
+    front: "",
+    back: "",
+  });
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Reset state when employee ID changes (for navigation between different employees)
@@ -79,6 +96,7 @@ const EditEmployee = () => {
     setCnicBackPreview(null);
     setCnicFrontFile(null);
     setCnicBackFile(null);
+    setCnicImageErrors({ front: "", back: "" });
   }, [id]);
 
   // ===========================================================================
@@ -185,6 +203,14 @@ const EditEmployee = () => {
   // Watch values
   const watchMedical = watch("medical");
   const watchLegal = watch("legal");
+  const watchGender = watch("gender");
+  const watchMaritalStatus = watch("maritalStatus");
+
+  useEffect(() => {
+    if (!(watchGender === "Female" && watchMaritalStatus === "Married")) {
+      setValue("husbandName", "");
+    }
+  }, [setValue, watchGender, watchMaritalStatus]);
 
   // ===========================================================================
   // QUERIES
@@ -194,47 +220,44 @@ const EditEmployee = () => {
     queryKey: ["employee", id],
     queryFn: () => fetchEmployeeById(id),
     enabled: !!id,
+    staleTime: 60 * 1000,
   });
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData, isLoading: isLoadingDepartments } = useQuery({
     queryKey: ["departmentsList"],
     queryFn: fetchDepartmentsList,
+    staleTime: 5 * 60 * 1000,
   });
+
+  const employee = employeeData?.employee;
+  const employeeDepartmentId = employee?.position?.department?._id || "";
+  const departmentIdForPositions = selectedDepartment || employeeDepartmentId;
 
   const { data: positionsData, isLoading: isLoadingPositions } = useQuery({
-    queryKey: ["positionsByDepartment", selectedDepartment],
-    queryFn: () => fetchPositionsByDepartment(selectedDepartment),
-    enabled: !!selectedDepartment,
+    queryKey: ["positionsByDepartment", departmentIdForPositions],
+    queryFn: () => fetchPositionsByDepartment(departmentIdForPositions),
+    enabled: !!departmentIdForPositions,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: allowancePoliciesData } = useQuery({
+  const {
+    data: allowancePoliciesData,
+    isLoading: isLoadingAllowancePolicies,
+  } = useQuery({
     queryKey: ["allowancePoliciesList"],
     queryFn: fetchAllowancePoliciesList,
+    staleTime: 5 * 60 * 1000,
   });
 
   // ===========================================================================
   // EFFECTS
   // ===========================================================================
 
-  // Set department first to trigger positions loading
+  // Populate form with employee data as soon as the main employee payload arrives.
+  // Dependent option lists can continue loading in parallel without blocking the form.
   useEffect(() => {
-    if (employeeData?.employee) {
-      const emp = employeeData.employee;
-      if (emp.position?.department?._id && !selectedDepartment) {
-        setSelectedDepartment(emp.position.department._id);
-      }
-    }
-  }, [employeeData, selectedDepartment]);
-
-  // Populate form with employee data after all data is loaded
-  useEffect(() => {
-    if (
-      employeeData?.employee &&
-      !isDataLoaded &&
-      departmentsData &&
-      (!selectedDepartment || positionsData)
-    ) {
-      const emp = employeeData.employee;
+    if (employee && !isDataLoaded) {
+      const emp = employee;
 
       // Parse dates as Date objects
       const parseDate = (dateString) => {
@@ -314,16 +337,10 @@ const EditEmployee = () => {
         setCnicBackPreview(emp.cnicImages.back);
       }
 
+      setSelectedDepartment(emp.position?.department?._id || "");
       setIsDataLoaded(true);
     }
-  }, [
-    employeeData,
-    reset,
-    isDataLoaded,
-    selectedDepartment,
-    departmentsData,
-    positionsData,
-  ]);
+  }, [employee, reset, isDataLoaded]);
 
   // ===========================================================================
   // MUTATION
@@ -358,19 +375,47 @@ const EditEmployee = () => {
 
   const handleImageUpload = (e, type) => {
     const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (type === "front") {
-          setCnicFrontPreview(reader.result);
-          setCnicFrontFile(file);
-        } else {
-          setCnicBackPreview(reader.result);
-          setCnicBackFile(file);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      return;
     }
+
+    if (file.size > CNIC_IMAGE_MAX_SIZE) {
+      const errorMessage = "CNIC image size must be 1MB or less";
+
+      setCnicImageErrors((prev) => ({
+        ...prev,
+        [type]: errorMessage,
+      }));
+
+      if (type === "front") {
+        setCnicFrontPreview(employee?.cnicImages?.front || null);
+        setCnicFrontFile(null);
+      } else {
+        setCnicBackPreview(employee?.cnicImages?.back || null);
+        setCnicBackFile(null);
+      }
+
+      e.target.value = "";
+      toast.error(errorMessage);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCnicImageErrors((prev) => ({
+        ...prev,
+        [type]: "",
+      }));
+
+      if (type === "front") {
+        setCnicFrontPreview(reader.result);
+        setCnicFrontFile(file);
+      } else {
+        setCnicBackPreview(reader.result);
+        setCnicBackFile(file);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const onSubmit = (data) => {
@@ -419,15 +464,38 @@ const EditEmployee = () => {
     mutation.mutate(formData);
   };
 
+  const renderLabel = (text, required = false) => (
+    <Label className={styles.label}>
+      {text}
+      {required ? <span className={styles.requiredMark}> *</span> : null}
+    </Label>
+  );
+
+  const renderSubmitButton = (extraProps = {}) => (
+    <Button
+      type="submit"
+      variant="green"
+      disabled={mutation.isPending}
+      className="cursor-pointer"
+      {...extraProps}
+    >
+      {mutation.isPending ? (
+        <>
+          <Spinner />
+          Saving...
+        </>
+      ) : (
+        "Save Changes"
+      )}
+    </Button>
+  );
+
   // ===========================================================================
   // RENDER
   // ===========================================================================
 
   // Show loading while employee data or dependent data is loading
-  const isLoadingData =
-    isLoadingEmployee ||
-    !departmentsData ||
-    (selectedDepartment && isLoadingPositions);
+  const isLoadingData = isLoadingEmployee || !isDataLoaded;
 
   if (isLoadingData) {
     return (
@@ -447,24 +515,14 @@ const EditEmployee = () => {
         <div className={styles.headerLeft}>
           <h1 className={styles.title}>Edit Employee</h1>
         </div>
-        <Button
-          variant="green"
-          onClick={handleSubmit(onSubmit)}
-          disabled={mutation.isPending}
-          className="cursor-pointer"
-        >
-          {mutation.isPending ? (
-            <>
-              <Spinner />
-              Saving...
-            </>
-          ) : (
-            "Save Changes"
-          )}
-        </Button>
+        {renderSubmitButton({ form: formId })}
       </div>
 
-      <form className={styles.formContainer}>
+      <form
+        id={formId}
+        className={styles.formContainer}
+        onSubmit={handleSubmit(onSubmit)}
+      >
         {/* Personal Information */}
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
@@ -472,16 +530,16 @@ const EditEmployee = () => {
           </div>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Full Name</Label>
+              {renderLabel("Full Name", true)}
               <Input {...register("fullName")} placeholder="Enter full name" />
               {errors.fullName && (
                 <span className={styles.error}>{errors.fullName.message}</span>
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Gender</Label>
+              {renderLabel("Gender", true)}
               <Select
-                value={watch("gender")}
+                value={watchGender}
                 onValueChange={(value) => setValue("gender", value)}
               >
                 <SelectTrigger className="w-full">
@@ -497,7 +555,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Date of Birth</Label>
+              {renderLabel("Date of Birth", true)}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -530,7 +588,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Father Name</Label>
+              {renderLabel("Father Name", true)}
               <Input
                 {...register("fatherName")}
                 placeholder="Enter father's name"
@@ -541,25 +599,51 @@ const EditEmployee = () => {
                 </span>
               )}
             </div>
+            {watchGender === "Female" && watchMaritalStatus === "Married" ? (
+              <div className={styles.formGroup}>
+                {renderLabel("Husband Name", true)}
+                <Input
+                  {...register("husbandName")}
+                  placeholder="Enter husband's name"
+                />
+                {errors.husbandName && (
+                  <span className={styles.error}>
+                    {errors.husbandName.message}
+                  </span>
+                )}
+              </div>
+            ) : null}
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Husband Name</Label>
+              {renderLabel("CNIC", true)}
               <Input
-                {...register("husbandName")}
-                placeholder="Enter husband's name"
+                {...register("cnic")}
+                inputMode="numeric"
+                maxLength={13}
+                placeholder="Enter 13 digit CNIC"
+                onInput={(event) => {
+                  event.currentTarget.value = sanitizeDigits(
+                    event.currentTarget.value,
+                    13,
+                  );
+                }}
               />
-            </div>
-            <div className={styles.formGroup}>
-              <Label className={styles.label}>CNIC</Label>
-              <Input {...register("cnic")} placeholder="Enter CNIC number" />
               {errors.cnic && (
                 <span className={styles.error}>{errors.cnic.message}</span>
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Contact Number</Label>
+              {renderLabel("Contact Number", true)}
               <Input
                 {...register("contactNumber")}
-                placeholder="Enter contact number"
+                inputMode="numeric"
+                maxLength={11}
+                placeholder="Enter 11 digit contact number"
+                onInput={(event) => {
+                  event.currentTarget.value = sanitizeDigits(
+                    event.currentTarget.value,
+                    11,
+                  );
+                }}
               />
               {errors.contactNumber && (
                 <span className={styles.error}>
@@ -568,23 +652,37 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Province</Label>
-              <Input {...register("province")} placeholder="Enter province" />
+              {renderLabel("Province", true)}
+              <Select
+                value={watch("province")}
+                onValueChange={(value) => setValue("province", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select province" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCES.map((province) => (
+                    <SelectItem key={province} value={province}>
+                      {province}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.province && (
                 <span className={styles.error}>{errors.province.message}</span>
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>City</Label>
+              {renderLabel("City", true)}
               <Input {...register("city")} placeholder="Enter city" />
               {errors.city && (
                 <span className={styles.error}>{errors.city.message}</span>
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Marital Status</Label>
+              {renderLabel("Marital Status", true)}
               <Select
-                value={watch("maritalStatus")}
+                value={watchMaritalStatus}
                 onValueChange={(value) => setValue("maritalStatus", value)}
               >
                 <SelectTrigger className="w-full">
@@ -604,10 +702,11 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Department</Label>
+              {renderLabel("Department", true)}
               <Select
                 value={selectedDepartment}
                 onValueChange={handleDepartmentChange}
+                disabled={isLoadingDepartments}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select department" />
@@ -627,16 +726,16 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Position</Label>
+              {renderLabel("Position", true)}
               <Select
                 value={watch("position")}
                 onValueChange={(value) => setValue("position", value)}
-                disabled={!selectedDepartment || isLoadingPositions}
+                disabled={!departmentIdForPositions || isLoadingPositions}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue
                     placeholder={
-                      !selectedDepartment
+                      !departmentIdForPositions
                         ? "Select department first"
                         : isLoadingPositions
                           ? "Loading..."
@@ -657,7 +756,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Employment Type</Label>
+              {renderLabel("Employment Type", true)}
               <Select
                 value={watch("employmentType")}
                 onValueChange={(value) => setValue("employmentType", value)}
@@ -678,7 +777,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Basic Salary</Label>
+              {renderLabel("Basic Salary", true)}
               <Input
                 {...register("basicSalary")}
                 type="number"
@@ -692,10 +791,11 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Allowance Policy</Label>
+              {renderLabel("Allowance Policy", true)}
               <Select
                 value={watch("allowancePolicy")}
                 onValueChange={(value) => setValue("allowancePolicy", value)}
+                disabled={isLoadingAllowancePolicies}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select allowance policy" />
@@ -715,7 +815,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Joining Date</Label>
+              {renderLabel("Joining Date", true)}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -750,7 +850,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              <Label className={styles.label}>Compensation Effective Date</Label>
+              {renderLabel("Compensation Effective Date")}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -780,14 +880,14 @@ const EditEmployee = () => {
               </Popover>
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>Compensation Change Reason</Label>
+              {renderLabel("Compensation Change Reason")}
               <Textarea
                 {...register("compensationChangeReason")}
                 placeholder="Reason for salary/policy change (optional)"
               />
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>Current Street Address</Label>
+              {renderLabel("Current Street Address", true)}
               <Textarea
                 {...register("currentStreetAddress")}
                 placeholder="Enter current address"
@@ -799,7 +899,7 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>Permanent Street Address</Label>
+              {renderLabel("Permanent Street Address", true)}
               <Textarea
                 {...register("permanentStreetAddress")}
                 placeholder="Enter permanent address"
@@ -846,6 +946,15 @@ const EditEmployee = () => {
                   )}
                 </label>
               </div>
+              <span className={styles.imageHint}>
+                Upload CNIC front/back images up to 1MB each.
+              </span>
+              {cnicImageErrors.front ? (
+                <span className={styles.error}>{cnicImageErrors.front}</span>
+              ) : null}
+              {cnicImageErrors.back ? (
+                <span className={styles.error}>{cnicImageErrors.back}</span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -873,7 +982,7 @@ const EditEmployee = () => {
             <div key={field.id} className={styles.dynamicEntry}>
               <div className={styles.dynamicEntryFields3}>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Contact Name</Label>
+                  {renderLabel("Contact Name", true)}
                   <Input
                     {...register(`emergencyContact.${index}.name`)}
                     placeholder="Enter name"
@@ -885,10 +994,18 @@ const EditEmployee = () => {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Contact Number</Label>
+                  {renderLabel("Contact Number", true)}
                   <Input
                     {...register(`emergencyContact.${index}.number`)}
+                    inputMode="numeric"
+                    maxLength={11}
                     placeholder="Enter number"
+                    onInput={(event) => {
+                      event.currentTarget.value = sanitizeDigits(
+                        event.currentTarget.value,
+                        11,
+                      );
+                    }}
                   />
                   {errors.emergencyContact?.[index]?.number && (
                     <span className={styles.error}>
@@ -897,7 +1014,7 @@ const EditEmployee = () => {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Relation</Label>
+                  {renderLabel("Relation", true)}
                   <Input
                     {...register(`emergencyContact.${index}.relation`)}
                     placeholder="Enter relation"
@@ -1230,7 +1347,7 @@ const EditEmployee = () => {
             <div key={field.id} className={styles.dynamicEntry}>
               <div className={styles.dynamicEntryFields}>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Name</Label>
+                  {renderLabel("Name", true)}
                   <Input
                     {...register(`guarantor.${index}.name`)}
                     placeholder="Enter name"
@@ -1242,10 +1359,18 @@ const EditEmployee = () => {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Contact Number</Label>
+                  {renderLabel("Contact Number", true)}
                   <Input
                     {...register(`guarantor.${index}.contactNumber`)}
+                    inputMode="numeric"
+                    maxLength={11}
                     placeholder="Enter contact"
+                    onInput={(event) => {
+                      event.currentTarget.value = sanitizeDigits(
+                        event.currentTarget.value,
+                        11,
+                      );
+                    }}
                   />
                   {errors.guarantor?.[index]?.contactNumber && (
                     <span className={styles.error}>
@@ -1254,10 +1379,18 @@ const EditEmployee = () => {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>CNIC</Label>
+                  {renderLabel("CNIC", true)}
                   <Input
                     {...register(`guarantor.${index}.cnic`)}
+                    inputMode="numeric"
+                    maxLength={13}
                     placeholder="Enter CNIC"
+                    onInput={(event) => {
+                      event.currentTarget.value = sanitizeDigits(
+                        event.currentTarget.value,
+                        13,
+                      );
+                    }}
                   />
                   {errors.guarantor?.[index]?.cnic && (
                     <span className={styles.error}>
@@ -1266,7 +1399,7 @@ const EditEmployee = () => {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <Label className={styles.label}>Address</Label>
+                  {renderLabel("Address", true)}
                   <Input
                     {...register(`guarantor.${index}.address`)}
                     placeholder="Enter address"
@@ -1362,6 +1495,7 @@ const EditEmployee = () => {
             </div>
           </div>
         </div>
+        <div className={styles.formActions}>{renderSubmitButton()}</div>
       </form>
     </div>
   );

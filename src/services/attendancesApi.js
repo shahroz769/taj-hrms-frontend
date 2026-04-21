@@ -1,15 +1,15 @@
 import API from "./api";
 
 /**
- * Bulk mark attendance for multiple employees over date ranges.
+ * Bulk mark attendance for multiple employees on a single date.
  *
  * @param {Object} payload
  * @param {string[]} payload.employeeIds
- * @param {{startDate: string, endDate: string}[]} payload.dateRanges
+ * @param {string} payload.date - attendance date in YYYY-MM-DD format
  * @param {string} [payload.fallbackShiftId]  - optional shift for employees without assigned shift
  * @param {boolean} payload.forceApplyShift   - override all employees' shifts with fallbackShiftId
  * @param {boolean} payload.overwrite         - overwrite existing records
- * @param {boolean} payload.markAllDaysPresent - mark Present even on off days
+ * @param {boolean} payload.markAllDaysPresent - mark Present even on off days for the selected date
  */
 export const bulkMarkAttendance = async (payload) => {
   const res = await API.post("/api/attendances/bulk-mark", payload);

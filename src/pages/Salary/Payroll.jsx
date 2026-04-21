@@ -91,6 +91,7 @@ const monthLabel = (month) =>
 
 const currency = (value) => `PKR ${Number(value || 0).toLocaleString()}`;
 const amount = (value) => Number(value || 0).toLocaleString();
+const roundMoney = (value) => Math.round(Number(value) || 0);
 const sumAmounts = (items = []) =>
   items.reduce((sum, item) => {
     if (typeof item === "number") return sum + Number(item || 0);
@@ -628,9 +629,9 @@ const Payroll = () => {
     .filter((item) => item.count > 0)
     .map((item) => ({
       ...item,
-      basicAmount: Number(item.basicAmount.toFixed(2)),
-      allowanceAmount: Number(item.allowanceAmount.toFixed(2)),
-      totalAmount: Number((item.basicAmount + item.allowanceAmount).toFixed(2)),
+      basicAmount: roundMoney(item.basicAmount),
+      allowanceAmount: roundMoney(item.allowanceAmount),
+      totalAmount: roundMoney(item.basicAmount + item.allowanceAmount),
       isInferred: true,
     }));
   const attendanceDeductionBreakdown =

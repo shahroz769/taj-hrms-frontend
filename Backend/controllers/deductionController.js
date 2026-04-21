@@ -326,6 +326,10 @@ export const updateDeduction = async (req, res, next) => {
       res.status(404);
       throw new Error("Deduction not found");
     }
+    if (deduction.status === "Deducted") {
+      res.status(400);
+      throw new Error("A paid deduction cannot be edited");
+    }
     ensureSupervisorCanManagePendingDeduction(req, deduction, res);
 
     const { employee, amount, date, reason } = req.body || {};
@@ -425,6 +429,10 @@ export const deleteDeduction = async (req, res, next) => {
     if (!deduction) {
       res.status(404);
       throw new Error("Deduction not found");
+    }
+    if (deduction.status === "Deducted") {
+      res.status(400);
+      throw new Error("A paid deduction cannot be deleted");
     }
     ensureSupervisorCanManagePendingDeduction(req, deduction, res);
 

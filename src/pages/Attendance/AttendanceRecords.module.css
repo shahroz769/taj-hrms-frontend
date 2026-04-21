@@ -74,6 +74,10 @@
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .fetchingOverlay {
@@ -87,9 +91,31 @@
   border-radius: 12px;
 }
 
+.tableMessageOverlay {
+  position: absolute;
+  inset: 56px 0 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+}
+
+.overlayStateContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
 .tableScrollArea {
   overflow-x: auto;
   max-width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .table {
@@ -173,6 +199,10 @@
   border-bottom: none;
 }
 
+.emptyRow td {
+  height: 44px;
+}
+
 /* Sticky employee column cell */
 .stickyCell {
   position: sticky;
@@ -192,12 +222,26 @@
   white-space: nowrap;
 }
 
+.emptyEmployeeText {
+  min-height: 20px;
+}
+
 /* Attendance cells */
 .attendanceCell {
   padding: 8px 4px;
   text-align: center;
   vertical-align: middle;
   transition: background-color 0.15s;
+}
+
+.emptyCellFill {
+  display: inline-block;
+  width: 100%;
+  min-width: 24px;
+  height: 20px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--muted) 70%, transparent);
+  opacity: 0.45;
 }
 
 /* Summary cells (sticky right) */

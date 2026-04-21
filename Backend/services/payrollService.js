@@ -33,6 +33,8 @@ const DAY_NAMES = [
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const roundMoney = (value) => Math.round(Number(value) || 0);
+
 const keyByPKDate = (date) => formatInTimeZone(date, PAKISTAN_TZ, "yyyy-MM-dd");
 
 const normalizeUtcDate = (value) => {
@@ -337,13 +339,13 @@ export const calculateLatePenalty = (lateDayRates) => {
     allowancePenaltyAmount += Number(triggerRates.allowancePerDay || 0) * 0.5;
   }
 
-  const roundedBasicPenaltyAmount = round2(basicPenaltyAmount);
-  const roundedAllowancePenaltyAmount = round2(allowancePenaltyAmount);
+  const roundedBasicPenaltyAmount = roundMoney(basicPenaltyAmount);
+  const roundedAllowancePenaltyAmount = roundMoney(allowancePenaltyAmount);
 
   return {
     basicPenaltyAmount: roundedBasicPenaltyAmount,
     allowancePenaltyAmount: roundedAllowancePenaltyAmount,
-    totalPenaltyAmount: round2(
+    totalPenaltyAmount: roundMoney(
       roundedBasicPenaltyAmount + roundedAllowancePenaltyAmount,
     ),
   };
@@ -529,7 +531,7 @@ export const calculateEmployeePayroll = async ({
     const segmentKey = [
       Number(basicSalaryMonthly || 0),
       policyId || "none",
-      round2(policyComponentsInfo.amount || 0),
+      roundMoney(policyComponentsInfo.amount || 0),
     ].join("::");
 
     if (!salarySegmentsMap.has(segmentKey)) {
@@ -612,46 +614,46 @@ export const calculateEmployeePayroll = async ({
     }
   }
 
-  const grossSalary = round2(fullBasicSalaryAmount + fullAllowanceAmount);
-  const roundedFullBasicSalaryAmount = round2(fullBasicSalaryAmount);
-  const roundedFullAllowanceAmount = round2(fullAllowanceAmount);
+  const grossSalary = roundMoney(fullBasicSalaryAmount + fullAllowanceAmount);
+  const roundedFullBasicSalaryAmount = roundMoney(fullBasicSalaryAmount);
+  const roundedFullAllowanceAmount = roundMoney(fullAllowanceAmount);
   const attendanceDeductionBreakdown = Object.values(
     attendanceDeductionTracker,
   )
     .filter(
       (item) =>
         item.count > 0 ||
-        Math.abs(item.basicAmount) > 0.009 ||
-        Math.abs(item.allowanceAmount) > 0.009,
+        Math.abs(item.basicAmount) > 0 ||
+        Math.abs(item.allowanceAmount) > 0,
     )
     .map((item) => ({
       ...item,
-      basicAmount: round2(item.basicAmount),
-      allowanceAmount: round2(item.allowanceAmount),
-      totalAmount: round2(item.basicAmount + item.allowanceAmount),
+      basicAmount: roundMoney(item.basicAmount),
+      allowanceAmount: roundMoney(item.allowanceAmount),
+      totalAmount: roundMoney(item.basicAmount + item.allowanceAmount),
     }));
-  const attendanceDeductionAmount = round2(
+  const attendanceDeductionAmount = roundMoney(
     attendanceDeductionBreakdown.reduce(
       (sum, item) => sum + Number(item.totalAmount || 0),
       0,
     ),
   );
-  const basicSalaryDeductionAmount = round2(
+  const basicSalaryDeductionAmount = roundMoney(
     attendanceDeductionBreakdown.reduce(
       (sum, item) => sum + Number(item.basicAmount || 0),
       0,
     ),
   );
-  const allowanceDeductionAmount = round2(
+  const allowanceDeductionAmount = roundMoney(
     attendanceDeductionBreakdown.reduce(
       (sum, item) => sum + Number(item.allowanceAmount || 0),
       0,
     ),
   );
-  payableBasicSalaryAmount = round2(
+  payableBasicSalaryAmount = roundMoney(
     roundedFullBasicSalaryAmount - basicSalaryDeductionAmount,
   );
-  payableAllowanceAmount = round2(
+  payableAllowanceAmount = roundMoney(
     roundedFullAllowanceAmount - allowanceDeductionAmount,
   );
 
@@ -677,7 +679,7 @@ export const calculateEmployeePayroll = async ({
         .lean()
     : [];
 
-  const arrearsAmount = round2(
+  const arrearsAmount = roundMoney(
     unsettledArrearsEntries
       .filter((entry) =>
         isEarlierMonth(entry.sourceYear, entry.sourceMonth, year, month),
@@ -708,7 +710,7 @@ export const calculateEmployeePayroll = async ({
         .lean()
     : [];
 
-  const salaryBeforeManualDeductions = round2(
+  const salaryBeforeManualDeductions = roundMoney(
     grossSalary - attendanceDeductionAmount + arrearsAmount,
   );
   const manualDeductionPlan = calculateManualDeductionPlan({
@@ -717,7 +719,7 @@ export const calculateEmployeePayroll = async ({
     payrollYear: Number(year),
     payrollMonth: Number(month),
   });
-  const manualDeductionAmount = round2(manualDeductionPlan.deductedAmount);
+  const manualDeductionAmount = roundMoney(manualDeductionPlan.deductedAmount);
   const deductionBreakdown = manualDeductionPlan.breakdown;
 
   // ── Loan Deduction ──
@@ -734,7 +736,7 @@ export const calculateEmployeePayroll = async ({
         },
       }).lean()
     : null;
-  const salaryBeforeLoan = round2(
+  const salaryBeforeLoan = roundMoney(
     grossSalary -
       attendanceDeductionAmount -
       manualDeductionAmount +
@@ -750,7 +752,7 @@ export const calculateEmployeePayroll = async ({
 
   const latePenaltyInfo = calculateLatePenalty([]);
   const latePenaltyAmount = 0;
-  const totalSalary = round2(
+  const totalSalary = roundMoney(
     grossSalary -
       attendanceDeductionAmount -
       manualDeductionAmount -
@@ -806,8 +808,8 @@ export const calculateEmployeePayroll = async ({
     },
     salarySegments: [...salarySegmentsMap.values()].map((segment) => ({
       ...segment,
-      segmentBasicAmount: round2(segment.segmentBasicAmount),
-      segmentAllowanceAmount: round2(segment.segmentAllowanceAmount),
+      segmentBasicAmount: roundMoney(segment.segmentBasicAmount),
+      segmentAllowanceAmount: roundMoney(segment.segmentAllowanceAmount),
       payableDayUnits: round2(segment.payableDayUnits),
     })),
     calculations: {
@@ -835,15 +837,15 @@ export const calculateEmployeePayroll = async ({
       loanDeductionAmount,
       arrearsAmount,
       totalSalary,
-      perDaySalary: round2(
+      perDaySalary: roundMoney(
         grossSalary / (calendarDaysInMonth || 1),
       ),
       scheduledDays: calendarDaysInMonth,
-      earnedBasic: round2(
+      earnedBasic: roundMoney(
         roundedFullBasicSalaryAmount - basicSalaryDeductionAmount,
       ),
-      paidLeaveAmount: round2(0),
-      halfDayDeduction: round2(
+      paidLeaveAmount: roundMoney(0),
+      halfDayDeduction: roundMoney(
         attendanceDeductionBreakdown.find((item) => item.key === "halfDay")
           ?.totalAmount || 0,
       ),
@@ -963,21 +965,21 @@ export const syncArrearsForEmployee = async ({
       session,
     });
 
-    const expectedWithoutArrears = round2(
+    const expectedWithoutArrears = roundMoney(
       Number(recomputed.calculations.grossSalary || 0) -
         Number(recomputed.calculations.attendanceDeductionAmount || 0) -
         Number(recomputed.calculations.latePenaltyAmount || 0),
     );
 
-    const existingWithoutArrears = round2(
+    const existingWithoutArrears = roundMoney(
       Number(payroll.calculations?.grossSalary || 0) -
         Number(payroll.calculations?.attendanceDeductionAmount || 0) -
         Number(payroll.calculations?.latePenaltyAmount || 0),
     );
 
-    const diff = round2(expectedWithoutArrears - existingWithoutArrears);
+    const diff = roundMoney(expectedWithoutArrears - existingWithoutArrears);
 
-    if (Math.abs(diff) < 0.01) {
+    if (Math.abs(diff) < 1) {
       if (existingLedger && !existingLedger.settled) {
         await PayrollArrearsLedger.deleteOne(
           { _id: existingLedger._id },

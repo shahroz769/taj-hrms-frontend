@@ -511,7 +511,7 @@ const ContractPayments = () => {
                 Remaining: {formatNumber(summary.remainingAmount)}
               </Badge>
               <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-                Percentage Paid: {summary.percentagePaid?.toFixed(2)}%
+                Percentage Paid: {Math.round(summary.percentagePaid || 0)}%
               </Badge>
               <Badge variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
                 Payment Count: {summary.paymentCount}
@@ -854,7 +854,7 @@ const ContractPayments = () => {
         loadingText="Loading payment records..."
       />
 
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

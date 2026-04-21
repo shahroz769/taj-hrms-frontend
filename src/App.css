@@ -117,7 +117,30 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.dashboard-page-shell {
+  min-height: 100%;
+  display: flex;
+}
+
+.dashboard-page-shell > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dashboard-page-shell > [class*="_container_"] {
+  min-height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
 }

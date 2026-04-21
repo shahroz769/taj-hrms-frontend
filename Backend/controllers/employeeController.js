@@ -11,6 +11,17 @@ import BasicSalaryHistory from "../models/BasicSalaryHistory.js";
 import { uploadToCloudinary } from "../config/cloudinaryConfig.js";
 import mongoose from "mongoose";
 
+const VALID_PROVINCES = [
+  "Sindh",
+  "Punjab",
+  "KPK",
+  "Balochistan",
+  "AJK",
+  "Gilgit",
+];
+const CNIC_REGEX = /^\d{13}$/;
+const PAKISTAN_MOBILE_REGEX = /^03\d{9}$/;
+
 // Helper function to generate employee ID
 const generateEmployeeId = async () => {
   const lastEmployee = await Employee.findOne()
@@ -74,6 +85,108 @@ const createLeaveBalances = async (employeeId, positionId) => {
   return leaveBalances;
 };
 
+const parseIfString = (value) => {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  return value;
+};
+
+const normalizeString = (value) =>
+  typeof value === "string" ? value.trim() : "";
+
+const validateCnic = (value, fieldName = "CNIC", required = true) => {
+  const normalizedValue = normalizeString(value);
+
+  if (!normalizedValue) {
+    if (required) {
+      throw new Error(`${fieldName} is required`);
+    }
+    return;
+  }
+
+  if (!CNIC_REGEX.test(normalizedValue)) {
+    throw new Error(`${fieldName} must be exactly 13 digits`);
+  }
+};
+
+const validateMobileNumber = (
+  value,
+  fieldName = "Contact number",
+  required = true,
+) => {
+  const normalizedValue = normalizeString(value);
+
+  if (!normalizedValue) {
+    if (required) {
+      throw new Error(`${fieldName} is required`);
+    }
+    return;
+  }
+
+  if (!PAKISTAN_MOBILE_REGEX.test(normalizedValue)) {
+    throw new Error(`${fieldName} must start with 03 and be 11 digits`);
+  }
+};
+
+const validateProvince = (value) => {
+  const normalizedValue = normalizeString(value);
+
+  if (!normalizedValue) {
+    throw new Error("Province is required");
+  }
+
+  if (!VALID_PROVINCES.includes(normalizedValue)) {
+    throw new Error(
+      `Province must be one of: ${VALID_PROVINCES.join(", ")}`,
+    );
+  }
+};
+
+const validateHusbandName = ({ gender, maritalStatus, husbandName }) => {
+  const shouldRequireHusbandName =
+    normalizeString(gender) === "Female" &&
+    normalizeString(maritalStatus) === "Married";
+
+  if (shouldRequireHusbandName && !normalizeString(husbandName)) {
+    throw new Error("Husband name is required for married female employees");
+  }
+};
+
+const validateEmergencyContacts = (contacts) => {
+  if (!Array.isArray(contacts) || contacts.length === 0) {
+    throw new Error("At least one emergency contact is required");
+  }
+
+  contacts.forEach((contact, index) => {
+    validateMobileNumber(
+      contact?.number,
+      `Emergency contact ${index + 1} number`,
+      true,
+    );
+  });
+};
+
+const validateGuarantors = (guarantors) => {
+  if (!Array.isArray(guarantors) || guarantors.length === 0) {
+    throw new Error("At least one guarantor is required");
+  }
+
+  guarantors.forEach((guarantor, index) => {
+    validateMobileNumber(
+      guarantor?.contactNumber,
+      `Guarantor ${index + 1} contact number`,
+      true,
+    );
+    validateCnic(guarantor?.cnic, `Guarantor ${index + 1} CNIC`, true);
+  });
+};
+
 // @description     Create new employee
 // @route           POST /api/employees
 // @access          Admin
@@ -119,6 +232,21 @@ export const createEmployee = async (req, res, next) => {
       res.status(400);
       throw new Error("Gender is required");
     }
+
+    const parsedEmergencyContact = parseIfString(emergencyContact) || [];
+    const parsedMedical = parseIfString(medical) || {};
+    const parsedEducation = parseIfString(education) || [];
+    const parsedPreviousExperience = parseIfString(previousExperience) || [];
+    const parsedGuarantor = parseIfString(guarantor) || [];
+    const parsedLegal = parseIfString(legal) || {};
+
+    res.status(400);
+    validateCnic(cnic, "CNIC", true);
+    validateMobileNumber(contactNumber, "Contact number", true);
+    validateProvince(province);
+    validateHusbandName({ gender, maritalStatus, husbandName });
+    validateEmergencyContacts(parsedEmergencyContact);
+    validateGuarantors(parsedGuarantor);
 
     // Validate position ID
     if (!mongoose.Types.ObjectId.isValid(position)) {
@@ -202,18 +330,6 @@ export const createEmployee = async (req, res, next) => {
       }
     }
 
-    // Parse JSON fields if they come as strings
-    const parseIfString = (value) => {
-      if (typeof value === "string") {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return value;
-        }
-      }
-      return value;
-    };
-
     // Create employee
     const newEmployee = new Employee({
       employeeID,
@@ -224,7 +340,10 @@ export const createEmployee = async (req, res, next) => {
       fullName: fullName.trim(),
       gender,
       fatherName: fatherName?.trim() || "",
-      husbandName: husbandName?.trim() || "",
+      husbandName:
+        gender === "Female" && maritalStatus === "Married"
+          ? husbandName?.trim() || ""
+          : "",
       joiningDate: joiningDate || new Date(),
       cnic: cnic?.trim() || "",
       cnicImages,
@@ -235,12 +354,12 @@ export const createEmployee = async (req, res, next) => {
       maritalStatus: maritalStatus || "Single",
       currentStreetAddress: currentStreetAddress?.trim() || "",
       permanentStreetAddress: permanentStreetAddress?.trim() || "",
-      emergencyContact: parseIfString(emergencyContact) || [],
-      medical: parseIfString(medical) || {},
-      education: parseIfString(education) || [],
-      previousExperience: parseIfString(previousExperience) || [],
-      guarantor: parseIfString(guarantor) || [],
-      legal: parseIfString(legal) || {},
+      emergencyContact: parsedEmergencyContact,
+      medical: parsedMedical,
+      education: parsedEducation,
+      previousExperience: parsedPreviousExperience,
+      guarantor: parsedGuarantor,
+      legal: parsedLegal,
     });
 
     const savedEmployee = await newEmployee.save();
@@ -538,6 +657,35 @@ export const updateEmployee = async (req, res, next) => {
       compensationChangeReason,
     } = req.body;
 
+    const parsedEmergencyContact =
+      emergencyContact !== undefined
+        ? parseIfString(emergencyContact) || []
+        : employee.emergencyContact || [];
+    const parsedMedical =
+      medical !== undefined ? parseIfString(medical) || {} : employee.medical || {};
+    const parsedEducation =
+      education !== undefined
+        ? parseIfString(education) || []
+        : employee.education || [];
+    const parsedPreviousExperience =
+      previousExperience !== undefined
+        ? parseIfString(previousExperience) || []
+        : employee.previousExperience || [];
+    const parsedGuarantor =
+      guarantor !== undefined
+        ? parseIfString(guarantor) || []
+        : employee.guarantor || [];
+    const parsedLegal =
+      legal !== undefined ? parseIfString(legal) || {} : employee.legal || {};
+    const nextGender = gender || employee.gender;
+    const nextMaritalStatus = maritalStatus || employee.maritalStatus;
+    const nextHusbandName =
+      husbandName !== undefined ? husbandName : employee.husbandName;
+    const nextCnic = cnic !== undefined ? cnic : employee.cnic;
+    const nextContactNumber =
+      contactNumber !== undefined ? contactNumber : employee.contactNumber;
+    const nextProvince = province !== undefined ? province : employee.province;
+
     const nextBasicSalaryCandidate =
       basicSalary !== undefined ? Number(basicSalary) || 0 : Number(employee.basicSalary || 0);
     const currentBasicSalary = Number(employee.basicSalary || 0);
@@ -573,6 +721,18 @@ export const updateEmployee = async (req, res, next) => {
       res.status(400);
       throw new Error("Invalid compensation effective date");
     }
+
+    res.status(400);
+    validateCnic(nextCnic, "CNIC", true);
+    validateMobileNumber(nextContactNumber, "Contact number", true);
+    validateProvince(nextProvince);
+    validateHusbandName({
+      gender: nextGender,
+      maritalStatus: nextMaritalStatus,
+      husbandName: nextHusbandName,
+    });
+    validateEmergencyContacts(parsedEmergencyContact);
+    validateGuarantors(parsedGuarantor);
 
     // Check for duplicate CNIC if changed
     if (cnic && cnic.trim() !== employee.cnic) {
@@ -611,18 +771,6 @@ export const updateEmployee = async (req, res, next) => {
         throw new Error(`Failed to upload CNIC images: ${uploadError.message}`);
       }
     }
-
-    // Parse JSON fields if they come as strings
-    const parseIfString = (value) => {
-      if (typeof value === "string") {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return value;
-        }
-      }
-      return value;
-    };
 
     // Track changes for response
     let positionChanged = false;
@@ -867,7 +1015,10 @@ export const updateEmployee = async (req, res, next) => {
     if (fatherName !== undefined)
       employee.fatherName = fatherName?.trim() || "";
     if (husbandName !== undefined)
-      employee.husbandName = husbandName?.trim() || "";
+      employee.husbandName =
+        nextGender === "Female" && nextMaritalStatus === "Married"
+          ? husbandName?.trim() || ""
+          : "";
     if (joiningDate) employee.joiningDate = joiningDate;
     if (cnic !== undefined) employee.cnic = cnic?.trim() || "";
     if (dob !== undefined) employee.dob = dob || null;
@@ -881,15 +1032,22 @@ export const updateEmployee = async (req, res, next) => {
     if (permanentStreetAddress !== undefined)
       employee.permanentStreetAddress = permanentStreetAddress?.trim() || "";
     if (emergencyContact !== undefined)
-      employee.emergencyContact = parseIfString(emergencyContact) || [];
-    if (medical !== undefined) employee.medical = parseIfString(medical) || {};
+      employee.emergencyContact = parsedEmergencyContact;
+    if (medical !== undefined) employee.medical = parsedMedical;
     if (education !== undefined)
-      employee.education = parseIfString(education) || [];
+      employee.education = parsedEducation;
     if (previousExperience !== undefined)
-      employee.previousExperience = parseIfString(previousExperience) || [];
+      employee.previousExperience = parsedPreviousExperience;
     if (guarantor !== undefined)
-      employee.guarantor = parseIfString(guarantor) || [];
-    if (legal !== undefined) employee.legal = parseIfString(legal) || {};
+      employee.guarantor = parsedGuarantor;
+    if (legal !== undefined) employee.legal = parsedLegal;
+
+    if (
+      (gender !== undefined || maritalStatus !== undefined) &&
+      !(nextGender === "Female" && nextMaritalStatus === "Married")
+    ) {
+      employee.husbandName = "";
+    }
 
     // Handle allowance policy change
     if (allowancePolicy !== undefined) {

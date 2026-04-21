@@ -63,12 +63,17 @@ import { Spinner } from "@/components/ui/spinner";
 import MarkAttendanceModal from "./MarkAttendanceModal";
 
 // Services
-import { fetchEmployees } from "@/services/employeesApi";
+import {
+  fetchEmployeeById,
+  fetchEmployees,
+  fetchPositionsByDepartment,
+} from "@/services/employeesApi";
 import {
   assignShiftToEmployees,
   fetchShiftsList,
 } from "@/services/employeeShiftsApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
+import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
 import { fetchPositionsFilters } from "@/services/positionsApi";
 
 // Utils
@@ -404,11 +409,48 @@ const AllEmployees = () => {
     },
   ];
 
+  const employees = data?.employees || [];
+  const selectedEmployees = employees.filter((employee) =>
+    selectedEmployeeIds.includes(employee._id),
+  );
+  const selectedEmployeesWithJoiningDate = selectedEmployees.filter(
+    (employee) => employee.joiningDate,
+  );
+  const minimumEffectiveDate = selectedEmployeesWithJoiningDate.length
+    ? new Date(
+        Math.max(
+          ...selectedEmployeesWithJoiningDate.map((employee) =>
+            new Date(employee.joiningDate).getTime(),
+          ),
+        ),
+      )
+    : undefined;
+
   // ===========================================================================
   // EVENT HANDLERS
   // ===========================================================================
 
   const handleEdit = (row) => {
+    void queryClient.prefetchQuery({
+      queryKey: ["employee", row._id],
+      queryFn: () => fetchEmployeeById(row._id),
+      staleTime: 60 * 1000,
+    });
+
+    void queryClient.prefetchQuery({
+      queryKey: ["allowancePoliciesList"],
+      queryFn: fetchAllowancePoliciesList,
+      staleTime: 5 * 60 * 1000,
+    });
+
+    if (row.position?.department?._id) {
+      void queryClient.prefetchQuery({
+        queryKey: ["positionsByDepartment", row.position.department._id],
+        queryFn: () => fetchPositionsByDepartment(row.position.department._id),
+        staleTime: 5 * 60 * 1000,
+      });
+    }
+
     navigate(`/workforce/employees/${row._id}/edit`);
   };
 
@@ -419,6 +461,9 @@ const AllEmployees = () => {
   const handleAssignShiftOpenChange = async (open) => {
     setAssignShiftModalOpen(open);
     if (open) {
+      if (minimumEffectiveDate) {
+        setEffectiveDate(new Date(minimumEffectiveDate));
+      }
       await refetchShiftsList();
     } else {
       setSelectedShiftId("");
@@ -434,6 +479,16 @@ const AllEmployees = () => {
 
     if (!effectiveDate) {
       toast.error("Please select an effective date");
+      return;
+    }
+
+    if (minimumEffectiveDate && effectiveDate < minimumEffectiveDate) {
+      toast.error(
+        `Shift assign date cannot be before joining date (${format(
+          minimumEffectiveDate,
+          "PPP",
+        )})`,
+      );
       return;
     }
 
@@ -613,6 +668,11 @@ const AllEmployees = () => {
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>Effective From</Label>
+                    {minimumEffectiveDate ? (
+                      <p className="text-sm text-muted-foreground">
+                        Earliest allowed date: {format(minimumEffectiveDate, "PPP")}
+                      </p>
+                    ) : null}
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -632,6 +692,7 @@ const AllEmployees = () => {
                           mode="single"
                           selected={effectiveDate}
                           onSelect={setEffectiveDate}
+                          fromDate={minimumEffectiveDate}
                           initialFocus
                         />
                       </PopoverContent>
@@ -888,7 +949,7 @@ const AllEmployees = () => {
         onSelectionChange={handleSelectionChange}
       />
 
-      {data?.pagination && data.pagination.totalPages > 1 && (
+      {data?.pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>

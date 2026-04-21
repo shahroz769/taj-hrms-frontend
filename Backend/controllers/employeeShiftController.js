@@ -3,6 +3,12 @@ import Employee from "../models/Employee.js";
 import Shift from "../models/Shift.js";
 import mongoose from "mongoose";
 
+const normalizeDateOnly = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 // @description     Assign shift to multiple employees
 // @route           POST /api/employee-shifts/assign
 // @access          Admin
@@ -58,7 +64,9 @@ export const assignShiftToEmployees = async (req, res, next) => {
     }
 
     // Check all employees exist
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employees = await Employee.find({ _id: { $in: employeeIds } }).select(
+      "_id fullName employeeID joiningDate",
+    );
     if (employees.length !== employeeIds.length) {
       const foundIds = employees.map((e) => e._id.toString());
       const notFoundIds = employeeIds.filter((id) => !foundIds.includes(id));
@@ -68,6 +76,15 @@ export const assignShiftToEmployees = async (req, res, next) => {
 
     const parsedEffectiveDate = new Date(effectiveDate);
     parsedEffectiveDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    if (Number.isNaN(parsedEffectiveDate.getTime())) {
+      res.status(400);
+      throw new Error("Invalid effective date");
+    }
+
+    const employeeMap = new Map(
+      employees.map((employee) => [employee._id.toString(), employee]),
+    );
 
     // Calculate end date for previous shifts (one day before new effective date)
     const previousEndDate = new Date(parsedEffectiveDate);
@@ -79,6 +96,28 @@ export const assignShiftToEmployees = async (req, res, next) => {
 
     for (const employeeId of employeeIds) {
       try {
+        const employee = employeeMap.get(employeeId);
+
+        if (!employee) {
+          errors.push({
+            employeeId,
+            error: "Employee not found",
+          });
+          continue;
+        }
+
+        if (employee.joiningDate) {
+          const normalizedJoiningDate = normalizeDateOnly(employee.joiningDate);
+
+          if (parsedEffectiveDate < normalizedJoiningDate) {
+            errors.push({
+              employeeId,
+              error: `Effective date cannot be before joining date (${normalizedJoiningDate.toISOString().split("T")[0]})`,
+            });
+            continue;
+          }
+        }
+
         // Find current active shift for this employee (endDate is null)
         const currentShift = await EmployeeShift.findOne({
           employee: employeeId,

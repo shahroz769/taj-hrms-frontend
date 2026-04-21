@@ -44,6 +44,10 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 0,
   })}`;
 
+const roundMoney = (value) => Math.round(Number(value) || 0);
+const clampMoney = (value, min = 0, max = Number.POSITIVE_INFINITY) =>
+  Math.min(max, Math.max(min, roundMoney(value)));
+
 const formatDisplayDate = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -173,9 +177,9 @@ const resolveAttendanceDeductionBreakdown = ({
     .filter((item) => item.count > 0)
     .map((item) => ({
       ...item,
-      basicAmount: Number(item.basicAmount.toFixed(2)),
-      allowanceAmount: Number(item.allowanceAmount.toFixed(2)),
-      totalAmount: Number((item.basicAmount + item.allowanceAmount).toFixed(2)),
+      basicAmount: roundMoney(item.basicAmount),
+      allowanceAmount: roundMoney(item.allowanceAmount),
+      totalAmount: roundMoney(item.basicAmount + item.allowanceAmount),
     }));
 };
 
@@ -450,8 +454,16 @@ const runPayrollMutationForEmployee = async ({
           for (const loanEntry of existingPayroll.loanDeductionBreakdown) {
             const prevLoan = await Loan.findById(loanEntry.loan).session(session);
             if (prevLoan) {
-              prevLoan.totalPaid = Math.round(Math.max(0, prevLoan.totalPaid - loanEntry.installmentAmount) * 100) / 100;
-              prevLoan.remainingBalance = Math.round((prevLoan.remainingBalance + loanEntry.installmentAmount) * 100) / 100;
+              prevLoan.totalPaid = clampMoney(
+                Number(prevLoan.totalPaid || 0) - Number(loanEntry.installmentAmount || 0),
+                0,
+                Number(prevLoan.loanAmount || 0),
+              );
+              prevLoan.remainingBalance = clampMoney(
+                Number(prevLoan.remainingBalance || 0) + Number(loanEntry.installmentAmount || 0),
+                0,
+                Number(prevLoan.loanAmount || 0),
+              );
               if (prevLoan.status === "Completed" && prevLoan.remainingBalance > 0) {
                 prevLoan.status = "Approved";
                 prevLoan.completedAt = null;
@@ -508,9 +520,9 @@ const runPayrollMutationForEmployee = async ({
           if (!deduction) continue;
 
           if (deductionEntry.status === "deducted") {
-            deduction.status = "Deducted";
-            deduction.deductedAt = new Date();
-            deduction.deductedByPayroll = createdPayroll._id;
+            deduction.status = "Approved";
+            deduction.deductedAt = null;
+            deduction.deductedByPayroll = null;
             deduction.currentDueYear =
               deductionEntry.sourceDueYear ||
               deduction.currentDueYear ||
@@ -542,8 +554,16 @@ const runPayrollMutationForEmployee = async ({
         for (const loanEntry of payload.loanDeductionBreakdown) {
           const loan = await Loan.findById(loanEntry.loan).session(session);
           if (loan) {
-            loan.totalPaid = Math.round((loan.totalPaid + loanEntry.installmentAmount) * 100) / 100;
-            loan.remainingBalance = Math.round((loan.remainingBalance - loanEntry.installmentAmount) * 100) / 100;
+            loan.totalPaid = clampMoney(
+              Number(loan.totalPaid || 0) + Number(loanEntry.installmentAmount || 0),
+              0,
+              Number(loan.loanAmount || 0),
+            );
+            loan.remainingBalance = clampMoney(
+              Number(loan.remainingBalance || 0) - Number(loanEntry.installmentAmount || 0),
+              0,
+              Number(loan.loanAmount || 0),
+            );
 
             // Update schedule entry
             const idx = loan.repaymentSchedule.findIndex(
@@ -1409,10 +1429,62 @@ export const markPayrollAsPaid = async (req, res, next) => {
       throw new Error('Payroll not found');
     }
 
-    payroll.isPaid = true;
-    payroll.paidAt = new Date();
-    payroll.paidBy = req.user?._id || null;
-    await payroll.save();
+    if (payroll.isPaid) {
+      res.status(400);
+      throw new Error("Payroll is already marked as paid");
+    }
+
+    const session = await mongoose.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        const livePayroll = await Payroll.findById(id).session(session);
+
+        if (!livePayroll) {
+          res.status(404);
+          throw new Error("Payroll not found");
+        }
+
+        if (livePayroll.isPaid) {
+          res.status(400);
+          throw new Error("Payroll is already marked as paid");
+        }
+
+        if (livePayroll.deductionBreakdown?.length > 0) {
+          for (const deductionEntry of livePayroll.deductionBreakdown) {
+            if (deductionEntry.status !== "deducted" || !deductionEntry.deduction) {
+              continue;
+            }
+
+            const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
+            if (!deduction) continue;
+
+            deduction.status = "Deducted";
+            deduction.deductedAt = new Date();
+            deduction.deductedByPayroll = livePayroll._id;
+            deduction.currentDueYear =
+              deductionEntry.sourceDueYear ||
+              deduction.currentDueYear ||
+              livePayroll.year;
+            deduction.currentDueMonth =
+              deductionEntry.sourceDueMonth ||
+              deduction.currentDueMonth ||
+              livePayroll.month;
+            await deduction.save({ session });
+          }
+        }
+
+        livePayroll.isPaid = true;
+        livePayroll.paidAt = new Date();
+        livePayroll.paidBy = req.user?._id || null;
+        await livePayroll.save({ session });
+
+        payroll.isPaid = livePayroll.isPaid;
+        payroll.paidAt = livePayroll.paidAt;
+      });
+    } finally {
+      await session.endSession();
+    }
 
     res.json({ success: true, isPaid: payroll.isPaid, paidAt: payroll.paidAt });
   } catch (error) {

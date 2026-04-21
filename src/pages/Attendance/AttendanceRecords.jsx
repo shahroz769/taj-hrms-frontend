@@ -9,7 +9,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ChevronLeftIcon from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
 import CircleXIcon from "lucide-react/dist/esm/icons/circle-x";
-import ClipboardListIcon from "lucide-react/dist/esm/icons/clipboard-list";
 import LoaderCircleIcon from "lucide-react/dist/esm/icons/loader-circle";
 import SearchIcon from "lucide-react/dist/esm/icons/search";
 
@@ -47,7 +46,6 @@ import {
 
 // Pages / Modals
 import AttendanceCellEditModal from "./AttendanceCellEditModal";
-import MarkAttendanceModal from "../Workforce/MarkAttendanceModal";
 
 // Services
 import { fetchMonthlyAttendance } from "@/services/attendancesApi";
@@ -76,6 +74,7 @@ const MONTH_NAMES = [
 ];
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MIN_TABLE_ROWS = 8;
 
 /** Get array of day numbers for a month (1-indexed) */
 const getDaysInMonth = (year, month) => {
@@ -152,9 +151,6 @@ const AttendanceRecords = () => {
   const [cellEditData, setCellEditData] = useState(null);
   const [loadingCellKey, setLoadingCellKey] = useState(null);
 
-  // Mark Attendance modal state
-  const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
-
   // ===========================================================================
   // DERIVED DATA
   // ===========================================================================
@@ -191,6 +187,11 @@ const AttendanceRecords = () => {
 
   const attendanceData = data?.employees || [];
   const pagination = data?.pagination;
+  const placeholderRowCount = useMemo(() => {
+    const targetRows =
+      limit === 0 ? Math.max(attendanceData.length, MIN_TABLE_ROWS) : limit;
+    return Math.max(targetRows - attendanceData.length, 0);
+  }, [attendanceData.length, limit]);
 
   // ===========================================================================
   // EFFECTS
@@ -389,33 +390,23 @@ const AttendanceRecords = () => {
       {/* Header */}
       <div className={styles.header}>
         <h1 className={styles.title}>Attendance Records</h1>
-        <div className="flex items-center gap-3">
-          <div className={styles.legend}>
-            <div className={styles.legendItem}>
-              <span className={styles.legendDotP} />
-              Present
-            </div>
-            <div className={styles.legendItem}>
-              <span className={styles.legendDotA} />
-              Absent
-            </div>
-            <div className={styles.legendItem}>
-              <span className={styles.legendDotL} />
-              Leave
-            </div>
-            <div className={styles.legendItem}>
-              <span className={styles.legendDotOff} />
-              Off Day
-            </div>
+        <div className={styles.legend}>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDotP} />
+            Present
           </div>
-          <Button
-            variant="green"
-            className="cursor-pointer shrink-0"
-            onClick={() => setMarkAttendanceOpen(true)}
-          >
-            <ClipboardListIcon size={16} />
-            Mark Attendance
-          </Button>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDotA} />
+            Absent
+          </div>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDotL} />
+            Leave
+          </div>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDotOff} />
+            Off Day
+          </div>
         </div>
       </div>
 
@@ -529,132 +520,196 @@ const AttendanceRecords = () => {
 
             {/* Body */}
             <tbody className={styles.tableBody}>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={days.length + 9}>
-                    <div className={styles.stateContainer}>
-                      <Spinner className={styles.loader} />
-                      <p className={styles.stateText}>
-                        Loading attendance data...
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : isError ? (
-                <tr>
-                  <td colSpan={days.length + 9}>
-                    <div className={styles.stateContainer}>
-                      <p className={styles.stateText}>
-                        Failed to load attendance data.{" "}
-                        <button
-                          onClick={() => refetch()}
-                          className="text-primary underline"
-                        >
-                          Retry
-                        </button>
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : attendanceData.length === 0 ? (
-                <tr>
-                  <td colSpan={days.length + 9}>
-                    <div className={styles.stateContainer}>
-                      <p className={styles.stateText}>
-                        No attendance records found.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                attendanceData.map((row) => (
-                  <tr key={row.employee._id}>
-                    {/* Sticky employee column */}
-                    <td className={styles.stickyCell}>
-                      <div className={styles.employeeName}>
-                        {row.employee.fullName} ({row.employee.employeeID})
-                      </div>
-                    </td>
+              {!isLoading && !isError ? (
+                <>
+                  {attendanceData.map((row) => (
+                    <tr key={row.employee._id}>
+                      {/* Sticky employee column */}
+                      <td className={styles.stickyCell}>
+                        <div className={styles.employeeName}>
+                          {row.employee.fullName} ({row.employee.employeeID})
+                        </div>
+                      </td>
 
-                    {/* Day cells */}
-                    {days.map((day) => {
-                      const record = row.records[day];
-                      const isFutureDate = record === null;
-                      const isBeforeJoining = record === "before_joining";
-                      const cellKey = `${row.employee._id}-${day}`;
-                      const isCellLoading = loadingCellKey === cellKey;
-                      return (
-                        <td
-                          key={day}
-                          className={
-                            isBeforeJoining
-                              ? styles.attendanceCell
-                              : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
-                          }
-                          onClick={
-                            !isFutureDate && !isBeforeJoining && !isCellLoading
-                              ? () => handleCellClick(row.employee, day, record)
-                              : undefined
-                          }
-                        >
-                          {isCellLoading ? (
-                            <LoaderCircleIcon
-                              size={16}
-                              className="mx-auto text-primary animate-spin"
-                            />
-                          ) : (
-                            renderBadge(record)
-                          )}
+                      {/* Day cells */}
+                      {days.map((day) => {
+                        const record = row.records[day];
+                        const isFutureDate = record === null;
+                        const isBeforeJoining = record === "before_joining";
+                        const cellKey = `${row.employee._id}-${day}`;
+                        const isCellLoading = loadingCellKey === cellKey;
+                        return (
+                          <td
+                            key={day}
+                            className={
+                              isBeforeJoining
+                                ? styles.attendanceCell
+                                : `${styles.attendanceCell}${!isFutureDate ? ` ${styles.clickableCell}` : ""}`
+                            }
+                            onClick={
+                              !isFutureDate && !isBeforeJoining && !isCellLoading
+                                ? () => handleCellClick(row.employee, day, record)
+                                : undefined
+                            }
+                          >
+                            {isCellLoading ? (
+                              <LoaderCircleIcon
+                                size={16}
+                                className="mx-auto text-primary animate-spin"
+                              />
+                            ) : (
+                              renderBadge(record)
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      {/* Summary cells */}
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryWD}`}
+                      >
+                        {row.summary?.workingDays || 0}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryP}`}
+                      >
+                        {(row.summary?.present || 0) + (row.summary?.late || 0) + (row.summary?.halfDay || 0)}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryA}`}
+                      >
+                        {row.summary?.absent || 0}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryLPaid}`}
+                      >
+                        {row.summary?.paidLeave || 0}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryLUnpaid}`}
+                      >
+                        {row.summary?.unpaidLeave || 0}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryHD}`}
+                      >
+                        {row.summary?.halfDay || 0}
+                      </td>
+                      <td
+                        className={`${styles.summaryCell} ${styles.summaryOff}`}
+                      >
+                        {row.summary?.off || 0}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {Array.from({ length: placeholderRowCount }, (_, index) => (
+                    <tr key={`empty-row-${index}`} className={styles.emptyRow}>
+                      <td className={styles.stickyCell}>
+                        <div className={styles.emptyEmployeeText}> </div>
+                      </td>
+                      {days.map((day) => (
+                        <td key={day} className={styles.attendanceCell}>
+                          <span className={styles.emptyCellFill} />
                         </td>
-                      );
-                    })}
-
-                    {/* Summary cells */}
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryWD}`}
-                    >
-                      {row.summary?.workingDays || 0}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryP}`}
-                    >
-                      {(row.summary?.present || 0) + (row.summary?.late || 0) + (row.summary?.halfDay || 0)}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryA}`}
-                    >
-                      {row.summary?.absent || 0}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryLPaid}`}
-                    >
-                      {row.summary?.paidLeave || 0}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryLUnpaid}`}
-                    >
-                      {row.summary?.unpaidLeave || 0}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryHD}`}
-                    >
-                      {row.summary?.halfDay || 0}
-                    </td>
-                    <td
-                      className={`${styles.summaryCell} ${styles.summaryOff}`}
-                    >
-                      {row.summary?.off || 0}
-                    </td>
-                  </tr>
-                ))
+                      ))}
+                      <td className={`${styles.summaryCell} ${styles.summaryWD}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryP}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryA}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryLPaid}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryLUnpaid}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryHD}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryOff}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              ) : (
+                Array.from(
+                  { length: Math.max(limit === 0 ? MIN_TABLE_ROWS : limit, MIN_TABLE_ROWS) },
+                  (_, index) => (
+                    <tr key={`loading-row-${index}`} className={styles.emptyRow}>
+                      <td className={styles.stickyCell}>
+                        <div className={styles.emptyEmployeeText}> </div>
+                      </td>
+                      {days.map((day) => (
+                        <td key={day} className={styles.attendanceCell}>
+                          <span className={styles.emptyCellFill} />
+                        </td>
+                      ))}
+                      <td className={`${styles.summaryCell} ${styles.summaryWD}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryP}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryA}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryLPaid}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryLUnpaid}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryHD}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                      <td className={`${styles.summaryCell} ${styles.summaryOff}`}>
+                        <span className={styles.emptyCellFill} />
+                      </td>
+                    </tr>
+                  ),
+                )
               )}
             </tbody>
           </table>
         </div>
+        {isLoading && (
+          <div className={styles.tableMessageOverlay}>
+            <div className={styles.overlayStateContent}>
+              <Spinner className={styles.loader} />
+              <p className={styles.stateText}>Loading attendance data...</p>
+            </div>
+          </div>
+        )}
+        {isError && (
+          <div className={styles.tableMessageOverlay}>
+            <div className={styles.overlayStateContent}>
+              <p className={styles.stateText}>
+                Failed to load attendance data.{" "}
+                <button
+                  onClick={() => refetch()}
+                  className="pointer-events-auto text-primary underline"
+                >
+                  Retry
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
+        {!isLoading && !isError && attendanceData.length === 0 && (
+          <div className={styles.tableMessageOverlay}>
+            <p className={styles.stateText}>No attendance records found.</p>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
+      {pagination && (
         <Pagination className="pt-5">
           <PaginationContent>
             <PaginationItem>
@@ -778,13 +833,6 @@ const AttendanceRecords = () => {
           preloadedShift={cellEditData.preloadedShift}
         />
       )}
-
-      {/* Mark Attendance Modal */}
-      <MarkAttendanceModal
-        open={markAttendanceOpen}
-        onOpenChange={setMarkAttendanceOpen}
-        preSelectedEmployeeIds={null}
-      />
     </div>
   );
 };

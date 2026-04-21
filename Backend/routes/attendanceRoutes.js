@@ -15,7 +15,7 @@ import {
 const router = express.Router();
 
 // @route           POST /api/attendances/bulk-mark
-// @description     Bulk mark attendance for multiple employees
+// @description     Bulk mark attendance for multiple employees on a single date
 // @access          Admin
 router.post(
   "/bulk-mark",

@@ -474,7 +474,11 @@ const AttendanceCellEditModal = ({
                     <SelectItem value="Present">Present</SelectItem>
                     <SelectItem value="Absent">Absent</SelectItem>
                     <SelectItem value="Off">Off</SelectItem>
-                    <SelectItem value="Leave">Leave</SelectItem>
+                    {mainStatus === "Leave" && (
+                      <SelectItem value="Leave" disabled>
+                        Leave
+                      </SelectItem>
+                    )}
                   </SelectGroup>
                 </SelectContent>
               </Select>

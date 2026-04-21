@@ -94,6 +94,10 @@
   color: var(--foreground);
 }
 
+.requiredMark {
+  color: var(--destructive);
+}
+
 .error {
   font-size: 0.75rem;
   color: var(--destructive);
@@ -152,13 +156,16 @@
 }
 
 .deleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
   color: #9ca3af;
   transition: color 0.2s ease;
-  align-self: flex-end;
+  align-self: center;
 }
 
 .deleteBtn:hover {
@@ -207,6 +214,18 @@
   text-align: center;
 }
 
+.imageHint {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
 @media (max-width: 1024px) {
   .formGrid {
     grid-template-columns: repeat(2, 1fr);
@@ -242,5 +261,13 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .formActions {
+    justify-content: stretch;
+  }
+
+  .formActions button {
+    width: 100%;
   }
 }
