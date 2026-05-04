@@ -404,6 +404,118 @@ const buildPayrollError = (
   reasonMessage,
 });
 
+export const applyDeductionStateOnPayrollGeneration = ({
+  deduction,
+  deductionEntry,
+  year,
+  month,
+}) => {
+  deduction.status = "Approved";
+  deduction.deductedAt = null;
+  deduction.deductedByPayroll = null;
+
+  if (deductionEntry.status !== "deducted") {
+    deduction.currentDueYear =
+      deductionEntry.deferredToYear ||
+      deduction.currentDueYear ||
+      year;
+    deduction.currentDueMonth =
+      deductionEntry.deferredToMonth ||
+      deduction.currentDueMonth ||
+      month;
+  }
+
+  return deduction;
+};
+
+export const applyDeductionStateOnPayrollPayment = ({
+  deduction,
+  deductionEntry,
+  payrollId,
+  payrollYear,
+  payrollMonth,
+  paidAt = new Date(),
+}) => {
+  deduction.status = "Deducted";
+  deduction.deductedAt = paidAt;
+  deduction.deductedByPayroll = payrollId;
+  deduction.currentDueYear =
+    deductionEntry.sourceDueYear ||
+    deduction.currentDueYear ||
+    payrollYear;
+  deduction.currentDueMonth =
+    deductionEntry.sourceDueMonth ||
+    deduction.currentDueMonth ||
+    payrollMonth;
+
+  return deduction;
+};
+
+export const applyLoanStateOnPayrollPayment = ({
+  loan,
+  loanEntry,
+  payrollYear,
+  payrollMonth,
+}) => {
+  loan.totalPaid = clampMoney(
+    Number(loan.totalPaid || 0) + Number(loanEntry.installmentAmount || 0),
+    0,
+    Number(loan.loanAmount || 0),
+  );
+  loan.remainingBalance = clampMoney(
+    Number(loan.remainingBalance || 0) - Number(loanEntry.installmentAmount || 0),
+    0,
+    Number(loan.loanAmount || 0),
+  );
+
+  const idx = loan.repaymentSchedule.findIndex(
+    (entry) => entry.year === payrollYear && entry.month === payrollMonth,
+  );
+
+  if (idx !== -1) {
+    const scheduled = Number(loan.repaymentSchedule[idx].amount || 0);
+    loan.repaymentSchedule[idx].actualAmount = Number(
+      loanEntry.installmentAmount || 0,
+    );
+    loan.repaymentSchedule[idx].status =
+      Number(loanEntry.installmentAmount || 0) >= scheduled ? "Paid" : "Partial";
+  }
+
+  if (loan.remainingBalance > 0) {
+    const hasFuturePending = loan.repaymentSchedule.some(
+      (entry) =>
+        entry.status === "Pending" &&
+        (entry.year > payrollYear ||
+          (entry.year === payrollYear && entry.month > payrollMonth)),
+    );
+
+    if (!hasFuturePending) {
+      let nextMonth = payrollMonth + 1;
+      let nextYear = payrollYear;
+      if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear += 1;
+      }
+
+      loan.repaymentSchedule.push({
+        year: nextYear,
+        month: nextMonth,
+        amount: loan.remainingBalance,
+        actualAmount: 0,
+        status: "Pending",
+      });
+    }
+  }
+
+  if (loan.remainingBalance <= 0) {
+    loan.status = "Completed";
+    loan.completedAt = new Date();
+    loan.remainingBalance = 0;
+  }
+
+  return loan;
+};
+
 const runPayrollMutationForEmployee = async ({
   employee,
   year,
@@ -449,37 +561,6 @@ const runPayrollMutationForEmployee = async ({
           }
         }
 
-        // Reverse previous loan deduction if any
-        if (existingPayroll.loanDeductionBreakdown?.length > 0) {
-          for (const loanEntry of existingPayroll.loanDeductionBreakdown) {
-            const prevLoan = await Loan.findById(loanEntry.loan).session(session);
-            if (prevLoan) {
-              prevLoan.totalPaid = clampMoney(
-                Number(prevLoan.totalPaid || 0) - Number(loanEntry.installmentAmount || 0),
-                0,
-                Number(prevLoan.loanAmount || 0),
-              );
-              prevLoan.remainingBalance = clampMoney(
-                Number(prevLoan.remainingBalance || 0) + Number(loanEntry.installmentAmount || 0),
-                0,
-                Number(prevLoan.loanAmount || 0),
-              );
-              if (prevLoan.status === "Completed" && prevLoan.remainingBalance > 0) {
-                prevLoan.status = "Approved";
-                prevLoan.completedAt = null;
-              }
-              const idx = prevLoan.repaymentSchedule.findIndex(
-                (e) => e.year === year && e.month === month,
-              );
-              if (idx !== -1) {
-                prevLoan.repaymentSchedule[idx].status = "Pending";
-                prevLoan.repaymentSchedule[idx].actualAmount = 0;
-              }
-              await prevLoan.save({ session });
-            }
-          }
-        }
-
         await Payroll.deleteOne({ _id: existingPayroll._id }, { session });
       }
 
@@ -519,93 +600,14 @@ const runPayrollMutationForEmployee = async ({
           const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
           if (!deduction) continue;
 
-          if (deductionEntry.status === "deducted") {
-            deduction.status = "Approved";
-            deduction.deductedAt = null;
-            deduction.deductedByPayroll = null;
-            deduction.currentDueYear =
-              deductionEntry.sourceDueYear ||
-              deduction.currentDueYear ||
-              year;
-            deduction.currentDueMonth =
-              deductionEntry.sourceDueMonth ||
-              deduction.currentDueMonth ||
-              month;
-          } else {
-            deduction.status = "Approved";
-            deduction.deductedAt = null;
-            deduction.deductedByPayroll = null;
-            deduction.currentDueYear =
-              deductionEntry.deferredToYear ||
-              deduction.currentDueYear ||
-              year;
-            deduction.currentDueMonth =
-              deductionEntry.deferredToMonth ||
-              deduction.currentDueMonth ||
-              month;
-          }
+          applyDeductionStateOnPayrollGeneration({
+            deduction,
+            deductionEntry,
+            year,
+            month,
+          });
 
           await deduction.save({ session });
-        }
-      }
-
-      // Update loan balance after payroll creation
-      if (payload.loanDeductionBreakdown?.length > 0) {
-        for (const loanEntry of payload.loanDeductionBreakdown) {
-          const loan = await Loan.findById(loanEntry.loan).session(session);
-          if (loan) {
-            loan.totalPaid = clampMoney(
-              Number(loan.totalPaid || 0) + Number(loanEntry.installmentAmount || 0),
-              0,
-              Number(loan.loanAmount || 0),
-            );
-            loan.remainingBalance = clampMoney(
-              Number(loan.remainingBalance || 0) - Number(loanEntry.installmentAmount || 0),
-              0,
-              Number(loan.loanAmount || 0),
-            );
-
-            // Update schedule entry
-            const idx = loan.repaymentSchedule.findIndex(
-              (e) => e.year === year && e.month === month,
-            );
-            if (idx !== -1) {
-              const scheduled = loan.repaymentSchedule[idx].amount;
-              loan.repaymentSchedule[idx].actualAmount = loanEntry.installmentAmount;
-              loan.repaymentSchedule[idx].status =
-                loanEntry.installmentAmount >= scheduled ? "Paid" : "Partial";
-            }
-
-            // Carry any unpaid remainder forward if the schedule has no future pending installment.
-            if (loan.remainingBalance > 0) {
-              const hasFuturePending = loan.repaymentSchedule.some(
-                (e) =>
-                  e.status === "Pending" &&
-                  (e.year > year || (e.year === year && e.month > month)),
-              );
-              if (!hasFuturePending) {
-                let nextM = month + 1;
-                let nextY = year;
-                if (nextM > 12) { nextM = 1; nextY += 1; }
-                loan.repaymentSchedule.push({
-                  year: nextY,
-                  month: nextM,
-                  amount: loan.remainingBalance,
-                  actualAmount: 0,
-                  status: "Pending",
-                });
-              }
-            }
-
-            // Check if fully paid
-            if (loan.remainingBalance <= 0) {
-              loan.status = "Completed";
-              loan.completedAt = new Date();
-              loan.remainingBalance = 0;
-            }
-
-            await loan.save({ session });
-          }
         }
       }
     });
@@ -1459,18 +1461,29 @@ export const markPayrollAsPaid = async (req, res, next) => {
             const deduction = await Deduction.findById(deductionEntry.deduction).session(session);
             if (!deduction) continue;
 
-            deduction.status = "Deducted";
-            deduction.deductedAt = new Date();
-            deduction.deductedByPayroll = livePayroll._id;
-            deduction.currentDueYear =
-              deductionEntry.sourceDueYear ||
-              deduction.currentDueYear ||
-              livePayroll.year;
-            deduction.currentDueMonth =
-              deductionEntry.sourceDueMonth ||
-              deduction.currentDueMonth ||
-              livePayroll.month;
+            applyDeductionStateOnPayrollPayment({
+              deduction,
+              deductionEntry,
+              payrollId: livePayroll._id,
+              payrollYear: livePayroll.year,
+              payrollMonth: livePayroll.month,
+            });
             await deduction.save({ session });
+          }
+        }
+
+        if (livePayroll.loanDeductionBreakdown?.length > 0) {
+          for (const loanEntry of livePayroll.loanDeductionBreakdown) {
+            const loan = await Loan.findById(loanEntry.loan).session(session);
+            if (!loan) continue;
+
+            applyLoanStateOnPayrollPayment({
+              loan,
+              loanEntry,
+              payrollYear: livePayroll.year,
+              payrollMonth: livePayroll.month,
+            });
+            await loan.save({ session });
           }
         }
 

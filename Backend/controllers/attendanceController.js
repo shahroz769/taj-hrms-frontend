@@ -5,6 +5,8 @@ import Employee from "../models/Employee.js";
 import EmployeeShift from "../models/EmployeeShift.js";
 import Shift from "../models/Shift.js";
 import LeaveApplication from "../models/LeaveApplication.js";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { PAKISTAN_TZ } from "../utils/timezone.js";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -55,8 +57,8 @@ const normalizeUtcDate = (value) => {
   if (!value) return null;
   const date = new Date(value);
   if (isNaN(date.getTime())) return null;
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
+  const pkDate = formatInTimeZone(date, PAKISTAN_TZ, "yyyy-MM-dd");
+  return fromZonedTime(`${pkDate}T00:00:00`, PAKISTAN_TZ);
 };
 
 const getEmploymentBounds = (employee) => {

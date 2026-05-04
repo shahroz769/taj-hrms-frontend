@@ -12,7 +12,7 @@ import {
   getMonthStartEndUtcForPakistan,
   PAKISTAN_TZ,
 } from "../utils/timezone.js";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import {
   calculateAttendanceDeductionFromCounts,
   calculateManualDeductionPlan,
@@ -41,8 +41,8 @@ const normalizeUtcDate = (value) => {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
+  const pkDate = formatInTimeZone(date, PAKISTAN_TZ, "yyyy-MM-dd");
+  return fromZonedTime(`${pkDate}T00:00:00`, PAKISTAN_TZ);
 };
 
 const isOutsideEmploymentWindow = (date, employmentBounds) => {
@@ -465,6 +465,7 @@ export const calculateEmployeePayroll = async ({
   let unpaidLeaves = 0;
   let halfDay = 0;
   let late = 0;
+  const lateDayRates = [];
 
   const salarySegmentsMap = new Map();
   let payableDayUnitsTotal = 0;
@@ -612,6 +613,14 @@ export const calculateEmployeePayroll = async ({
       tracker.basicAmount += Number(item.basicAmount || 0);
       tracker.allowanceAmount += Number(item.allowanceAmount || 0);
     }
+
+    if (dayState.type === "late") {
+      lateDayRates.push({
+        basicPerDay: Number(basicSalaryMonthly || 0) / (calendarDaysInMonth || 1),
+        allowancePerDay:
+          Number(policyComponentsInfo.amount || 0) / (calendarDaysInMonth || 1),
+      });
+    }
   }
 
   const grossSalary = roundMoney(fullBasicSalaryAmount + fullAllowanceAmount);
@@ -750,11 +759,12 @@ export const calculateEmployeePayroll = async ({
       salaryAvailable: salaryBeforeLoan,
     });
 
-  const latePenaltyInfo = calculateLatePenalty([]);
-  const latePenaltyAmount = 0;
+  const latePenaltyInfo = calculateLatePenalty(lateDayRates);
+  const latePenaltyAmount = roundMoney(latePenaltyInfo.totalPenaltyAmount);
   const totalSalary = roundMoney(
     grossSalary -
       attendanceDeductionAmount -
+      latePenaltyAmount -
       manualDeductionAmount -
       loanDeductionAmount +
       arrearsAmount,
@@ -850,7 +860,7 @@ export const calculateEmployeePayroll = async ({
           ?.totalAmount || 0,
       ),
       lateCount: late,
-      latePenaltyGroups: 0,
+      latePenaltyGroups: Math.floor(lateDayRates.length / 3),
       netSalary: totalSalary,
     },
     attendanceDeductionBreakdown,
