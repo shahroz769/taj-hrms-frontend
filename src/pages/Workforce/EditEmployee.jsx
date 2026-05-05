@@ -43,7 +43,8 @@ import {
   fetchPositionsByDepartment,
 } from "@/services/employeesApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
-import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
+import { fetchAllowanceComponentsList } from "@/services/allowanceComponentsApi";
+import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -60,6 +61,7 @@ const PROVINCES = [
   "Gilgit",
 ];
 const CNIC_IMAGE_MAX_SIZE = 1 * 1024 * 1024;
+const EMPLOYEE_PICTURE_MAX_SIZE = 1 * 1024 * 1024;
 
 const sanitizeDigits = (value, maxLength) =>
   value.replace(/\D/g, "").slice(0, maxLength);
@@ -78,6 +80,9 @@ const EditEmployee = () => {
   // STATE
   // ===========================================================================
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [employeePicturePreview, setEmployeePicturePreview] = useState(null);
+  const [employeePictureFile, setEmployeePictureFile] = useState(null);
+  const [employeePictureError, setEmployeePictureError] = useState("");
   const [cnicFrontPreview, setCnicFrontPreview] = useState(null);
   const [cnicBackPreview, setCnicBackPreview] = useState(null);
   const [cnicFrontFile, setCnicFrontFile] = useState(null);
@@ -92,6 +97,9 @@ const EditEmployee = () => {
   useEffect(() => {
     setIsDataLoaded(false);
     setSelectedDepartment("");
+    setEmployeePicturePreview(null);
+    setEmployeePictureFile(null);
+    setEmployeePictureError("");
     setCnicFrontPreview(null);
     setCnicBackPreview(null);
     setCnicFrontFile(null);
@@ -117,8 +125,12 @@ const EditEmployee = () => {
       gender: "",
       department: "",
       position: "",
+      employeeOf: "Taj Agri",
       basicSalary: "",
-      allowancePolicy: "",
+      leaveEntitlements: [],
+      leaveAnnualDays: "",
+      leaveMethod: "Fixed",
+      allowances: [],
       compensationEffectiveDate: new Date(),
       compensationChangeReason: "",
       employmentType: "Permanent",
@@ -151,14 +163,15 @@ const EditEmployee = () => {
           lastSalary: "",
         },
       ],
-      guarantor: [{ name: "", contactNumber: "", cnic: "", address: "" }],
+      guarantor: [
+        { name: "", contactNumber: "", relation: "", cnic: "", address: "", documentUrl: "" },
+      ],
+      references: [{ name: "", contactNumber: "", relation: "", address: "" }],
       legal: {
-        involvedInIllegalActivity: false,
-        illegalActivityDetails: "",
-        convictedBefore: false,
-        convictedBeforeDetails: "",
-        restrictedPlaces: false,
-        restrictedPlacesDetails: "",
+        convictedCriminalCorruptionCase: false,
+        rusticatedDismissedTerminated: false,
+        pendingLitigationCourtCase: false,
+        availableAnywhereInPakistan: false,
       },
     },
   });
@@ -200,11 +213,26 @@ const EditEmployee = () => {
     name: "guarantor",
   });
 
+  const {
+    fields: referenceFields,
+    append: appendReference,
+    remove: removeReference,
+  } = useFieldArray({
+    control,
+    name: "references",
+  });
+
+  // Per-guarantor document file state (parallel array)
+  const [guarantorDocFiles, setGuarantorDocFiles] = useState([]);
+
   // Watch values
   const watchMedical = watch("medical");
   const watchLegal = watch("legal");
   const watchGender = watch("gender");
   const watchMaritalStatus = watch("maritalStatus");
+  const watchEmployeeOf = watch("employeeOf");
+  const watchLeaveEntitlements = watch("leaveEntitlements") || [];
+  const watchAllowances = watch("allowances") || [];
 
   useEffect(() => {
     if (!(watchGender === "Female" && watchMaritalStatus === "Married")) {
@@ -240,12 +268,15 @@ const EditEmployee = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  const {
-    data: allowancePoliciesData,
-    isLoading: isLoadingAllowancePolicies,
-  } = useQuery({
-    queryKey: ["allowancePoliciesList"],
-    queryFn: fetchAllowancePoliciesList,
+  const { data: allowanceComponentsData } = useQuery({
+    queryKey: ["allowanceComponentsList"],
+    queryFn: fetchAllowanceComponentsList,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: leaveTypesData } = useQuery({
+    queryKey: ["leaveTypesList"],
+    queryFn: fetchLeaveTypesList,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -256,7 +287,7 @@ const EditEmployee = () => {
   // Populate form with employee data as soon as the main employee payload arrives.
   // Dependent option lists can continue loading in parallel without blocking the form.
   useEffect(() => {
-    if (employee && !isDataLoaded) {
+    if (employee && !isDataLoaded && leaveTypesData && allowanceComponentsData) {
       const emp = employee;
 
       // Parse dates as Date objects
@@ -271,8 +302,33 @@ const EditEmployee = () => {
         gender: emp.gender || "",
         department: emp.position?.department?._id || "",
         position: emp.position?._id || "",
+        employeeOf: emp.employeeOf || "Taj Agri",
         basicSalary: emp.basicSalary ?? "",
-        allowancePolicy: emp.allowancePolicy?._id || "",
+        leaveEntitlements: (leaveTypesData || [])
+          .filter((leaveType) => leaveType.name !== "Earned Leave")
+          .map((leaveType) => {
+            const existing = emp.leaveEntitlements?.find(
+              (item) => item.leaveType?._id === leaveType._id,
+            );
+            return {
+              leaveType: leaveType._id,
+              enabled: Boolean(existing?.enabled),
+            };
+          }),
+        leaveAnnualDays:
+          emp.leaveEntitlements?.find((item) => item.enabled)?.annualDays ?? "",
+        leaveMethod:
+          emp.leaveEntitlements?.find((item) => item.enabled)?.method || "Fixed",
+        allowances: (allowanceComponentsData || []).map((allowance) => {
+          const existing = emp.allowances?.find(
+            (item) => item.allowanceComponent?._id === allowance._id,
+          );
+          return {
+            allowanceComponent: allowance._id,
+            enabled: Boolean(existing?.enabled),
+            amount: existing?.amount ?? "",
+          };
+        }),
         compensationEffectiveDate: new Date(),
         compensationChangeReason: "",
         employmentType: emp.employmentType || "Permanent",
@@ -316,20 +372,46 @@ const EditEmployee = () => {
               },
             ],
         guarantor: emp.guarantor?.length
-          ? emp.guarantor
-          : [{ name: "", contactNumber: "", cnic: "", address: "" }],
+          ? emp.guarantor.map((g) => ({
+              name: g.name || "",
+              contactNumber: g.contactNumber || "",
+              relation: g.relation || "",
+              cnic: g.cnic || "",
+              address: g.address || "",
+              documentUrl: g.documentUrl || "",
+            }))
+          : [
+              {
+                name: "",
+                contactNumber: "",
+                relation: "",
+                cnic: "",
+                address: "",
+                documentUrl: "",
+              },
+            ],
+        references: emp.references?.length
+          ? emp.references.map((r) => ({
+              name: r.name || "",
+              contactNumber: r.contactNumber || "",
+              relation: r.relation || "",
+              address: r.address || "",
+            }))
+          : [{ name: "", contactNumber: "", relation: "", address: "" }],
         legal: {
-          involvedInIllegalActivity:
-            emp.legal?.involvedInIllegalActivity || false,
-          illegalActivityDetails: emp.legal?.illegalActivityDetails || "",
-          convictedBefore: emp.legal?.convictedBefore || false,
-          convictedBeforeDetails: emp.legal?.convictedBeforeDetails || "",
-          restrictedPlaces: emp.legal?.restrictedPlaces || false,
-          restrictedPlacesDetails: emp.legal?.restrictedPlacesDetails || "",
+          convictedCriminalCorruptionCase:
+            emp.legal?.convictedCriminalCorruptionCase || false,
+          rusticatedDismissedTerminated:
+            emp.legal?.rusticatedDismissedTerminated || false,
+          pendingLitigationCourtCase:
+            emp.legal?.pendingLitigationCourtCase || false,
+          availableAnywhereInPakistan:
+            emp.legal?.availableAnywhereInPakistan || false,
         },
       });
 
-      // Set CNIC previews
+      // Set image previews
+      setEmployeePicturePreview(emp.employeePicture || null);
       if (emp.cnicImages?.front) {
         setCnicFrontPreview(emp.cnicImages.front);
       }
@@ -340,7 +422,7 @@ const EditEmployee = () => {
       setSelectedDepartment(emp.position?.department?._id || "");
       setIsDataLoaded(true);
     }
-  }, [employee, reset, isDataLoaded]);
+  }, [employee, reset, isDataLoaded, leaveTypesData, allowanceComponentsData]);
 
   // ===========================================================================
   // MUTATION
@@ -371,6 +453,31 @@ const EditEmployee = () => {
     setSelectedDepartment(value);
     setValue("department", value);
     setValue("position", ""); // Reset position when department changes
+  };
+
+  const handleEmployeePictureUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    if (file.size > EMPLOYEE_PICTURE_MAX_SIZE) {
+      const errorMessage = "Employee picture size must be 1MB or less";
+      setEmployeePicturePreview(employee?.employeePicture || null);
+      setEmployeePictureFile(null);
+      setEmployeePictureError(errorMessage);
+      e.target.value = "";
+      toast.error(errorMessage);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEmployeePicturePreview(reader.result);
+      setEmployeePictureFile(file);
+      setEmployeePictureError("");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleImageUpload = (e, type) => {
@@ -421,10 +528,7 @@ const EditEmployee = () => {
   const onSubmit = (data) => {
     const currentBasicSalary = Number(employeeData?.employee?.basicSalary || 0);
     const nextBasicSalary = Number(data.basicSalary || 0);
-    const currentAllowancePolicy = employeeData?.employee?.allowancePolicy?._id || "";
-    const nextAllowancePolicy = data.allowancePolicy || "";
-    const hasCompensationChange =
-      currentBasicSalary !== nextBasicSalary || currentAllowancePolicy !== nextAllowancePolicy;
+    const hasCompensationChange = currentBasicSalary !== nextBasicSalary;
 
     if (hasCompensationChange && !data.compensationEffectiveDate) {
       toast.error("Compensation effective date is required for salary/policy changes");
@@ -433,15 +537,36 @@ const EditEmployee = () => {
 
     const formData = new FormData();
 
+    // Expand the single annual days + method into per-entitlement values
+    const annualDays = data.leaveAnnualDays;
+    const method = data.leaveMethod || "Fixed";
+    const expandedEntitlements = (data.leaveEntitlements || [])
+      .filter((entry) => entry.enabled)
+      .map((entry) => ({
+        leaveType: entry.leaveType,
+        enabled: true,
+        annualDays,
+        method,
+      }));
+
     // Append simple fields
     Object.keys(data).forEach((key) => {
+      if (key === "leaveAnnualDays" || key === "leaveMethod") {
+        return;
+      }
+      if (key === "leaveEntitlements") {
+        formData.append("leaveEntitlements", JSON.stringify(expandedEntitlements));
+        return;
+      }
       if (
         key === "emergencyContact" ||
         key === "education" ||
         key === "previousExperience" ||
         key === "guarantor" ||
+        key === "references" ||
         key === "medical" ||
-        key === "legal"
+        key === "legal" ||
+        key === "allowances"
       ) {
         formData.append(key, JSON.stringify(data[key]));
       } else if (key !== "department") {
@@ -454,6 +579,9 @@ const EditEmployee = () => {
     });
 
     // Append files only if new ones were selected
+    if (employeePictureFile) {
+      formData.append("employeePicture", employeePictureFile);
+    }
     if (cnicFrontFile) {
       formData.append("cnicFront", cnicFrontFile);
     }
@@ -461,7 +589,37 @@ const EditEmployee = () => {
       formData.append("cnicBack", cnicBackFile);
     }
 
+    // Append guarantor documents along with parallel index mapping
+    const docIndices = [];
+    (data.guarantor || []).forEach((_, i) => {
+      const file = guarantorDocFiles[i];
+      if (file instanceof File) {
+        formData.append("guarantorDocuments", file);
+        docIndices.push(i);
+      }
+    });
+    if (docIndices.length > 0) {
+      formData.append("guarantorDocumentIndices", JSON.stringify(docIndices));
+    }
+
     mutation.mutate(formData);
+  };
+
+  const handleGuarantorDocUpload = (index, e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      return;
+    }
+    if (file.size > CNIC_IMAGE_MAX_SIZE) {
+      toast.error("Guarantor document size must be 1MB or less");
+      e.target.value = "";
+      return;
+    }
+    setGuarantorDocFiles((prev) => {
+      const next = [...prev];
+      next[index] = file;
+      return next;
+    });
   };
 
   const renderLabel = (text, required = false) => (
@@ -756,6 +914,28 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
+              {renderLabel("Employee of", true)}
+              <Select
+                value={watchEmployeeOf}
+                onValueChange={(value) => setValue("employeeOf", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Taj Agri">Taj Agri</SelectItem>
+                  <SelectItem value="YD">YD</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.employeeOf && (
+                <span className={styles.error}>{errors.employeeOf.message}</span>
+              )}
+            </div>
+            <div className={styles.formGroup}>
+              {renderLabel("Employee ID")}
+              <Input value={employee?.employeeID || ""} readOnly />
+            </div>
+            <div className={styles.formGroup}>
               {renderLabel("Employment Type", true)}
               <Select
                 value={watch("employmentType")}
@@ -787,30 +967,6 @@ const EditEmployee = () => {
               {errors.basicSalary && (
                 <span className={styles.error}>
                   {errors.basicSalary.message}
-                </span>
-              )}
-            </div>
-            <div className={styles.formGroup}>
-              {renderLabel("Allowance Policy", true)}
-              <Select
-                value={watch("allowancePolicy")}
-                onValueChange={(value) => setValue("allowancePolicy", value)}
-                disabled={isLoadingAllowancePolicies}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select allowance policy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allowancePoliciesData?.map((ap) => (
-                    <SelectItem key={ap._id} value={ap._id}>
-                      {ap.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.allowancePolicy && (
-                <span className={styles.error}>
-                  {errors.allowancePolicy.message}
                 </span>
               )}
             </div>
@@ -911,6 +1067,33 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
+              <Label className={styles.label}>Employee Picture (Optional)</Label>
+              <div className={styles.imageUpload}>
+                <label className={`${styles.imagePreview} ${styles.employeePicturePreview}`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEmployeePictureUpload}
+                    style={{ display: "none" }}
+                  />
+                  {employeePicturePreview ? (
+                    <img src={employeePicturePreview} alt="Employee" />
+                  ) : (
+                    <>
+                      <UploadIcon size={24} className="text-muted-foreground" />
+                      <span>Employee Picture</span>
+                    </>
+                  )}
+                </label>
+              </div>
+              <span className={styles.imageHint}>
+                Upload an employee picture up to 1MB.
+              </span>
+              {employeePictureError ? (
+                <span className={styles.error}>{employeePictureError}</span>
+              ) : null}
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               <Label className={styles.label}>CNIC Images</Label>
               <div className={styles.imageUpload}>
                 <label className={styles.imagePreview}>
@@ -956,6 +1139,104 @@ const EditEmployee = () => {
                 <span className={styles.error}>{cnicImageErrors.back}</span>
               ) : null}
             </div>
+          </div>
+        </div>
+
+        {/* Leave Entitlements */}
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Leave Entitlements</h2>
+          </div>
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              {renderLabel("Annual Days (applies to all selected leaves)", true)}
+              <Input
+                type="number"
+                min="0"
+                placeholder="e.g. 14"
+                {...register("leaveAnnualDays")}
+              />
+              {errors.leaveAnnualDays ? (
+                <span className={styles.error}>
+                  {errors.leaveAnnualDays.message}
+                </span>
+              ) : null}
+            </div>
+            <div className={styles.formGroup}>
+              {renderLabel("Method", true)}
+              <Select
+                value={watch("leaveMethod") || "Fixed"}
+                onValueChange={(value) => setValue("leaveMethod", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Fixed">Fixed</SelectItem>
+                  <SelectItem value="Prorata">Prorata</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className={styles.policyList}>
+            {(leaveTypesData || [])
+              .filter((leaveType) => leaveType.name !== "Earned Leave")
+              .map((leaveType, index) => {
+                const enabled = watchLeaveEntitlements[index]?.enabled;
+                return (
+                  <div key={leaveType._id} className={styles.checkboxGroup}>
+                    <Checkbox
+                      checked={Boolean(enabled)}
+                      onCheckedChange={(checked) =>
+                        setValue(`leaveEntitlements.${index}.enabled`, Boolean(checked))
+                      }
+                    />
+                    <Label className={styles.label}>{leaveType.name}</Label>
+                    <input
+                      type="hidden"
+                      {...register(`leaveEntitlements.${index}.leaveType`)}
+                      value={leaveType._id}
+                    />
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+
+        {/* Allowances */}
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Allowances</h2>
+          </div>
+          <div className={styles.policyList}>
+            {(allowanceComponentsData || []).map((allowance, index) => {
+              const enabled = watchAllowances[index]?.enabled;
+              return (
+                <div key={allowance._id} className={styles.policyRow}>
+                  <div className={styles.checkboxGroup}>
+                    <Checkbox
+                      checked={Boolean(enabled)}
+                      onCheckedChange={(checked) =>
+                        setValue(`allowances.${index}.enabled`, Boolean(checked))
+                      }
+                    />
+                    <Label className={styles.label}>{allowance.name}</Label>
+                  </div>
+                  <Input
+                    type="number"
+                    min="0"
+                    disabled={!enabled}
+                    placeholder="Monthly amount"
+                    {...register(`allowances.${index}.amount`)}
+                  />
+                  <input
+                    type="hidden"
+                    {...register(`allowances.${index}.allowanceComponent`)}
+                    value={allowance._id}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1322,46 +1603,44 @@ const EditEmployee = () => {
         {/* Reference Information */}
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>
-              Reference Information (Guarantor)
-            </h2>
+            <h2 className={styles.sectionTitle}>Reference Information</h2>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() =>
-                appendGuarantor({
+                appendReference({
                   name: "",
                   contactNumber: "",
-                  cnic: "",
+                  relation: "",
                   address: "",
                 })
               }
               className="cursor-pointer"
             >
               <PlusIcon size={16} />
-              Add Guarantor
+              Add Reference
             </Button>
           </div>
-          {guarantorFields.map((field, index) => (
+          {referenceFields.map((field, index) => (
             <div key={field.id} className={styles.dynamicEntry}>
               <div className={styles.dynamicEntryFields}>
                 <div className={styles.formGroup}>
                   {renderLabel("Name", true)}
                   <Input
-                    {...register(`guarantor.${index}.name`)}
+                    {...register(`references.${index}.name`)}
                     placeholder="Enter name"
                   />
-                  {errors.guarantor?.[index]?.name && (
+                  {errors.references?.[index]?.name && (
                     <span className={styles.error}>
-                      {errors.guarantor[index].name.message}
+                      {errors.references[index].name.message}
                     </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
                   {renderLabel("Contact Number", true)}
                   <Input
-                    {...register(`guarantor.${index}.contactNumber`)}
+                    {...register(`references.${index}.contactNumber`)}
                     inputMode="numeric"
                     maxLength={11}
                     placeholder="Enter contact"
@@ -1372,49 +1651,41 @@ const EditEmployee = () => {
                       );
                     }}
                   />
-                  {errors.guarantor?.[index]?.contactNumber && (
+                  {errors.references?.[index]?.contactNumber && (
                     <span className={styles.error}>
-                      {errors.guarantor[index].contactNumber.message}
+                      {errors.references[index].contactNumber.message}
                     </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  {renderLabel("CNIC", true)}
+                  {renderLabel("Relation", true)}
                   <Input
-                    {...register(`guarantor.${index}.cnic`)}
-                    inputMode="numeric"
-                    maxLength={13}
-                    placeholder="Enter CNIC"
-                    onInput={(event) => {
-                      event.currentTarget.value = sanitizeDigits(
-                        event.currentTarget.value,
-                        13,
-                      );
-                    }}
+                    {...register(`references.${index}.relation`)}
+                    placeholder="e.g. Friend, Colleague"
                   />
-                  {errors.guarantor?.[index]?.cnic && (
+                  {errors.references?.[index]?.relation && (
                     <span className={styles.error}>
-                      {errors.guarantor[index].cnic.message}
+                      {errors.references[index].relation.message}
                     </span>
                   )}
                 </div>
                 <div className={styles.formGroup}>
                   {renderLabel("Address", true)}
                   <Input
-                    {...register(`guarantor.${index}.address`)}
+                    {...register(`references.${index}.address`)}
                     placeholder="Enter address"
                   />
-                  {errors.guarantor?.[index]?.address && (
+                  {errors.references?.[index]?.address && (
                     <span className={styles.error}>
-                      {errors.guarantor[index].address.message}
+                      {errors.references[index].address.message}
                     </span>
                   )}
                 </div>
               </div>
-              {guarantorFields.length > 1 && (
+              {referenceFields.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => removeGuarantor(index)}
+                  onClick={() => removeReference(index)}
                   className={styles.deleteBtn}
                 >
                   <TrashIcon size={18} />
@@ -1422,6 +1693,153 @@ const EditEmployee = () => {
               )}
             </div>
           ))}
+        </div>
+
+        {/* Guarantor */}
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Guarantor</h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                appendGuarantor({
+                  name: "",
+                  contactNumber: "",
+                  relation: "",
+                  cnic: "",
+                  address: "",
+                  documentUrl: "",
+                })
+              }
+              className="cursor-pointer"
+            >
+              <PlusIcon size={16} />
+              Add Guarantor
+            </Button>
+          </div>
+          {guarantorFields.map((field, index) => {
+            const existingDocUrl = watch(`guarantor.${index}.documentUrl`);
+            const newDocFile = guarantorDocFiles[index];
+            return (
+              <div key={field.id} className={styles.dynamicEntry}>
+                <div className={styles.dynamicEntryFields}>
+                  <div className={styles.formGroup}>
+                    {renderLabel("Name", true)}
+                    <Input
+                      {...register(`guarantor.${index}.name`)}
+                      placeholder="Enter name"
+                    />
+                    {errors.guarantor?.[index]?.name && (
+                      <span className={styles.error}>
+                        {errors.guarantor[index].name.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    {renderLabel("Contact Number", true)}
+                    <Input
+                      {...register(`guarantor.${index}.contactNumber`)}
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="Enter contact"
+                      onInput={(event) => {
+                        event.currentTarget.value = sanitizeDigits(
+                          event.currentTarget.value,
+                          11,
+                        );
+                      }}
+                    />
+                    {errors.guarantor?.[index]?.contactNumber && (
+                      <span className={styles.error}>
+                        {errors.guarantor[index].contactNumber.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    {renderLabel("Relation", true)}
+                    <Input
+                      {...register(`guarantor.${index}.relation`)}
+                      placeholder="e.g. Brother, Father"
+                    />
+                    {errors.guarantor?.[index]?.relation && (
+                      <span className={styles.error}>
+                        {errors.guarantor[index].relation.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    {renderLabel("CNIC", true)}
+                    <Input
+                      {...register(`guarantor.${index}.cnic`)}
+                      inputMode="numeric"
+                      maxLength={13}
+                      placeholder="Enter CNIC"
+                      onInput={(event) => {
+                        event.currentTarget.value = sanitizeDigits(
+                          event.currentTarget.value,
+                          13,
+                        );
+                      }}
+                    />
+                    {errors.guarantor?.[index]?.cnic && (
+                      <span className={styles.error}>
+                        {errors.guarantor[index].cnic.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    {renderLabel("Address", true)}
+                    <Input
+                      {...register(`guarantor.${index}.address`)}
+                      placeholder="Enter address"
+                    />
+                    {errors.guarantor?.[index]?.address && (
+                      <span className={styles.error}>
+                        {errors.guarantor[index].address.message}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    {renderLabel("Relevant Document")}
+                    <Input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={(e) => handleGuarantorDocUpload(index, e)}
+                    />
+                    {newDocFile?.name ? (
+                      <span className={styles.imageHint}>
+                        New: {newDocFile.name}
+                      </span>
+                    ) : existingDocUrl ? (
+                      <a
+                        href={existingDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.imageHint}
+                      >
+                        View existing document
+                      </a>
+                    ) : (
+                      <span className={styles.imageHint}>
+                        Image up to 1MB (JPG, PNG, WebP)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {guarantorFields.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeGuarantor(index)}
+                    className={styles.deleteBtn}
+                  >
+                    <TrashIcon size={18} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Legal Information */}
@@ -1433,65 +1851,58 @@ const EditEmployee = () => {
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               <div className={styles.checkboxGroup}>
                 <Checkbox
-                  id="involvedInIllegalActivity"
-                  checked={watchLegal?.involvedInIllegalActivity}
+                  id="convictedCriminalCorruptionCase"
+                  checked={watchLegal?.convictedCriminalCorruptionCase}
                   onCheckedChange={(checked) =>
-                    setValue("legal.involvedInIllegalActivity", checked)
+                    setValue("legal.convictedCriminalCorruptionCase", checked)
                   }
                 />
-                <Label htmlFor="involvedInIllegalActivity">
-                  Have you ever been involved in any illegal activity?
+                <Label htmlFor="convictedCriminalCorruptionCase">
+                  Have you ever been convicted in any criminal/corruption case?
                 </Label>
               </div>
-              {watchLegal?.involvedInIllegalActivity && (
-                <Textarea
-                  {...register("legal.illegalActivityDetails")}
-                  placeholder="Provide details..."
-                  className="mt-2"
-                />
-              )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               <div className={styles.checkboxGroup}>
                 <Checkbox
-                  id="convictedBefore"
-                  checked={watchLegal?.convictedBefore}
+                  id="rusticatedDismissedTerminated"
+                  checked={watchLegal?.rusticatedDismissedTerminated}
                   onCheckedChange={(checked) =>
-                    setValue("legal.convictedBefore", checked)
+                    setValue("legal.rusticatedDismissedTerminated", checked)
                   }
                 />
-                <Label htmlFor="convictedBefore">
-                  Have you ever been convicted before?
+                <Label htmlFor="rusticatedDismissedTerminated">
+                  Have you ever been rusticated / dismissed or terminated?
                 </Label>
               </div>
-              {watchLegal?.convictedBefore && (
-                <Textarea
-                  {...register("legal.convictedBeforeDetails")}
-                  placeholder="Provide details..."
-                  className="mt-2"
-                />
-              )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               <div className={styles.checkboxGroup}>
                 <Checkbox
-                  id="restrictedPlaces"
-                  checked={watchLegal?.restrictedPlaces}
+                  id="pendingLitigationCourtCase"
+                  checked={watchLegal?.pendingLitigationCourtCase}
                   onCheckedChange={(checked) =>
-                    setValue("legal.restrictedPlaces", checked)
+                    setValue("legal.pendingLitigationCourtCase", checked)
                   }
                 />
-                <Label htmlFor="restrictedPlaces">
-                  Are you restricted from entering any places?
+                <Label htmlFor="pendingLitigationCourtCase">
+                  Do you have any litigation or court case pending against you at present?
                 </Label>
               </div>
-              {watchLegal?.restrictedPlaces && (
-                <Textarea
-                  {...register("legal.restrictedPlacesDetails")}
-                  placeholder="Provide details..."
-                  className="mt-2"
+            </div>
+            <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
+              <div className={styles.checkboxGroup}>
+                <Checkbox
+                  id="availableAnywhereInPakistan"
+                  checked={watchLegal?.availableAnywhereInPakistan}
+                  onCheckedChange={(checked) =>
+                    setValue("legal.availableAnywhereInPakistan", checked)
+                  }
                 />
-              )}
+                <Label htmlFor="availableAnywhereInPakistan">
+                  Are you available to work anywhere in Pakistan?
+                </Label>
+              </div>
             </div>
           </div>
         </div>

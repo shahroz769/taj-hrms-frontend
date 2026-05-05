@@ -6,8 +6,7 @@ import LeaveApplication from "../models/LeaveApplication.js";
 import Payroll from "../models/Payroll.js";
 import PayrollArrearsLedger from "../models/PayrollArrearsLedger.js";
 import BasicSalaryHistory from "../models/BasicSalaryHistory.js";
-import AllowancePolicyHistory from "../models/AllowancePolicyHistory.js";
-import AllowancePolicyAmountHistory from "../models/AllowancePolicyAmountHistory.js";
+import EmployeeAllowanceHistory from "../models/EmployeeAllowanceHistory.js";
 import {
   getMonthStartEndUtcForPakistan,
   PAKISTAN_TZ,
@@ -75,31 +74,18 @@ const getAllDatesInRange = (start, endExclusive) => {
   return dates;
 };
 
-const sumPolicyComponents = (components = []) =>
-  components.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+const sumAllowances = (allowances = []) =>
+  allowances
+    .filter((item) => item.enabled)
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-const getAllowanceBreakdown = (policy, components) => {
-  if (!policy) return [];
-
-  const namesById = new Map(
-    (policy.components || []).map((component) => {
-      const id =
-        component.allowanceComponent?._id?.toString() ||
-        component.allowanceComponent?.toString();
-      const name = component.allowanceComponent?.name || "Allowance";
-      return [id, name];
-    }),
-  );
-
-  return (components || []).map((component) => ({
-    name:
-      namesById.get(
-        component.allowanceComponent?._id?.toString() ||
-          component.allowanceComponent?.toString(),
-      ) || "Allowance",
-    amount: Number(component.amount || 0),
-  }));
-};
+const getAllowanceBreakdown = (allowances = []) =>
+  (allowances || [])
+    .filter((item) => item.enabled && Number(item.amount || 0) > 0)
+    .map((item) => ({
+      name: item.allowanceComponent?.name || "Allowance",
+      amount: Number(item.amount || 0),
+    }));
 
 const getSalaryFromHistory = (employee, salaryHistory, date) => {
   if (!salaryHistory?.length) return Number(employee.basicSalary || 0);
@@ -122,55 +108,25 @@ const getSalaryFromHistory = (employee, salaryHistory, date) => {
   return value;
 };
 
-const getPolicyIdFromHistory = (employee, assignmentHistory, date) => {
-  const fallback =
-    employee.allowancePolicy?._id?.toString() ||
-    employee.allowancePolicy?.toString() ||
-    null;
+const getAllowancesFromHistory = (employee, allowanceHistory, date) => {
+  const fallback = employee.allowances || [];
+  if (!allowanceHistory?.length) return fallback;
 
-  if (!assignmentHistory?.length) return fallback;
-
-  const first = assignmentHistory[0];
+  const first = allowanceHistory[0];
   if (date < first.effectiveDate) {
-    return first.fromAllowancePolicy?.toString() || fallback;
+    return first.fromAllowances || fallback;
   }
 
-  let policyId = fallback;
-  for (const entry of assignmentHistory) {
+  let allowances = fallback;
+  for (const entry of allowanceHistory) {
     if (entry.effectiveDate <= date) {
-      policyId = entry.toAllowancePolicy?.toString() || null;
+      allowances = entry.toAllowances || [];
     } else {
       break;
     }
   }
 
-  return policyId;
-};
-
-const getPolicyComponentsForDate = ({ policy, amountHistory = [], date }) => {
-  if (!policy) return { components: [], amount: 0 };
-
-  if (!amountHistory.length) {
-    const components = policy.components || [];
-    return { components, amount: sumPolicyComponents(components) };
-  }
-
-  const first = amountHistory[0];
-  if (date < first.effectiveDate) {
-    const components = first.fromComponents || [];
-    return { components, amount: sumPolicyComponents(components) };
-  }
-
-  let components = policy.components || [];
-  for (const item of amountHistory) {
-    if (item.effectiveDate <= date) {
-      components = item.toComponents || [];
-    } else {
-      break;
-    }
-  }
-
-  return { components, amount: sumPolicyComponents(components) };
+  return allowances;
 };
 
 const getShiftForDate = (assignments, date) => {
@@ -300,23 +256,6 @@ const buildAttendanceMap = async ({
   return byDate;
 };
 
-const getPoliciesByIds = async (
-  policyIds,
-  AllowancePolicyModel,
-  session = null,
-) => {
-  const uniquePolicyIds = [...new Set(policyIds.filter(Boolean))];
-  if (!uniquePolicyIds.length) return new Map();
-
-  const policies = await AllowancePolicyModel.find({
-    _id: { $in: uniquePolicyIds },
-  })
-    .session(session)
-    .populate("components.allowanceComponent", "name");
-
-  return new Map(policies.map((policy) => [policy._id.toString(), policy]));
-};
-
 export const calculateLatePenalty = (lateDayRates) => {
   const groups = Math.floor(lateDayRates.length / 3);
   if (!groups) {
@@ -360,7 +299,6 @@ export const calculateEmployeePayroll = async ({
   includeArrears = true,
   includeFinancialAdjustments = true,
   skipArrearsSync = false,
-  AllowancePolicyModel,
   session = null,
 }) => {
   const { monthStartUtc, nextMonthStartUtc } = getMonthStartEndUtcForPakistan(
@@ -368,7 +306,7 @@ export const calculateEmployeePayroll = async ({
     month,
   );
 
-  const [salaryHistory, assignmentHistory] = await Promise.all([
+  const [salaryHistory, allowanceHistory] = await Promise.all([
     BasicSalaryHistory.find({
       employee: employee._id,
       effectiveDate: { $lt: nextMonthStartUtc },
@@ -376,10 +314,12 @@ export const calculateEmployeePayroll = async ({
       .session(session)
       .sort({ effectiveDate: 1 })
       .lean(),
-    AllowancePolicyHistory.find({
+    EmployeeAllowanceHistory.find({
       employee: employee._id,
       effectiveDate: { $lt: nextMonthStartUtc },
     })
+      .populate("fromAllowances.allowanceComponent", "name")
+      .populate("toAllowances.allowanceComponent", "name")
       .session(session)
       .sort({ effectiveDate: 1 })
       .lean(),
@@ -390,45 +330,10 @@ export const calculateEmployeePayroll = async ({
     effectiveDate: new Date(entry.effectiveDate),
   }));
 
-  const normalizedAssignmentHistory = assignmentHistory.map((entry) => ({
+  const normalizedAllowanceHistory = allowanceHistory.map((entry) => ({
     ...entry,
     effectiveDate: new Date(entry.effectiveDate),
   }));
-
-  const policyIdsFromHistory = normalizedAssignmentHistory.flatMap((entry) => [
-    entry.fromAllowancePolicy?.toString(),
-    entry.toAllowancePolicy?.toString(),
-  ]);
-
-  const policyIds = [
-    employee.allowancePolicy?._id?.toString() ||
-      employee.allowancePolicy?.toString(),
-    ...policyIdsFromHistory,
-  ];
-
-  const policiesMap = await getPoliciesByIds(
-    policyIds,
-    AllowancePolicyModel,
-    session,
-  );
-
-  const amountHistories = await AllowancePolicyAmountHistory.find({
-    allowancePolicy: { $in: [...policiesMap.keys()] },
-    effectiveDate: { $lt: nextMonthStartUtc },
-  })
-    .session(session)
-    .sort({ effectiveDate: 1 })
-    .lean();
-
-  const amountHistoryMap = new Map();
-  for (const history of amountHistories) {
-    const key = history.allowancePolicy.toString();
-    if (!amountHistoryMap.has(key)) amountHistoryMap.set(key, []);
-    amountHistoryMap.get(key).push({
-      ...history,
-      effectiveDate: new Date(history.effectiveDate),
-    });
-  }
 
   const [scheduledDates, attendanceMap, leaveMap] = await Promise.all([
     getScheduledDatesForPayrollDivisor({
@@ -509,30 +414,23 @@ export const calculateEmployeePayroll = async ({
       date,
     );
 
-    const policyId = getPolicyIdFromHistory(
+    const allowanceSnapshot = getAllowancesFromHistory(
       employee,
-      normalizedAssignmentHistory,
+      normalizedAllowanceHistory,
       date,
     );
-
-    const policy = policyId ? policiesMap.get(policyId) : null;
-    const policyComponentsInfo = getPolicyComponentsForDate({
-      policy,
-      amountHistory: amountHistoryMap.get(policyId) || [],
-      date,
-    });
+    const allowanceMonthly = sumAllowances(allowanceSnapshot);
 
     const divisor = calendarDaysInMonth || 1;
     const basicPerDay = Number(basicSalaryMonthly || 0) / divisor;
-    const allowancePerDay = Number(policyComponentsInfo.amount || 0) / divisor;
+    const allowancePerDay = Number(allowanceMonthly || 0) / divisor;
 
     fullBasicSalaryAmount += basicPerDay;
     fullAllowanceAmount += allowancePerDay;
 
     const segmentKey = [
       Number(basicSalaryMonthly || 0),
-      policyId || "none",
-      roundMoney(policyComponentsInfo.amount || 0),
+      roundMoney(allowanceMonthly || 0),
     ].join("::");
 
     if (!salarySegmentsMap.has(segmentKey)) {
@@ -540,8 +438,8 @@ export const calculateEmployeePayroll = async ({
         startDate: date,
         endDate: date,
         basicSalary: Number(basicSalaryMonthly || 0),
-        allowancePolicy: policyId || null,
-        allowanceAmount: Number(policyComponentsInfo.amount || 0),
+        allowancePolicy: null,
+        allowanceAmount: Number(allowanceMonthly || 0),
         payableDayUnits: 0,
         segmentBasicAmount: 0,
         segmentAllowanceAmount: 0,
@@ -584,22 +482,16 @@ export const calculateEmployeePayroll = async ({
       date,
     );
 
-    const policyId = getPolicyIdFromHistory(
+    const allowanceSnapshot = getAllowancesFromHistory(
       employee,
-      normalizedAssignmentHistory,
+      normalizedAllowanceHistory,
       date,
     );
-
-    const policy = policyId ? policiesMap.get(policyId) : null;
-    const policyComponentsInfo = getPolicyComponentsForDate({
-      policy,
-      amountHistory: amountHistoryMap.get(policyId) || [],
-      date,
-    });
+    const allowanceMonthly = sumAllowances(allowanceSnapshot);
 
     const dayDeduction = calculateAttendanceDeductionFromCounts({
       basicSalaryMonthly,
-      allowanceMonthly: policyComponentsInfo.amount,
+      allowanceMonthly,
       calendarDaysInMonth,
       absences: dayState.type === "absent" ? 1 : 0,
       unpaidLeaves: dayState.type === "unpaidLeave" ? 1 : 0,
@@ -618,7 +510,7 @@ export const calculateEmployeePayroll = async ({
       lateDayRates.push({
         basicPerDay: Number(basicSalaryMonthly || 0) / (calendarDaysInMonth || 1),
         allowancePerDay:
-          Number(policyComponentsInfo.amount || 0) / (calendarDaysInMonth || 1),
+          Number(allowanceMonthly || 0) / (calendarDaysInMonth || 1),
       });
     }
   }
@@ -672,7 +564,6 @@ export const calculateEmployeePayroll = async ({
       targetYear: year,
       targetMonth: month,
       generatedBy,
-      AllowancePolicyModel,
       session,
     });
   }
@@ -773,24 +664,12 @@ export const calculateEmployeePayroll = async ({
   const monthEndDate = new Date(nextMonthStartUtc);
   monthEndDate.setUTCDate(monthEndDate.getUTCDate() - 1);
 
-  const monthEndPolicyId = getPolicyIdFromHistory(
+  const monthEndAllowances = getAllowancesFromHistory(
     employee,
-    normalizedAssignmentHistory,
+    normalizedAllowanceHistory,
     monthEndDate,
   );
-  const monthEndPolicy = monthEndPolicyId
-    ? policiesMap.get(monthEndPolicyId)
-    : null;
-  const monthEndComponents = getPolicyComponentsForDate({
-    policy: monthEndPolicy,
-    amountHistory: amountHistoryMap.get(monthEndPolicyId) || [],
-    date: monthEndDate,
-  }).components;
-
-  const allowanceBreakdown = getAllowanceBreakdown(
-    monthEndPolicy,
-    monthEndComponents,
-  );
+  const allowanceBreakdown = getAllowanceBreakdown(monthEndAllowances);
 
   return {
     employee: employee._id,
@@ -922,7 +801,6 @@ export const syncArrearsForEmployee = async ({
   targetYear,
   targetMonth,
   generatedBy,
-  AllowancePolicyModel,
   session = null,
 }) => {
   const previousPayrolls = await Payroll.find({
@@ -971,7 +849,6 @@ export const syncArrearsForEmployee = async ({
       includeArrears: false,
       includeFinancialAdjustments: false,
       skipArrearsSync: true,
-      AllowancePolicyModel,
       session,
     });
 

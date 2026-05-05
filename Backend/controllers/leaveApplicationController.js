@@ -2,7 +2,6 @@ import LeaveApplication from "../models/LeaveApplication.js";
 import LeaveBalance from "../models/LeaveBalance.js";
 import Employee from "../models/Employee.js";
 import LeaveType from "../models/LeaveType.js";
-import Position from "../models/Position.js";
 import Attendance from "../models/Attendance.js";
 import MonthlyAttendanceSummary from "../models/MonthlyAttendanceSummary.js";
 import mongoose from "mongoose";
@@ -33,12 +32,12 @@ const generateDatesFromRanges = (dateRanges) => {
 
 /**
  * Ensure leave balances exist for an employee for the given year.
- * Uses lazy initialization: creates balances from position → leavePolicy if missing.
+ * Uses lazy initialization from employee-specific leave entitlements.
  */
 const ensureLeaveBalances = async (employeeId, year) => {
   let balances = await LeaveBalance.find({
     employee: employeeId,
-    year,
+    year: { $in: [year, 0] },
   }).populate("leaveType", "name");
 
   // If balances already exist, return them
@@ -46,36 +45,46 @@ const ensureLeaveBalances = async (employeeId, year) => {
     return balances;
   }
 
-  // Lazy initialize from employee's position → leavePolicy → entitlements
-  const employee = await Employee.findById(employeeId).populate({
-    path: "position",
-    populate: {
-      path: "leavePolicy",
-      populate: {
-        path: "entitlements.leaveType",
-        select: "_id name",
-      },
-    },
-  });
+  const employee = await Employee.findById(employeeId).populate(
+    "leaveEntitlements.leaveType",
+    "_id name",
+  );
 
-  if (
-    !employee?.position?.leavePolicy?.entitlements ||
-    employee.position.leavePolicy.status !== "Approved"
-  ) {
+  if (!employee?.leaveEntitlements?.length) {
     return [];
   }
 
-  const entitlements = employee.position.leavePolicy.entitlements;
+  const entitlements = employee.leaveEntitlements;
   const newBalances = [];
 
   for (const entitlement of entitlements) {
+    if (!entitlement.enabled) continue;
+    const balanceYear = entitlement.autoManaged ? 0 : year;
+    const totalDays = entitlement.autoManaged
+      ? 0
+      : entitlement.method === "Prorata"
+        ? Math.ceil(
+            (Number(entitlement.annualDays || 0) / 12) *
+              (() => {
+                const effectiveDate = new Date(entitlement.effectiveDate || Date.UTC(year, 0, 1));
+                if (effectiveDate.getFullYear() < year) return 12;
+                if (effectiveDate.getFullYear() > year) return 0;
+                const firstMonth =
+                  effectiveDate.getDate() <= 15
+                    ? effectiveDate.getMonth()
+                    : effectiveDate.getMonth() + 1;
+                return Math.max(0, 12 - firstMonth);
+              })(),
+          )
+        : Number(entitlement.annualDays || 0);
+
     const balance = await LeaveBalance.create({
       employee: employeeId,
       leaveType: entitlement.leaveType._id,
-      totalDays: entitlement.days,
+      totalDays,
       usedDays: 0,
-      remainingDays: entitlement.days,
-      year,
+      remainingDays: totalDays,
+      year: balanceYear,
     });
     newBalances.push(balance);
   }
@@ -83,7 +92,7 @@ const ensureLeaveBalances = async (employeeId, year) => {
   // Re-fetch with populated leaveType
   balances = await LeaveBalance.find({
     employee: employeeId,
-    year,
+    year: { $in: [year, 0] },
   }).populate("leaveType", "name");
 
   return balances;
@@ -252,6 +261,7 @@ const upsertApprovedLeaveAttendance = async ({
         source: "leave_auto",
         lockReason: "approved_leave",
         linkedLeaveApplication: leaveApplicationId,
+        workingOnHoliday: false,
         markedBy: userId || null,
       },
       { upsert: true, returnDocument: "after" }
@@ -585,7 +595,7 @@ export const createLeaveApplication = async (req, res, next) => {
     if (!balance) {
       res.status(400);
       throw new Error(
-        "No leave balance found for this leave type. The employee's leave policy may not include this leave type."
+        "No leave balance found for this leave type. This leave type may not be enabled for the employee."
       );
     }
 

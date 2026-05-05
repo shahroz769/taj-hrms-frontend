@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -48,7 +49,10 @@ import { Spinner } from "@/components/ui/spinner";
 // Services
 import { bulkMarkAttendance } from "@/services/attendancesApi";
 import { fetchEmployeesList } from "@/services/employeesApi";
-import { fetchShiftsList } from "@/services/employeeShiftsApi";
+import {
+  fetchEmployeeShiftOnDate,
+  fetchShiftsList,
+} from "@/services/employeeShiftsApi";
 
 // Utils
 import { formatDate, formatTimeToAMPM } from "@/utils/dateUtils";
@@ -88,6 +92,15 @@ const MarkAttendanceModal = ({
   const [markAllDaysPresent, setMarkAllDaysPresent] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
 
+  // Per-employee status / time overrides (used primarily when 1 employee is targeted)
+  const [manualStatus, setManualStatus] = useState(""); // "" => auto
+  const [manualCheckIn, setManualCheckIn] = useState(""); // HH:MM
+  const [manualCheckOut, setManualCheckOut] = useState(""); // HH:MM
+  const [manualSeg1In, setManualSeg1In] = useState("");
+  const [manualSeg1Out, setManualSeg1Out] = useState("");
+  const [manualSeg2In, setManualSeg2In] = useState("");
+  const [manualSeg2Out, setManualSeg2Out] = useState("");
+
   const [errors, setErrors] = useState({});
   const [submissionErrors, setSubmissionErrors] = useState([]);
 
@@ -101,6 +114,13 @@ const MarkAttendanceModal = ({
     setForceApplyShift(false);
     setMarkAllDaysPresent(false);
     setOverwrite(false);
+    setManualStatus("");
+    setManualCheckIn("");
+    setManualCheckOut("");
+    setManualSeg1In("");
+    setManualSeg1Out("");
+    setManualSeg2In("");
+    setManualSeg2Out("");
     setErrors({});
     setSubmissionErrors([]);
   }, []);
@@ -177,6 +197,69 @@ const MarkAttendanceModal = ({
     ? preSelectedEmployeeIds
     : selectedEmployeeIds;
 
+  // Auto-resolve the assigned shift when exactly 1 employee + a date are chosen
+  const isSingleEmployee = activeEmployeeIds.length === 1;
+  const singleEmployeeId = isSingleEmployee ? activeEmployeeIds[0] : null;
+  const dateForShift = attendanceDate
+    ? `${attendanceDate.getFullYear()}-${String(attendanceDate.getMonth() + 1).padStart(2, "0")}-${String(attendanceDate.getDate()).padStart(2, "0")}`
+    : null;
+
+  const { data: resolvedEmployeeShift = null, isFetching: isFetchingEmployeeShift } =
+    useQuery({
+      queryKey: ["employee-shift-on-date", singleEmployeeId, dateForShift],
+      queryFn: () =>
+        fetchEmployeeShiftOnDate({
+          employeeId: singleEmployeeId,
+          date: dateForShift,
+        }),
+      enabled: open && !!singleEmployeeId && !!dateForShift,
+    });
+
+  // Effective shift used for status / off-day decisions in the UI:
+  // forced shift > resolved employee shift > selected fallback shift
+  const fallbackShiftObject =
+    fallbackShiftId
+      ? shiftsList.find((s) => s._id === fallbackShiftId) || null
+      : null;
+  const effectiveShift =
+    forceApplyShift && fallbackShiftObject
+      ? fallbackShiftObject
+      : resolvedEmployeeShift || fallbackShiftObject;
+
+  const dayName = attendanceDate
+    ? attendanceDate.toLocaleDateString("en-US", { weekday: "long" })
+    : null;
+  const isOffDayForShift =
+    effectiveShift && dayName
+      ? !(effectiveShift.workingDays || []).includes(dayName)
+      : false;
+  const isSplitShiftSelected =
+    !!effectiveShift &&
+    Array.isArray(effectiveShift.segments) &&
+    effectiveShift.segments.length === 2;
+
+  // When off-day is detected, force status to Present (only allowed value)
+  useEffect(() => {
+    if (isOffDayForShift && manualStatus && manualStatus !== "Present") {
+      setManualStatus("Present");
+    }
+  }, [isOffDayForShift, manualStatus]);
+
+  // When effective shift changes, prefill check-in/out from shift defaults
+  useEffect(() => {
+    if (!effectiveShift) return;
+    if (isSplitShiftSelected) {
+      const [s1, s2] = effectiveShift.segments;
+      setManualSeg1In((v) => v || (s1?.startTime || "").slice(0, 5));
+      setManualSeg1Out((v) => v || (s1?.endTime || "").slice(0, 5));
+      setManualSeg2In((v) => v || (s2?.startTime || "").slice(0, 5));
+      setManualSeg2Out((v) => v || (s2?.endTime || "").slice(0, 5));
+    } else {
+      setManualCheckIn((v) => v || (effectiveShift.startTime || "").slice(0, 5));
+      setManualCheckOut((v) => v || (effectiveShift.endTime || "").slice(0, 5));
+    }
+  }, [effectiveShift, isSplitShiftSelected]);
+
   const toggleEmployee = (employeeId) => {
     setSelectedEmployeeIds((previous) =>
       previous.includes(employeeId)
@@ -211,14 +294,48 @@ const MarkAttendanceModal = ({
     const year = attendanceDate.getFullYear();
     const month = String(attendanceDate.getMonth() + 1).padStart(2, "0");
     const day = String(attendanceDate.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Build manual time payloads (only when status is Present/Late/Half Day)
+    const wantsTimes =
+      manualStatus &&
+      manualStatus !== "Off" &&
+      manualStatus !== "Absent" &&
+      manualStatus !== "Leave";
+
+    const toIso = (hhmm) => {
+      if (!hhmm) return undefined;
+      const [h, m] = hhmm.split(":").map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return undefined;
+      const d = new Date(attendanceDate);
+      d.setHours(h, m, 0, 0);
+      return d.toISOString();
+    };
+
+    let manualCheckInIso;
+    let manualCheckOutIso;
+    let manualSegmentsPayload;
+    if (wantsTimes && isSplitShiftSelected) {
+      manualSegmentsPayload = [
+        { checkIn: toIso(manualSeg1In), checkOut: toIso(manualSeg1Out) },
+        { checkIn: toIso(manualSeg2In), checkOut: toIso(manualSeg2Out) },
+      ];
+    } else if (wantsTimes) {
+      manualCheckInIso = toIso(manualCheckIn);
+      manualCheckOutIso = toIso(manualCheckOut);
+    }
 
     markMutation.mutate({
       employeeIds: activeEmployeeIds,
-      date: `${year}-${month}-${day}`,
+      date: dateStr,
       fallbackShiftId: fallbackShiftId || undefined,
       forceApplyShift,
       overwrite,
       markAllDaysPresent,
+      manualStatus: manualStatus || undefined,
+      manualCheckIn: manualCheckInIso,
+      manualCheckOut: manualCheckOutIso,
+      manualSegments: manualSegmentsPayload,
     });
   };
 
@@ -403,6 +520,142 @@ const MarkAttendanceModal = ({
               <p className="text-sm text-red-500">{errors.fallbackShift}</p>
             )}
           </div>
+
+          {/* Resolved-shift hint shown when single employee + date selected */}
+          {isSingleEmployee && attendanceDate && (
+            <div className="rounded-md border border-input bg-muted/30 p-3 grid gap-1">
+              <Label className="text-foreground text-xs uppercase tracking-wide">
+                Assigned Shift
+              </Label>
+              {isFetchingEmployeeShift ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : effectiveShift ? (
+                <div className="text-sm">
+                  <span className="font-medium">{effectiveShift.name}</span>
+                  {isSplitShiftSelected ? (
+                    <span className="ml-2 text-muted-foreground">
+                      Split:{" "}
+                      {formatTimeToAMPM(effectiveShift.segments[0].startTime)}–
+                      {formatTimeToAMPM(effectiveShift.segments[0].endTime)} |{" "}
+                      {formatTimeToAMPM(effectiveShift.segments[1].startTime)}–
+                      {formatTimeToAMPM(effectiveShift.segments[1].endTime)}
+                    </span>
+                  ) : (
+                    <span className="ml-2 text-muted-foreground">
+                      {formatTimeToAMPM(effectiveShift.startTime)}–
+                      {formatTimeToAMPM(effectiveShift.endTime)}
+                    </span>
+                  )}
+                  {isOffDayForShift && (
+                    <Badge className="ml-2 bg-amber-100 text-amber-700 hover:bg-amber-100">
+                      Off Day — only Present allowed
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No shift assigned. Select a fallback shift above.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Status selector + manual times (single-employee scenario) */}
+          {isSingleEmployee && attendanceDate && effectiveShift && (
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <Label className="text-foreground">Status</Label>
+                <Select
+                  value={manualStatus || "auto"}
+                  onValueChange={(v) => setManualStatus(v === "auto" ? "" : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Auto (based on shift)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (based on shift)</SelectItem>
+                    <SelectItem value="Present">Present</SelectItem>
+                    {!isOffDayForShift && (
+                      <SelectItem value="Absent">Absent</SelectItem>
+                    )}
+                    {!isOffDayForShift && (
+                      <SelectItem value="Off">Off</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Show check-in/out only when status implies attendance */}
+              {manualStatus &&
+                manualStatus !== "Off" &&
+                manualStatus !== "Absent" &&
+                manualStatus !== "Leave" && (
+                  isSplitShiftSelected ? (
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label className="text-foreground text-xs uppercase tracking-wide">
+                          Segment 1
+                        </Label>
+                        <div className="flex gap-3">
+                          <Input
+                            type="time"
+                            value={manualSeg1In}
+                            onChange={(e) => setManualSeg1In(e.target.value)}
+                            className="bg-background flex-1"
+                          />
+                          <Input
+                            type="time"
+                            value={manualSeg1Out}
+                            onChange={(e) => setManualSeg1Out(e.target.value)}
+                            className="bg-background flex-1"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label className="text-foreground text-xs uppercase tracking-wide">
+                          Segment 2
+                        </Label>
+                        <div className="flex gap-3">
+                          <Input
+                            type="time"
+                            value={manualSeg2In}
+                            onChange={(e) => setManualSeg2In(e.target.value)}
+                            className="bg-background flex-1"
+                          />
+                          <Input
+                            type="time"
+                            value={manualSeg2Out}
+                            onChange={(e) => setManualSeg2Out(e.target.value)}
+                            className="bg-background flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <div className="grid gap-2 flex-1">
+                        <Label className="text-foreground">Check In</Label>
+                        <Input
+                          type="time"
+                          value={manualCheckIn}
+                          onChange={(e) => setManualCheckIn(e.target.value)}
+                          className="bg-background"
+                        />
+                      </div>
+                      <div className="grid gap-2 flex-1">
+                        <Label className="text-foreground">Check Out</Label>
+                        <Input
+                          type="time"
+                          value={manualCheckOut}
+                          onChange={(e) => setManualCheckOut(e.target.value)}
+                          className="bg-background"
+                        />
+                      </div>
+                    </div>
+                  )
+                )}
+            </div>
+          )}
 
           <Separator />
 

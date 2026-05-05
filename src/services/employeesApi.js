@@ -55,6 +55,13 @@ export const fetchEmployeesList = async ({ q = "", limit = 10 } = {}) => {
   return res.data;
 };
 
+export const fetchNextEmployeeId = async (employeeOf = "Taj Agri") => {
+  const res = await API.get(`/api/employees/next-id`, {
+    params: { employeeOf },
+  });
+  return res.data;
+};
+
 export const fetchPositionsByDepartment = async (departmentId) => {
   const res = await API.get(`/api/positions/by-department/${departmentId}`);
   return res.data;

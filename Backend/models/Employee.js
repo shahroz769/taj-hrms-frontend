@@ -7,11 +7,65 @@ const employeeSchema = new mongoose.Schema(
       ref: "Position",
       required: true,
     },
-    allowancePolicy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "AllowancePolicy",
-      default: null,
+    employeeOf: {
+      type: String,
+      enum: ["Taj Agri", "YD"],
+      required: true,
+      default: "Taj Agri",
     },
+    allowances: [
+      {
+        allowanceComponent: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "AllowanceComponent",
+          required: true,
+        },
+        enabled: {
+          type: Boolean,
+          default: false,
+        },
+        amount: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        effectiveDate: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    leaveEntitlements: [
+      {
+        leaveType: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "LeaveType",
+          required: true,
+        },
+        enabled: {
+          type: Boolean,
+          default: true,
+        },
+        annualDays: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        method: {
+          type: String,
+          enum: ["Fixed", "Prorata"],
+          default: "Fixed",
+        },
+        effectiveDate: {
+          type: Date,
+          default: Date.now,
+        },
+        autoManaged: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
     basicSalary: {
       type: Number,
       default: 0,
@@ -40,6 +94,7 @@ const employeeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    employeePicture: String,
     cnic: { type: String, unique: true },
     cnicImages: { front: String, back: String },
     dob: Date,
@@ -92,23 +147,31 @@ const employeeSchema = new mongoose.Schema(
     ],
 
     // --- Reference / Guarantor ---
+    references: [
+      {
+        name: String,
+        contactNumber: String,
+        relation: String,
+        address: String,
+      },
+    ],
     guarantor: [
       {
         name: String,
         contactNumber: String,
+        relation: String,
         cnic: String,
         address: String,
+        documentUrl: String,
       },
     ],
 
     // --- Legal ---
     legal: {
-      involvedInIllegalActivity: Boolean,
-      illegalActivityDetails: String,
-      convictedBefore: Boolean,
-      convictedBeforeDetails: String,
-      restrictedPlaces: Boolean,
-      restrictedPlacesDetails: String,
+      convictedCriminalCorruptionCase: Boolean,
+      rusticatedDismissedTerminated: Boolean,
+      pendingLitigationCourtCase: Boolean,
+      availableAnywhereInPakistan: Boolean,
     },
   },
   { timestamps: true },

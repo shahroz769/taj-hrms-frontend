@@ -39,7 +39,6 @@ export const getAllPositions = async (req, res, next) => {
 
     // Get paginated positions
     const positions = await Position.find(query)
-      .populate("leavePolicy", "name")
       .populate("department", "name")
       .populate("reportsTo", "name")
       .sort({ createdAt: -1 })
@@ -68,8 +67,7 @@ export const getAllPositionsFiltersList = async (req, res, next) => {
   try {
     const positionsFiltersList = await Position.find()
       .populate("department", "name")
-      .populate("leavePolicy", "name")
-      .select("name reportsTo department leavePolicy");
+      .select("name reportsTo department");
     res.json({
       positionsFiltersList,
     });
@@ -92,8 +90,7 @@ export const getPositionsByDepartment = async (req, res, next) => {
     }
 
     const positions = await Position.find({ department: departmentId })
-      .populate("leavePolicy", "name")
-      .select("name leavePolicy employeeLimit hiredEmployees");
+      .select("name employeeLimit hiredEmployees");
 
     res.json({ positions });
   } catch (err) {
@@ -115,7 +112,6 @@ export const getPositionById = async (req, res, next) => {
     }
 
     const position = await Position.findById(id)
-      .populate("leavePolicy", "name")
       .populate("department", "name");
     if (!position) {
       res.status(404);
@@ -133,19 +129,17 @@ export const getPositionById = async (req, res, next) => {
 // @access          Admin
 export const createPosition = async (req, res, next) => {
   try {
-    const { name, reportsTo, employeeLimit, department, leavePolicy } =
-      req.body || {};
+    const { name, reportsTo, employeeLimit, department } = req.body || {};
 
     if (
       !name?.trim() ||
       !employeeLimit?.toString().trim() ||
       !reportsTo?.trim() ||
-      !department?.trim() ||
-      !leavePolicy?.trim()
+      !department?.trim()
     ) {
       res.status(400);
       throw new Error(
-        "Position name, employee limit, reports to, department and leave policy are required",
+        "Position name, position limit, reports to and department are required",
       );
     }
 
@@ -155,45 +149,11 @@ export const createPosition = async (req, res, next) => {
       throw new Error("Invalid department ID");
     }
 
-    // Validate leave policy ID
-    if (!mongoose.Types.ObjectId.isValid(leavePolicy)) {
-      res.status(400);
-      throw new Error("Invalid leave policy ID");
-    }
-
     // Check if department exists
     const departmentDoc = await Department.findById(department);
     if (!departmentDoc) {
       res.status(404);
       throw new Error("Department not found");
-    }
-
-    // Check position count limit for the department
-    const positionCountLimit = departmentDoc.positionCount
-      ?.trim()
-      .toLowerCase();
-
-    if (positionCountLimit && positionCountLimit !== "unlimited") {
-      // Count current positions in this department
-      const currentPositionCount = await Position.countDocuments({
-        department: department,
-      });
-
-      // Parse the limit as a number
-      const limit = parseInt(positionCountLimit, 10);
-
-      if (isNaN(limit)) {
-        res.status(400);
-        throw new Error("Invalid position count limit in department");
-      }
-
-      // Check if limit is reached
-      if (currentPositionCount >= limit) {
-        res.status(400);
-        throw new Error(
-          `Position limit reached for ${departmentDoc.name} department. Maximum positions allowed: ${limit}`,
-        );
-      }
     }
 
     // Check if position already exists in this department
@@ -213,7 +173,6 @@ export const createPosition = async (req, res, next) => {
       name: name.trim(),
       department: department,
       reportsTo: reportsTo,
-      leavePolicy: leavePolicy,
       employeeLimit: employeeLimit,
       createdBy: req.user._id,
     });
@@ -221,7 +180,6 @@ export const createPosition = async (req, res, next) => {
     const savedPosition = await newPosition.save();
 
     const populatedPosition = await Position.findById(savedPosition._id)
-      .populate("leavePolicy", "name")
       .populate("department", "name");
 
     res.status(201).json(populatedPosition);
@@ -250,19 +208,17 @@ export const updatePosition = async (req, res, next) => {
       throw new Error("Position not found");
     }
 
-    const { name, reportsTo, employeeLimit, department, leavePolicy } =
-      req.body || {};
+    const { name, reportsTo, employeeLimit, department } = req.body || {};
 
     if (
       !name?.trim() ||
       !employeeLimit?.toString().trim() ||
       !reportsTo?.trim() ||
-      !department?.trim() ||
-      !leavePolicy?.trim()
+      !department?.trim()
     ) {
       res.status(400);
       throw new Error(
-        "Position name, employee limit, reports to, department and leave policy are required",
+        "Position name, position limit, reports to and department are required",
       );
     }
 
@@ -272,47 +228,11 @@ export const updatePosition = async (req, res, next) => {
       throw new Error("Invalid department ID");
     }
 
-    // Validate leave policy ID
-    if (!mongoose.Types.ObjectId.isValid(leavePolicy)) {
-      res.status(400);
-      throw new Error("Invalid leave policy ID");
-    }
-
     // Check if department exists
     const departmentDoc = await Department.findById(department);
     if (!departmentDoc) {
       res.status(404);
       throw new Error("Department not found");
-    }
-
-    // If department is being changed, check position limit for new department
-    if (department !== position.department.toString()) {
-      const positionCountLimit = departmentDoc.positionCount
-        ?.trim()
-        .toLowerCase();
-
-      if (positionCountLimit && positionCountLimit !== "unlimited") {
-        // Count current positions in the new department
-        const currentPositionCount = await Position.countDocuments({
-          department: department,
-        });
-
-        // Parse the limit as a number
-        const limit = parseInt(positionCountLimit, 10);
-
-        if (isNaN(limit)) {
-          res.status(400);
-          throw new Error("Invalid position count limit in department");
-        }
-
-        // Check if limit is reached
-        if (currentPositionCount >= limit) {
-          res.status(400);
-          throw new Error(
-            `Position limit reached for ${departmentDoc.name} department. Maximum positions allowed: ${limit}`,
-          );
-        }
-      }
     }
 
     // Check if new name conflicts with existing position in the target department
@@ -338,13 +258,11 @@ export const updatePosition = async (req, res, next) => {
     position.name = name.trim();
     position.department = department;
     position.reportsTo = reportsTo;
-    position.leavePolicy = leavePolicy;
     position.employeeLimit = employeeLimit;
 
     const updatedPosition = await position.save();
 
     const populatedPosition = await Position.findById(updatedPosition._id)
-      .populate("leavePolicy", "name")
       .populate("department", "name");
 
     res.json(populatedPosition);

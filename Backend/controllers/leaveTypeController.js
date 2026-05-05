@@ -1,13 +1,30 @@
 import LeaveType from "../models/LeaveType.js";
-import LeavePolicy from "../models/LeavePolicy.js";
 import mongoose from "mongoose";
 import { ROLES } from "../utils/roles.js";
+
+const EARNED_LEAVE_NAME = "Earned Leave";
+
+const ensureEarnedLeaveType = async () => {
+  return LeaveType.findOneAndUpdate(
+    { name: { $regex: new RegExp(`^${EARNED_LEAVE_NAME}$`, "i") } },
+    {
+      $setOnInsert: {
+        name: EARNED_LEAVE_NAME,
+        isPaid: true,
+        status: "Approved",
+        createdBy: "system",
+      },
+    },
+    { upsert: true, new: true },
+  );
+};
 
 // @description     Get all leave types
 // @route           GET /api/leave-types
 // @access          Admin, Supervisor
 export const getAllLeaveTypes = async (req, res, next) => {
   try {
+    await ensureEarnedLeaveType();
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const searchText = req.query.search || "";
@@ -50,6 +67,7 @@ export const getAllLeaveTypes = async (req, res, next) => {
 // @access          Admin, Supervisor
 export const getAllLeaveTypesList = async (req, res, next) => {
   try {
+    await ensureEarnedLeaveType();
     const leaveTypes = await LeaveType.find()
       .sort({ name: 1 })
       .collation({ locale: "en", strength: 2 })
@@ -110,7 +128,7 @@ export const getAllLeaveTypesList = async (req, res, next) => {
 // @access          Admin
 export const createLeaveType = async (req, res, next) => {
   try {
-    const { name, isPaid } = req.body || {};
+    const { name } = req.body || {};
 
     if (!name?.trim()) {
       res.status(400);
@@ -131,7 +149,7 @@ export const createLeaveType = async (req, res, next) => {
 
     const newLeaveType = new LeaveType({
       name: name.trim(),
-      isPaid: isPaid !== undefined ? Boolean(isPaid) : false,
+      isPaid: true,
       status: isAdmin ? "Approved" : "Pending",
       createdBy: isAdmin ? req.user.name : req.user._id,
     });
@@ -164,7 +182,7 @@ export const updateLeaveType = async (req, res, next) => {
       throw new Error("Leave type not found");
     }
 
-    const { name, isPaid } = req.body || {};
+    const { name } = req.body || {};
 
     // Validate required fields
     if (!name?.trim()) {
@@ -187,8 +205,7 @@ export const updateLeaveType = async (req, res, next) => {
 
     // Update leave type fields
     leaveType.name = name.trim();
-    leaveType.isPaid =
-      isPaid !== undefined ? Boolean(isPaid) : leaveType.isPaid;
+    leaveType.isPaid = true;
 
     const updatedLeaveType = await leaveType.save();
 
@@ -261,18 +278,9 @@ export const deleteLeaveType = async (req, res, next) => {
       throw new Error("Leave type not found");
     }
 
-    // Check if leave type is used in any leave policies
-    const leavePolicyCount = await LeavePolicy.countDocuments({
-      "entitlements.leaveType": id,
-    });
-
-    if (leavePolicyCount > 0) {
+    if (leaveType.name.toLowerCase() === EARNED_LEAVE_NAME.toLowerCase()) {
       res.status(400);
-      throw new Error(
-        `Cannot delete leave type. It is currently used in ${leavePolicyCount} leave ${
-          leavePolicyCount === 1 ? "policy" : "policies"
-        }. Please remove it from all leave policies first.`
-      );
+      throw new Error("Earned Leave is built in and cannot be deleted");
     }
 
     await leaveType.deleteOne();

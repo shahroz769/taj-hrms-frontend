@@ -1,0 +1,99 @@
+.container {
+  background-color: var(--card);
+  margin: 16px;
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.title {
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 36px;
+  color: var(--primary);
+}
+
+.subtitle {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.formCard {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  background-color: var(--background);
+}
+
+.sectionTitle {
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+
+.sectionHint {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldHelp {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fieldError {
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.metaText {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-align: right;
+  margin-top: 12px;
+}

@@ -420,14 +420,15 @@ const Deductions = () => {
 
   const columns = [
     {
+      key: "employeeID",
+      label: "Employee ID",
+      render: (row) => row.employee?.employeeID || "-",
+    },
+    {
       key: "employeeName",
-      label: "Employee",
+      label: "Employee Name",
       fontWeight: "medium",
-      render: (row) => {
-        const name = row.employee?.fullName || "-";
-        const id = row.employee?.employeeID || "";
-        return id ? `${name} (${id})` : name;
-      },
+      render: (row) => row.employee?.fullName || "-",
     },
     {
       key: "department",

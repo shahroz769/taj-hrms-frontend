@@ -377,6 +377,12 @@ const AttendanceRecords = () => {
         {config.cornerLabel && (
           <span className={config.cornerCls}>{config.cornerLabel}</span>
         )}
+        {record.workingOnHoliday && (
+          <span className={styles.cornerBadgeHoliday}>Holiday</span>
+        )}
+        {Array.isArray(record.segments) && record.segments.length === 2 && (
+          <span className={styles.cornerBadgeSplit}>Split</span>
+        )}
       </span>
     );
   }, []);

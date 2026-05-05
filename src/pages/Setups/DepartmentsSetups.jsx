@@ -26,7 +26,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -107,7 +106,6 @@ const DepartmentsSetups = () => {
   // ===========================================================================
   // STATE
   // ===========================================================================
-  const [unlimitedChecked, setUnlimitedChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editingDepartment, setEditingDepartment] = useState(null);
@@ -183,7 +181,6 @@ const DepartmentsSetups = () => {
     mutationFn: createDepartment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
-      setUnlimitedChecked(false);
       setDialogOpen(false);
       setErrors({});
       setEditingDepartment(null);
@@ -205,7 +202,6 @@ const DepartmentsSetups = () => {
     mutationFn: ({ id, payload }) => updateDepartment(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
-      setUnlimitedChecked(false);
       setDialogOpen(false);
       setErrors({});
       setEditingDepartment(null);
@@ -248,10 +244,6 @@ const DepartmentsSetups = () => {
       label: "Department Name",
     },
     {
-      key: "positionCount",
-      label: "Positions",
-    },
-    {
       key: "employeeCount",
       label: "No. of Employees",
     },
@@ -278,7 +270,6 @@ const DepartmentsSetups = () => {
   // ---------------------------------------------------------------------------
   const handleEdit = (row) => {
     setEditingDepartment(row);
-    setUnlimitedChecked(row.positionCount === "Unlimited");
     setDialogOpen(true);
   };
 
@@ -340,9 +331,6 @@ const DepartmentsSetups = () => {
     const formData = new FormData(e.target);
     const payload = {
       name: formData.get("department-name"),
-      positionCount: unlimitedChecked
-        ? "Unlimited"
-        : formData.get("position-limits"),
     };
 
     // Validate
@@ -350,25 +338,6 @@ const DepartmentsSetups = () => {
 
     if (!payload.name?.trim()) {
       newErrors.name = "Department name is required";
-    }
-
-    if (!unlimitedChecked && !payload.positionCount?.trim()) {
-      newErrors.positionCount = "Position count is required";
-    }
-
-    // Validate position count is a positive integer when not unlimited
-    if (!unlimitedChecked && payload.positionCount?.trim()) {
-      const positionCountValue = payload.positionCount.trim();
-      const isValidNumber = /^\d+$/.test(positionCountValue); // Only positive integers
-      const numericValue = Number(positionCountValue);
-
-      if (
-        !isValidNumber ||
-        numericValue <= 0 ||
-        !Number.isInteger(numericValue)
-      ) {
-        newErrors.positionCount = "Position limit must be a proper number";
-      }
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -412,7 +381,6 @@ const DepartmentsSetups = () => {
               setErrors({});
               setTimeout(() => {
                 setEditingDepartment(null);
-                setUnlimitedChecked(false);
               }, 200);
             }
           }}
@@ -431,7 +399,7 @@ const DepartmentsSetups = () => {
               <DialogDescription className="sr-only">
                 {editingDepartment
                   ? "Edit the department information below"
-                  : "Create a new department by entering the name and position limits"}
+                  : "Create a new department by entering the name"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateDepartment}>
@@ -453,42 +421,6 @@ const DepartmentsSetups = () => {
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-                  )}
-                </div>
-                <div className="grid gap-3">
-                  <Label htmlFor="position-limits" className="text-foreground">
-                    Position Limits
-                  </Label>
-                  <InputGroup className={styles.searchInput}>
-                    <InputGroupInput
-                      id="position-limits"
-                      name="position-limits"
-                      placeholder="Enter position limits"
-                      disabled={unlimitedChecked}
-                      defaultValue={
-                        editingDepartment?.positionCount !== "Unlimited"
-                          ? editingDepartment?.positionCount || ""
-                          : ""
-                      }
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <Checkbox
-                        checked={unlimitedChecked}
-                        onCheckedChange={(checked) => {
-                          setUnlimitedChecked(checked);
-                          if (checked && errors.positionCount) {
-                            setErrors({ ...errors, positionCount: undefined });
-                          }
-                        }}
-                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                      <p>Unlimited</p>
-                    </InputGroupAddon>
-                  </InputGroup>
-                  {errors.positionCount && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.positionCount}
-                    </p>
                   )}
                 </div>
               </div>

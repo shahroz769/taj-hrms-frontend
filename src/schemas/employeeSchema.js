@@ -41,6 +41,20 @@ const previousExperienceSchema = z.object({
   lastSalary: z.union([z.string(), z.number()]).optional(),
 });
 
+// Reference Schema (Required)
+const referenceSchema = z.object({
+  name: z.string().min(1, "Reference name is required"),
+  contactNumber: z
+    .string()
+    .min(1, "Reference contact number is required")
+    .regex(
+      PAKISTAN_MOBILE_REGEX,
+      "Reference contact number must start with 03 and be 11 digits",
+    ),
+  relation: z.string().min(1, "Relation is required"),
+  address: z.string().min(1, "Reference address is required"),
+});
+
 // Guarantor Schema (Required)
 const guarantorSchema = z.object({
   name: z.string().min(1, "Guarantor name is required"),
@@ -51,11 +65,13 @@ const guarantorSchema = z.object({
       PAKISTAN_MOBILE_REGEX,
       "Guarantor contact number must start with 03 and be 11 digits",
     ),
+  relation: z.string().min(1, "Guarantor relation is required"),
   cnic: z
     .string()
     .min(1, "Guarantor CNIC is required")
     .regex(CNIC_REGEX, "Guarantor CNIC must be exactly 13 digits"),
   address: z.string().min(1, "Guarantor address is required"),
+  documentUrl: z.string().optional(),
 });
 
 // Medical Schema (Required fields)
@@ -69,12 +85,23 @@ const medicalSchema = z.object({
 
 // Legal Schema (Required fields)
 const legalSchema = z.object({
-  involvedInIllegalActivity: z.boolean(),
-  illegalActivityDetails: z.string().optional(),
-  convictedBefore: z.boolean(),
-  convictedBeforeDetails: z.string().optional(),
-  restrictedPlaces: z.boolean(),
-  restrictedPlacesDetails: z.string().optional(),
+  convictedCriminalCorruptionCase: z.boolean(),
+  rusticatedDismissedTerminated: z.boolean(),
+  pendingLitigationCourtCase: z.boolean(),
+  availableAnywhereInPakistan: z.boolean(),
+});
+
+const leaveEntitlementSchema = z.object({
+  leaveType: z.string().min(1),
+  enabled: z.boolean(),
+  annualDays: z.union([z.string(), z.number()]).optional(),
+  method: z.enum(["Fixed", "Prorata"]).default("Fixed"),
+});
+
+const allowanceSchema = z.object({
+  allowanceComponent: z.string().min(1),
+  enabled: z.boolean(),
+  amount: z.union([z.string(), z.number()]).optional(),
 });
 
 // Main Employee Schema
@@ -121,6 +148,10 @@ export const employeeSchema = z
     // Employment Information - Required
     department: z.string().min(1, "Department is required"),
     position: z.string().min(1, "Position is required"),
+    employeeOf: z.enum(["Taj Agri", "YD"], {
+      required_error: "Employee of is required",
+      invalid_type_error: "Employee of is required",
+    }),
     employmentType: z.enum(["Permanent", "Contract", "Part Time"], {
       required_error: "Employment type is required",
       invalid_type_error: "Employment type is required",
@@ -129,7 +160,10 @@ export const employeeSchema = z
       (val) => !isNaN(Number(val)) && Number(val) >= 0,
       { message: "Basic salary must be a non-negative number" },
     ),
-    allowancePolicy: z.string().min(1, "Allowance policy is required"),
+    leaveEntitlements: z.array(leaveEntitlementSchema).optional(),
+    leaveAnnualDays: z.union([z.string(), z.number()]).optional(),
+    leaveMethod: z.enum(["Fixed", "Prorata"]).default("Fixed").optional(),
+    allowances: z.array(allowanceSchema).optional(),
     compensationEffectiveDate: z
       .union([z.string(), z.date()])
       .optional()
@@ -148,6 +182,9 @@ export const employeeSchema = z
     guarantor: z
       .array(guarantorSchema)
       .min(1, "At least one guarantor is required"),
+    references: z
+      .array(referenceSchema)
+      .min(1, "At least one reference is required"),
 
     // Objects
     medical: medicalSchema,

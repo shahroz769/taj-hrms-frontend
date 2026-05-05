@@ -1,11 +1,38 @@
 import mongoose from "mongoose";
 
+const shiftSegmentSchema = new mongoose.Schema(
+  {
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const shiftSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
       trim: true,
+    },
+    // ---------------------------------------------------------------------
+    // Split-shift support:
+    //  - `segments` always holds the canonical timing definition
+    //    (1 segment for normal shifts, 2 for split shifts).
+    //  - `isSplit` mirrors `segments.length === 2` and is set in the controller.
+    //  - Top-level `startTime`/`endTime` always mirror the FIRST segment for
+    //    backward compatibility with legacy reports/payroll code.
+    //
+    // Validation (controller): split shifts must have exactly 2 non-overlapping
+    // segments separated by at least 1 hour.
+    // ---------------------------------------------------------------------
+    isSplit: {
+      type: Boolean,
+      default: false,
+    },
+    segments: {
+      type: [shiftSegmentSchema],
+      default: undefined,
     },
     startTime: {
       type: String,

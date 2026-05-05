@@ -81,7 +81,6 @@ import {
 
 // Services
 import { fetchDepartmentsList } from "@/services/departmentsApi";
-import { fetchLeavePoliciesList } from "@/services/leavePoliciesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -131,12 +130,8 @@ const PositionsSetups = () => {
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
   const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedLeavePolicy, setSelectedLeavePolicy] = useState("");
-  const [selectedFilterPosition, setSelectedFilterPosition] = useState("");
   const [selectedFilterReportsTo, setSelectedFilterReportsTo] = useState("");
   const [selectedFilterDepartment, setSelectedFilterDepartment] = useState("");
-  const [selectedFilterLeavePolicy, setSelectedFilterLeavePolicy] =
-    useState("");
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
 
   // ===========================================================================
@@ -214,11 +209,6 @@ const PositionsSetups = () => {
   // ---------------------------------------------------------------------------
   const filtersList = filters?.positionsFiltersList ?? [];
 
-  const uniquePositions = React.useMemo(
-    () => [...new Set(filtersList.map((item) => item.name))].filter(Boolean),
-    [filtersList],
-  );
-
   const uniqueReportsTo = React.useMemo(
     () =>
       [...new Set(filtersList.map((item) => item.reportsTo))].filter(Boolean),
@@ -228,14 +218,6 @@ const PositionsSetups = () => {
   const uniqueDepartments = React.useMemo(
     () =>
       [...new Set(filtersList.map((item) => item.department?.name))].filter(
-        Boolean,
-      ),
-    [filtersList],
-  );
-
-  const uniqueLeavePolicies = React.useMemo(
-    () =>
-      [...new Set(filtersList.map((item) => item.leavePolicy?.name))].filter(
         Boolean,
       ),
     [filtersList],
@@ -255,19 +237,6 @@ const PositionsSetups = () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Fetch Leave Policies List Query (lazy loading)
-  // ---------------------------------------------------------------------------
-  const {
-    data: leavePoliciesList,
-    isLoading: isCheckingLeavePolicies,
-    refetch: fetchLeavePolicies,
-  } = useQuery({
-    queryKey: ["leavePoliciesList"],
-    queryFn: fetchLeavePoliciesList,
-    enabled: false, // Don't fetch on mount, only when manually triggered
-  });
-
-  // ---------------------------------------------------------------------------
   // Create Position Mutation
   // ---------------------------------------------------------------------------
   const mutation = useMutation({
@@ -277,7 +246,6 @@ const PositionsSetups = () => {
       setUnlimitedChecked(false);
       setNoneChecked(false);
       setSelectedDepartment("");
-      setSelectedLeavePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -302,7 +270,6 @@ const PositionsSetups = () => {
       setUnlimitedChecked(false);
       setNoneChecked(false);
       setSelectedDepartment("");
-      setSelectedLeavePolicy("");
       setDialogOpen(false);
       setErrors({});
       setEditingPosition(null);
@@ -355,13 +322,8 @@ const PositionsSetups = () => {
       render: (row) => row.department?.name || "-",
     },
     {
-      key: "leavePolicy",
-      label: "Leave Policy",
-      render: (row) => row.leavePolicy?.name || "-",
-    },
-    {
       key: "employeeLimit",
-      label: "Employees Limit",
+      label: "Position Limit",
     },
     {
       key: "hiredEmployees",
@@ -389,11 +351,7 @@ const PositionsSetups = () => {
   // Edit & Delete Handlers
   // ---------------------------------------------------------------------------
   const handleEdit = async (row) => {
-    // Fetch departments and leave policies first
-    const [deptResult, leavePolicyResult] = await Promise.all([
-      fetchDepartments(),
-      fetchLeavePolicies(),
-    ]);
+    const deptResult = await fetchDepartments();
 
     if (deptResult.isError) {
       const errorMessage =
@@ -408,23 +366,9 @@ const PositionsSetups = () => {
       return;
     }
 
-    if (leavePolicyResult.isError) {
-      const errorMessage =
-        leavePolicyResult.error?.response?.data?.message ||
-        "Failed to fetch leave policies";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!leavePolicyResult.data || leavePolicyResult.data.length === 0) {
-      toast.error("Add leave policy first");
-      return;
-    }
-
     // Set all the editing states
     setEditingPosition(row);
     setSelectedDepartment(row.department?._id || "");
-    setSelectedLeavePolicy(row.leavePolicy?._id || "");
     setUnlimitedChecked(row.employeeLimit === "Unlimited");
     setNoneChecked(row.reportsTo === "None" || !row.reportsTo);
     setDialogOpen(true);
@@ -445,10 +389,7 @@ const PositionsSetups = () => {
   // Add Position Handler
   // ---------------------------------------------------------------------------
   const handleAddPositionClick = async () => {
-    const [deptResult, leavePolicyResult] = await Promise.all([
-      fetchDepartments(),
-      fetchLeavePolicies(),
-    ]);
+    const deptResult = await fetchDepartments();
 
     if (deptResult.isError) {
       const errorMessage =
@@ -463,20 +404,7 @@ const PositionsSetups = () => {
       return;
     }
 
-    if (leavePolicyResult.isError) {
-      const errorMessage =
-        leavePolicyResult.error?.response?.data?.message ||
-        "Failed to fetch leave policies";
-      toast.error(errorMessage);
-      return;
-    }
-
-    if (!leavePolicyResult.data || leavePolicyResult.data.length === 0) {
-      toast.error("Add leave policy first");
-      return;
-    }
-
-    // If departments and leave policies exist, open the dialog
+    // If departments exist, open the dialog
     setDialogOpen(true);
   };
 
@@ -528,7 +456,6 @@ const PositionsSetups = () => {
     const payload = {
       name: formData.get("position-name"),
       department: selectedDepartment,
-      leavePolicy: selectedLeavePolicy,
       reportsTo: noneChecked ? "None" : formData.get("reports-to"),
       employeeLimit: unlimitedChecked
         ? "Unlimited"
@@ -546,16 +473,12 @@ const PositionsSetups = () => {
       newErrors.department = "Department is required";
     }
 
-    if (!payload.leavePolicy) {
-      newErrors.leavePolicy = "Leave policy is required";
-    }
-
     if (!noneChecked && !payload.reportsTo?.trim()) {
       newErrors.reportsTo = "Reports to is required";
     }
 
     if (!unlimitedChecked && !payload.employeeLimit?.trim()) {
-      newErrors.employeeLimit = "Employee limit is required";
+      newErrors.employeeLimit = "Position limit is required";
     }
 
     // Validate position count is a positive integer when not unlimited
@@ -569,7 +492,7 @@ const PositionsSetups = () => {
         numericValue <= 0 ||
         !Number.isInteger(numericValue)
       ) {
-        newErrors.employeeLimit = "Employee limit must be a proper number";
+        newErrors.employeeLimit = "Position limit must be a proper number";
       }
     }
 
@@ -617,7 +540,6 @@ const PositionsSetups = () => {
                 setEditingPosition(null);
                 setUnlimitedChecked(false);
                 setSelectedDepartment("");
-                setSelectedLeavePolicy("");
                 setNoneChecked(false);
               }, 200);
             }
@@ -627,9 +549,9 @@ const PositionsSetups = () => {
             variant="green"
             className="cursor-pointer"
             onClick={handleAddPositionClick}
-            disabled={isCheckingDepartments || isCheckingLeavePolicies}
+            disabled={isCheckingDepartments}
           >
-            {isCheckingDepartments || isCheckingLeavePolicies ? (
+            {isCheckingDepartments ? (
               <Spinner />
             ) : (
               <PlusIcon size={16} />
@@ -644,7 +566,7 @@ const PositionsSetups = () => {
               <DialogDescription className="sr-only">
                 {editingPosition
                   ? "Edit the position information below"
-                  : "Create a new position by entering the name and employee limits"}
+                  : "Create a new position by entering the name and position limit"}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreatePosition}>
@@ -701,39 +623,6 @@ const PositionsSetups = () => {
                     </p>
                   )}
                 </div>
-                {/* Select Leave Policy */}
-                <div className="grid gap-3">
-                  <Label htmlFor="leavePolicy" className="text-foreground">
-                    Leave Policy
-                  </Label>
-                  <Select
-                    value={selectedLeavePolicy}
-                    onValueChange={(value) => {
-                      setSelectedLeavePolicy(value);
-                      if (errors.leavePolicy) {
-                        setErrors({ ...errors, leavePolicy: undefined });
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a leave policy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {leavePoliciesList?.map((policy) => (
-                          <SelectItem key={policy._id} value={policy._id}>
-                            {policy.name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.leavePolicy && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {errors.leavePolicy}
-                    </p>
-                  )}
-                </div>
                 <div className="grid gap-3">
                   <Label htmlFor="reports-to" className="text-foreground">
                     Reports To
@@ -772,13 +661,13 @@ const PositionsSetups = () => {
                 </div>
                 <div className="grid gap-3">
                   <Label htmlFor="employee-limit" className="text-foreground">
-                    Employee Limit
+                    Position Limit
                   </Label>
                   <InputGroup className={styles.searchInput}>
                     <InputGroupInput
                       id="employee-limit"
                       name="employee-limit"
-                      placeholder="Enter employee limit"
+                      placeholder="Enter position limit"
                       disabled={unlimitedChecked}
                       defaultValue={
                         editingPosition?.employeeLimit !== "Unlimited"
@@ -948,28 +837,6 @@ const PositionsSetups = () => {
                         {uniqueDepartments.map((deptName) => (
                           <SelectItem key={deptName} value={deptName}>
                             {deptName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-3 items-center gap-4">
-                  <Label htmlFor="leavePolicy">Leave Policy</Label>
-                  <Select
-                    value={selectedFilterLeavePolicy}
-                    onValueChange={(value) => {
-                      setSelectedFilterLeavePolicy(value);
-                    }}
-                  >
-                    <SelectTrigger className="w-full col-span-2">
-                      <SelectValue placeholder="Select leave policy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {uniqueLeavePolicies.map((leavePolicy) => (
-                          <SelectItem key={leavePolicy} value={leavePolicy}>
-                            {leavePolicy}
                           </SelectItem>
                         ))}
                       </SelectGroup>

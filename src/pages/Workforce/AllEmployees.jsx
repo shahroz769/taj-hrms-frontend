@@ -267,7 +267,6 @@ const AllEmployees = () => {
   // Departments list query (lazy loading)
   const {
     data: departmentsList,
-    isLoading: isLoadingDepartments,
     refetch: fetchDepartments,
   } = useQuery({
     queryKey: ["departmentsList"],
@@ -278,7 +277,6 @@ const AllEmployees = () => {
   // Positions filters query (lazy loading)
   const {
     data: positionsFilters,
-    isLoading: isLoadingPositionsFilters,
     refetch: fetchPositionsFiltersData,
   } = useQuery({
     queryKey: ["positionsFilters"],
@@ -318,13 +316,14 @@ const AllEmployees = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "employee",
-      label: "Employee",
-      render: (row) => {
-        const name = row.fullName || "-";
-        const id = row.employeeID || "";
-        return id ? `${name} (${id})` : name;
-      },
+      key: "employeeID",
+      label: "Employee ID",
+      render: (row) => row.employeeID || "-",
+    },
+    {
+      key: "fullName",
+      label: "Employee Name",
+      render: (row) => row.fullName || "-",
     },
     {
       key: "department",
@@ -517,7 +516,7 @@ const AllEmployees = () => {
       setTempFilterType(filterType);
       setTempFilterShift(filterShift);
       setFilterPopoverOpen(true);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load filter data");
     } finally {
       setIsFiltersLoading(false);

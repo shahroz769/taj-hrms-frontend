@@ -3,11 +3,12 @@ import { protect } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/rbacMiddleware.js";
 import { ROLES } from "../utils/roles.js";
 import {
-  uploadCnicImages,
+  uploadEmployeeImages,
   handleMulterError,
 } from "../middleware/uploadMiddleware.js";
 import {
   createEmployee,
+  getNextEmployeeId,
   getAllEmployees,
   getEmployeeById,
   updateEmployee,
@@ -43,6 +44,13 @@ router.get(
   getEmployeesList,
 );
 
+router.get(
+  "/next-id",
+  protect,
+  authorize(ROLES.admin),
+  getNextEmployeeId,
+);
+
 // @route           POST /api/employees/renew-all-leave-balances
 // @description     Bulk renew leave balances for all active employees
 // @access          Admin
@@ -65,7 +73,7 @@ router.post(
   "/",
   protect,
   authorize(ROLES.admin),
-  uploadCnicImages,
+  uploadEmployeeImages,
   handleMulterError,
   createEmployee
 );
@@ -77,7 +85,7 @@ router.put(
   "/:id",
   protect,
   authorize(ROLES.admin),
-  uploadCnicImages,
+  uploadEmployeeImages,
   handleMulterError,
   updateEmployee
 );

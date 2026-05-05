@@ -129,7 +129,6 @@ const LeavesTypes = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(getInitialSearch);
   const [limit, setLimit] = useState(getInitialLimit);
   const [page, setPage] = useState(getInitialPage);
-  const [selectedIsPaid, setSelectedIsPaid] = useState("");
   const [approvingLeaveTypeId, setApprovingLeaveTypeId] = useState(null);
   const [rejectingLeaveTypeId, setRejectingLeaveTypeId] = useState(null);
 
@@ -201,7 +200,6 @@ const LeavesTypes = () => {
       setDialogOpen(false);
       setErrors({});
       setEditingLeaveType(null);
-      setSelectedIsPaid("");
       toast.success("Leave type created successfully");
     },
     onError: (error) => {
@@ -223,7 +221,6 @@ const LeavesTypes = () => {
       setDialogOpen(false);
       setErrors({});
       setEditingLeaveType(null);
-      setSelectedIsPaid("");
       toast.success("Leave type updated successfully");
     },
     onError: (error) => {
@@ -311,21 +308,6 @@ const LeavesTypes = () => {
       render: (row) => (row.createdAt ? formatDate(row.createdAt) : "-"),
     },
     {
-      key: "isPaid",
-      label: "Nature",
-      render: (row) => {
-        return row.isPaid ? (
-          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-            Paid
-          </Badge>
-        ) : (
-          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-            Unpaid
-          </Badge>
-        );
-      },
-    },
-    {
       key: "status",
       label: "Status",
       render: (row) => {
@@ -385,7 +367,6 @@ const LeavesTypes = () => {
   const handleEdit = (row) => {
     // Set all the editing states
     setEditingLeaveType(row);
-    setSelectedIsPaid(row.isPaid !== undefined ? row.isPaid.toString() : "");
     setDialogOpen(true);
   };
 
@@ -481,11 +462,6 @@ const LeavesTypes = () => {
       newErrors.name = "Leave type name is required";
     }
 
-    // Validate nature of leaves (isPaid)
-    if (!selectedIsPaid) {
-      newErrors.isPaid = "Please select nature of leaves";
-    }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -493,7 +469,7 @@ const LeavesTypes = () => {
 
     const payload = {
       name: leaveTypeName,
-      isPaid: selectedIsPaid === "true",
+      isPaid: true,
     };
 
     if (editingLeaveType) {
@@ -533,7 +509,6 @@ const LeavesTypes = () => {
               setErrors({});
               setTimeout(() => {
                 setEditingLeaveType(null);
-                setSelectedIsPaid("");
               }, 200);
             }
           }}
@@ -577,29 +552,6 @@ const LeavesTypes = () => {
                   />
                   {errors.name && (
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-                  )}
-                </div>
-                {/* Nature of Leaves (Paid/Unpaid) */}
-                <div className="grid gap-3">
-                  <Label htmlFor="nature-of-leaves" className="text-foreground">
-                    Nature of Leaves
-                  </Label>
-                  <Select
-                    value={selectedIsPaid}
-                    onValueChange={(value) => setSelectedIsPaid(value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select nature of leaves" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="true">Paid</SelectItem>
-                        <SelectItem value="false">Unpaid</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  {errors.isPaid && (
-                    <p className="text-sm text-red-500 mt-1">{errors.isPaid}</p>
                   )}
                 </div>
               </div>

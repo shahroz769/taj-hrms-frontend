@@ -1,12 +1,13 @@
 import Employee from "../models/Employee.js";
 import Position from "../models/Position.js";
 import Department from "../models/Department.js";
-import LeavePolicy from "../models/LeavePolicy.js";
 import LeaveBalance from "../models/LeaveBalance.js";
+import LeaveType from "../models/LeaveType.js";
+import AllowanceComponent from "../models/AllowanceComponent.js";
 import PositionHistory from "../models/PositionHistory.js";
 import EmployeeShift from "../models/EmployeeShift.js";
-import AllowancePolicy from "../models/AllowancePolicy.js";
-import AllowancePolicyHistory from "../models/AllowancePolicyHistory.js";
+import EmployeeAllowanceHistory from "../models/EmployeeAllowanceHistory.js";
+import EmployeeLeaveEntitlementHistory from "../models/EmployeeLeaveEntitlementHistory.js";
 import BasicSalaryHistory from "../models/BasicSalaryHistory.js";
 import { uploadToCloudinary } from "../config/cloudinaryConfig.js";
 import mongoose from "mongoose";
@@ -22,64 +23,176 @@ const VALID_PROVINCES = [
 const CNIC_REGEX = /^\d{13}$/;
 const PAKISTAN_MOBILE_REGEX = /^03\d{9}$/;
 
+const EMPLOYEE_OF_PREFIX = {
+  "Taj Agri": "TA",
+  YD: "YD",
+};
+const EARNED_LEAVE_NAME = "Earned Leave";
+const EARNED_LEAVE_YEAR = 0;
+
 // Helper function to generate employee ID
-const generateEmployeeId = async () => {
-  const lastEmployee = await Employee.findOne()
-    .sort({ createdAt: -1 })
+const generateEmployeeId = async (employeeOf) => {
+  const prefix = EMPLOYEE_OF_PREFIX[employeeOf] || EMPLOYEE_OF_PREFIX["Taj Agri"];
+  const lastEmployee = await Employee.findOne({
+    employeeID: { $regex: new RegExp(`^${prefix}\\d{5}$`) },
+  })
+    .sort({ employeeID: -1 })
     .select("employeeID");
 
-  if (!lastEmployee || !lastEmployee.employeeID) {
-    return "TAJ-0001";
+  if (!lastEmployee?.employeeID) {
+    return `${prefix}00001`;
   }
 
-  const lastNumber = parseInt(lastEmployee.employeeID.split("-")[1], 10);
-  const newNumber = (lastNumber + 1).toString().padStart(4, "0");
-  return `TAJ-${newNumber}`;
+  const lastNumber = parseInt(lastEmployee.employeeID.slice(prefix.length), 10);
+  const newNumber = (lastNumber + 1).toString().padStart(5, "0");
+  return `${prefix}${newNumber}`;
 };
 
-// Helper function to create or update leave balances for an employee
-const createLeaveBalances = async (employeeId, positionId) => {
-  const position = await Position.findById(positionId).populate({
-    path: "leavePolicy",
-    populate: {
-      path: "entitlements.leaveType",
-      select: "_id name",
-    },
-  });
+export const getNextEmployeeId = async (req, res, next) => {
+  try {
+    const employeeOf = req.query.employeeOf || "Taj Agri";
+    res.json({ employeeID: await generateEmployeeId(employeeOf) });
+  } catch (err) {
+    next(err);
+  }
+};
 
-  if (!position || !position.leavePolicy) {
-    throw new Error("Position does not have a leave policy assigned");
+const ensureEarnedLeaveType = async () => {
+  return LeaveType.findOneAndUpdate(
+    { name: { $regex: new RegExp(`^${EARNED_LEAVE_NAME}$`, "i") } },
+    {
+      $setOnInsert: {
+        name: EARNED_LEAVE_NAME,
+        isPaid: true,
+        status: "Approved",
+        createdBy: "system",
+      },
+    },
+    { upsert: true, new: true },
+  );
+};
+
+const monthsEligibleForYear = (effectiveDate, year) => {
+  const start = new Date(effectiveDate || Date.UTC(year, 0, 1));
+  const startYear = start.getFullYear();
+  if (startYear > year) return 0;
+  if (startYear < year) return 12;
+
+  const firstMonth = start.getDate() <= 15 ? start.getMonth() : start.getMonth() + 1;
+  return Math.max(0, 12 - firstMonth);
+};
+
+const calculateEntitlementDays = (entitlement, year) => {
+  const annualDays = Number(entitlement.annualDays || 0);
+  if (!entitlement.enabled) return 0;
+  if (entitlement.autoManaged) return 0;
+  if (entitlement.method !== "Prorata") return annualDays;
+  return Math.ceil((annualDays / 12) * monthsEligibleForYear(entitlement.effectiveDate, year));
+};
+
+const normalizeLeaveEntitlements = async (rawEntitlements, effectiveDate) => {
+  const parsed = parseIfString(rawEntitlements) || [];
+  const earnedLeave = await ensureEarnedLeaveType();
+  const entitlements = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(parsed) ? parsed : []) {
+    if (!item?.leaveType || !mongoose.Types.ObjectId.isValid(item.leaveType)) continue;
+    if (item.leaveType.toString() === earnedLeave._id.toString()) continue;
+
+    const leaveType = await LeaveType.findById(item.leaveType);
+    if (!leaveType || leaveType.status !== "Approved") continue;
+    const key = leaveType._id.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const enabled = Boolean(item.enabled);
+    entitlements.push({
+      leaveType: leaveType._id,
+      enabled,
+      annualDays: enabled ? Math.max(0, Number(item.annualDays || 0)) : 0,
+      method: item.method === "Prorata" ? "Prorata" : "Fixed",
+      effectiveDate: item.effectiveDate || effectiveDate || new Date(),
+      autoManaged: false,
+    });
   }
 
-  const currentYear = new Date().getFullYear();
+  entitlements.push({
+    leaveType: earnedLeave._id,
+    enabled: true,
+    annualDays: 0,
+    method: "Fixed",
+    effectiveDate: effectiveDate || new Date(),
+    autoManaged: true,
+  });
+
+  return entitlements;
+};
+
+const normalizeAllowances = async (rawAllowances, effectiveDate) => {
+  const parsed = parseIfString(rawAllowances) || [];
+  const allowances = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(parsed) ? parsed : []) {
+    if (!item?.allowanceComponent || !mongoose.Types.ObjectId.isValid(item.allowanceComponent)) continue;
+
+    const component = await AllowanceComponent.findById(item.allowanceComponent);
+    if (!component || component.status !== "Approved") continue;
+    const key = component._id.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const enabled = Boolean(item.enabled);
+    allowances.push({
+      allowanceComponent: component._id,
+      enabled,
+      amount: enabled ? Math.max(0, Number(item.amount || 0)) : 0,
+      effectiveDate: item.effectiveDate || effectiveDate || new Date(),
+    });
+  }
+
+  return allowances;
+};
+
+const syncLeaveBalancesFromEntitlements = async (employeeId, entitlements, year) => {
   const leaveBalances = [];
 
-  for (const entitlement of position.leavePolicy.entitlements) {
+  for (const entitlement of entitlements || []) {
+    const targetYear = entitlement.autoManaged ? EARNED_LEAVE_YEAR : year;
+    const totalDays = entitlement.autoManaged
+      ? 0
+      : calculateEntitlementDays(entitlement, year);
+    if (!entitlement.enabled && !entitlement.autoManaged) continue;
+
     const existingBalance = await LeaveBalance.findOne({
       employee: employeeId,
-      leaveType: entitlement.leaveType._id,
-      year: currentYear,
+      leaveType: entitlement.leaveType,
+      year: targetYear,
     });
 
     if (existingBalance) {
-      existingBalance.totalDays = entitlement.days;
-      existingBalance.remainingDays = Math.max(
-        0,
-        existingBalance.totalDays - existingBalance.usedDays,
-      );
+      if (!entitlement.autoManaged) {
+        existingBalance.totalDays = totalDays;
+        existingBalance.remainingDays = Math.max(
+          0,
+          existingBalance.totalDays - existingBalance.usedDays,
+        );
+      }
       await existingBalance.save();
       leaveBalances.push(existingBalance);
-    } else {
-      const newBalance = await LeaveBalance.create({
-        employee: employeeId,
-        leaveType: entitlement.leaveType._id,
-        totalDays: entitlement.days,
-        usedDays: 0,
-        remainingDays: entitlement.days,
-        year: currentYear,
-      });
-      leaveBalances.push(newBalance);
+      continue;
     }
+
+    const newBalance = await LeaveBalance.create({
+      employee: employeeId,
+      leaveType: entitlement.leaveType,
+      totalDays,
+      usedDays: 0,
+      remainingDays: totalDays,
+      year: targetYear,
+    });
+    leaveBalances.push(newBalance);
   }
 
   return leaveBalances;
@@ -184,6 +297,31 @@ const validateGuarantors = (guarantors) => {
       true,
     );
     validateCnic(guarantor?.cnic, `Guarantor ${index + 1} CNIC`, true);
+    if (!guarantor?.relation?.trim()) {
+      throw new Error(`Guarantor ${index + 1} relation is required`);
+    }
+  });
+};
+
+const validateReferences = (references) => {
+  if (!Array.isArray(references) || references.length === 0) {
+    throw new Error("At least one reference is required");
+  }
+  references.forEach((ref, index) => {
+    if (!ref?.name?.trim()) {
+      throw new Error(`Reference ${index + 1} name is required`);
+    }
+    validateMobileNumber(
+      ref?.contactNumber,
+      `Reference ${index + 1} contact number`,
+      true,
+    );
+    if (!ref?.relation?.trim()) {
+      throw new Error(`Reference ${index + 1} relation is required`);
+    }
+    if (!ref?.address?.trim()) {
+      throw new Error(`Reference ${index + 1} address is required`);
+    }
   });
 };
 
@@ -195,7 +333,9 @@ export const createEmployee = async (req, res, next) => {
     const {
       position,
       basicSalary,
-      allowancePolicy,
+      employeeOf = "Taj Agri",
+      allowances,
+      leaveEntitlements,
       fullName,
       gender,
       fatherName,
@@ -214,6 +354,7 @@ export const createEmployee = async (req, res, next) => {
       education,
       previousExperience,
       guarantor,
+      references,
       legal,
     } = req.body;
 
@@ -238,6 +379,7 @@ export const createEmployee = async (req, res, next) => {
     const parsedEducation = parseIfString(education) || [];
     const parsedPreviousExperience = parseIfString(previousExperience) || [];
     const parsedGuarantor = parseIfString(guarantor) || [];
+    const parsedReferences = parseIfString(references) || [];
     const parsedLegal = parseIfString(legal) || {};
 
     res.status(400);
@@ -247,6 +389,7 @@ export const createEmployee = async (req, res, next) => {
     validateHusbandName({ gender, maritalStatus, husbandName });
     validateEmergencyContacts(parsedEmergencyContact);
     validateGuarantors(parsedGuarantor);
+    validateReferences(parsedReferences);
 
     // Validate position ID
     if (!mongoose.Types.ObjectId.isValid(position)) {
@@ -254,38 +397,33 @@ export const createEmployee = async (req, res, next) => {
       throw new Error("Invalid position ID");
     }
 
-    // Check if position exists and get leave policy
-    const positionDoc =
-      await Position.findById(position).populate("leavePolicy");
+    // Check if position exists
+    const positionDoc = await Position.findById(position);
     if (!positionDoc) {
       res.status(404);
       throw new Error("Position not found");
     }
 
-    // Validate allowancePolicy (required)
-    if (!allowancePolicy || !allowancePolicy.trim()) {
+    if (!EMPLOYEE_OF_PREFIX[employeeOf]) {
       res.status(400);
-      throw new Error("Allowance policy is required");
+      throw new Error("Employee of must be Taj Agri or YD");
     }
-    if (!mongoose.Types.ObjectId.isValid(allowancePolicy)) {
-      res.status(400);
-      throw new Error("Invalid allowance policy ID");
-    }
-    const apDoc = await AllowancePolicy.findById(allowancePolicy);
-    if (!apDoc) {
-      res.status(404);
-      throw new Error("Allowance policy not found");
-    }
-    const resolvedAllowancePolicy = allowancePolicy;
 
-    // Check employee limit for position
+    const effectiveDate = joiningDate ? new Date(joiningDate) : new Date();
+    const resolvedAllowances = await normalizeAllowances(allowances, effectiveDate);
+    const resolvedLeaveEntitlements = await normalizeLeaveEntitlements(
+      leaveEntitlements,
+      effectiveDate,
+    );
+
+    // Check position limit for position
     const employeeLimitStr = positionDoc.employeeLimit?.trim().toLowerCase();
     if (employeeLimitStr && employeeLimitStr !== "unlimited") {
       const limit = parseInt(employeeLimitStr, 10);
       if (!isNaN(limit) && positionDoc.hiredEmployees >= limit) {
         res.status(400);
         throw new Error(
-          `Employee limit reached for ${positionDoc.name} position. Maximum employees allowed: ${limit}`,
+          `Position limit reached for ${positionDoc.name} position. Maximum employees allowed: ${limit}`,
         );
       }
     }
@@ -300,13 +438,23 @@ export const createEmployee = async (req, res, next) => {
     }
 
     // Generate employee ID
-    const employeeID = await generateEmployeeId();
+    const employeeID = await generateEmployeeId(employeeOf);
 
-    // Handle CNIC image uploads
+    // Handle employee image uploads
+    let employeePicture = null;
     let cnicImages = { front: null, back: null };
 
     if (req.files) {
       try {
+        if (req.files.employeePicture && req.files.employeePicture[0]) {
+          const pictureResult = await uploadToCloudinary(
+            req.files.employeePicture[0].buffer,
+            `taj-hrms/employees/${employeeID}/profile`,
+            "picture",
+          );
+          employeePicture = pictureResult.secure_url;
+        }
+
         if (req.files.cnicFront && req.files.cnicFront[0]) {
           const frontResult = await uploadToCloudinary(
             req.files.cnicFront[0].buffer,
@@ -324,9 +472,27 @@ export const createEmployee = async (req, res, next) => {
           );
           cnicImages.back = backResult.secure_url;
         }
+
+        // Guarantor documents — files arrive aligned to indices in guarantorDocumentIndices
+        if (Array.isArray(req.files.guarantorDocuments)) {
+          const docIndices = parseIfString(req.body.guarantorDocumentIndices) || [];
+          for (let i = 0; i < req.files.guarantorDocuments.length; i++) {
+            const file = req.files.guarantorDocuments[i];
+            if (!file) continue;
+            const slot = docIndices[i] !== undefined ? Number(docIndices[i]) : i;
+            const docResult = await uploadToCloudinary(
+              file.buffer,
+              `taj-hrms/employees/${employeeID}/guarantors`,
+              `guarantor-${slot}`,
+            );
+            if (parsedGuarantor[slot]) {
+              parsedGuarantor[slot].documentUrl = docResult.secure_url;
+            }
+          }
+        }
       } catch (uploadError) {
         res.status(500);
-        throw new Error(`Failed to upload CNIC images: ${uploadError.message}`);
+        throw new Error(`Failed to upload employee images: ${uploadError.message}`);
       }
     }
 
@@ -334,8 +500,10 @@ export const createEmployee = async (req, res, next) => {
     const newEmployee = new Employee({
       employeeID,
       position,
+      employeeOf,
       basicSalary: basicSalary ? Number(basicSalary) : 0,
-      allowancePolicy: resolvedAllowancePolicy,
+      allowances: resolvedAllowances,
+      leaveEntitlements: resolvedLeaveEntitlements,
       status: "Active",
       fullName: fullName.trim(),
       gender,
@@ -345,6 +513,7 @@ export const createEmployee = async (req, res, next) => {
           ? husbandName?.trim() || ""
           : "",
       joiningDate: joiningDate || new Date(),
+      employeePicture,
       cnic: cnic?.trim() || "",
       cnicImages,
       dob: dob || null,
@@ -359,6 +528,7 @@ export const createEmployee = async (req, res, next) => {
       education: parsedEducation,
       previousExperience: parsedPreviousExperience,
       guarantor: parsedGuarantor,
+      references: parsedReferences,
       legal: parsedLegal,
     });
 
@@ -372,16 +542,11 @@ export const createEmployee = async (req, res, next) => {
       $inc: { employeeCount: 1 },
     });
 
-    // Create leave balances based on position's leave policy
-    let leaveBalances = [];
-    try {
-      if (positionDoc.leavePolicy) {
-        leaveBalances = await createLeaveBalances(savedEmployee._id, position);
-      }
-    } catch (leaveError) {
-      console.error("Error creating leave balances:", leaveError.message);
-      // Don't fail the whole request if leave balance creation fails
-    }
+    const leaveBalances = await syncLeaveBalancesFromEntitlements(
+      savedEmployee._id,
+      resolvedLeaveEntitlements,
+      effectiveDate.getFullYear(),
+    );
 
     // Create initial position history record
     await PositionHistory.create({
@@ -392,17 +557,23 @@ export const createEmployee = async (req, res, next) => {
       reason: "Initial assignment on employee creation",
     });
 
-    // Create initial allowance policy history if assigned
-    if (resolvedAllowancePolicy) {
-      await AllowancePolicyHistory.create({
-        employee: savedEmployee._id,
-        fromAllowancePolicy: null,
-        toAllowancePolicy: resolvedAllowancePolicy,
-        changedBy: req.user._id,
-        effectiveDate: new Date(),
-        reason: "Initial assignment on employee creation",
-      });
-    }
+    await EmployeeAllowanceHistory.create({
+      employee: savedEmployee._id,
+      fromAllowances: [],
+      toAllowances: resolvedAllowances,
+      changedBy: req.user._id,
+      effectiveDate,
+      reason: "Initial allowance setup on employee creation",
+    });
+
+    await EmployeeLeaveEntitlementHistory.create({
+      employee: savedEmployee._id,
+      fromEntitlements: [],
+      toEntitlements: resolvedLeaveEntitlements,
+      changedBy: req.user._id,
+      effectiveDate,
+      reason: "Initial leave entitlement setup on employee creation",
+    });
 
     // Populate references for response
     const populatedEmployee = await Employee.findById(savedEmployee._id)
@@ -411,7 +582,8 @@ export const createEmployee = async (req, res, next) => {
         select: "name department",
         populate: { path: "department", select: "name" },
       })
-      .populate("allowancePolicy", "name");
+      .populate("allowances.allowanceComponent", "name")
+      .populate("leaveEntitlements.leaveType", "name");
 
     res.status(201).json({
       employee: populatedEmployee,
@@ -511,7 +683,7 @@ export const getAllEmployees = async (req, res, next) => {
         select: "name department",
         populate: { path: "department", select: "name" },
       })
-      .populate("allowancePolicy", "name")
+      .populate("allowances.allowanceComponent", "name")
       .sort({ createdAt: -1 });
 
     // Only apply skip and limit if limit is greater than 0
@@ -575,20 +747,11 @@ export const getEmployeeById = async (req, res, next) => {
     const employee = await Employee.findById(id)
       .populate({
         path: "position",
-        select: "name department leavePolicy",
-        populate: [
-          { path: "department", select: "name" },
-          { path: "leavePolicy", select: "name" },
-        ],
+        select: "name department",
+        populate: { path: "department", select: "name" },
       })
-      .populate({
-        path: "allowancePolicy",
-        select: "name components",
-        populate: {
-          path: "components.allowanceComponent",
-          select: "name",
-        },
-      });
+      .populate("allowances.allowanceComponent", "name")
+      .populate("leaveEntitlements.leaveType", "name");
 
     if (!employee) {
       res.status(404);
@@ -648,11 +811,14 @@ export const updateEmployee = async (req, res, next) => {
       education,
       previousExperience,
       guarantor,
+      references,
       legal,
       position,
       basicSalary,
+      employeeOf,
+      allowances,
+      leaveEntitlements,
       employmentType,
-      allowancePolicy,
       compensationEffectiveDate,
       compensationChangeReason,
     } = req.body;
@@ -675,6 +841,10 @@ export const updateEmployee = async (req, res, next) => {
       guarantor !== undefined
         ? parseIfString(guarantor) || []
         : employee.guarantor || [];
+    const parsedReferences =
+      references !== undefined
+        ? parseIfString(references) || []
+        : employee.references || [];
     const parsedLegal =
       legal !== undefined ? parseIfString(legal) || {} : employee.legal || {};
     const nextGender = gender || employee.gender;
@@ -690,17 +860,28 @@ export const updateEmployee = async (req, res, next) => {
       basicSalary !== undefined ? Number(basicSalary) || 0 : Number(employee.basicSalary || 0);
     const currentBasicSalary = Number(employee.basicSalary || 0);
 
-    const nextAllowancePolicyCandidate =
-      allowancePolicy !== undefined
-        ? allowancePolicy && allowancePolicy.trim()
-          ? allowancePolicy.trim()
-          : null
-        : employee.allowancePolicy?.toString() || null;
-    const currentAllowancePolicy = employee.allowancePolicy?.toString() || null;
+    const nextAllowanceCandidate =
+      allowances !== undefined
+        ? await normalizeAllowances(allowances, compensationEffectiveDate || new Date())
+        : employee.allowances || [];
+    const currentAllowanceSignature = JSON.stringify(
+      (employee.allowances || []).map((item) => ({
+        allowanceComponent: item.allowanceComponent?.toString(),
+        enabled: Boolean(item.enabled),
+        amount: Number(item.amount || 0),
+      })),
+    );
+    const nextAllowanceSignature = JSON.stringify(
+      nextAllowanceCandidate.map((item) => ({
+        allowanceComponent: item.allowanceComponent?.toString(),
+        enabled: Boolean(item.enabled),
+        amount: Number(item.amount || 0),
+      })),
+    );
 
     const hasCompensationChangeInput =
       nextBasicSalaryCandidate !== currentBasicSalary ||
-      nextAllowancePolicyCandidate !== currentAllowancePolicy;
+      nextAllowanceSignature !== currentAllowanceSignature;
 
     if (hasCompensationChangeInput && !compensationEffectiveDate) {
       res.status(400);
@@ -733,6 +914,9 @@ export const updateEmployee = async (req, res, next) => {
     });
     validateEmergencyContacts(parsedEmergencyContact);
     validateGuarantors(parsedGuarantor);
+    if (references !== undefined) {
+      validateReferences(parsedReferences);
+    }
 
     // Check for duplicate CNIC if changed
     if (cnic && cnic.trim() !== employee.cnic) {
@@ -746,9 +930,18 @@ export const updateEmployee = async (req, res, next) => {
       }
     }
 
-    // Handle CNIC image uploads
+    // Handle employee image uploads
     if (req.files) {
       try {
+        if (req.files.employeePicture && req.files.employeePicture[0]) {
+          const pictureResult = await uploadToCloudinary(
+            req.files.employeePicture[0].buffer,
+            `taj-hrms/employees/${employee.employeeID}/profile`,
+            "picture",
+          );
+          employee.employeePicture = pictureResult.secure_url;
+        }
+
         if (req.files.cnicFront && req.files.cnicFront[0]) {
           const frontResult = await uploadToCloudinary(
             req.files.cnicFront[0].buffer,
@@ -766,9 +959,27 @@ export const updateEmployee = async (req, res, next) => {
           );
           employee.cnicImages.back = backResult.secure_url;
         }
+
+        // Guarantor documents — files arrive aligned to indices in guarantorDocumentIndices
+        if (Array.isArray(req.files.guarantorDocuments)) {
+          const docIndices = parseIfString(req.body.guarantorDocumentIndices) || [];
+          for (let i = 0; i < req.files.guarantorDocuments.length; i++) {
+            const file = req.files.guarantorDocuments[i];
+            if (!file) continue;
+            const slot = docIndices[i] !== undefined ? Number(docIndices[i]) : i;
+            const docResult = await uploadToCloudinary(
+              file.buffer,
+              `taj-hrms/employees/${employee.employeeID}/guarantors`,
+              `guarantor-${slot}-${Date.now()}`,
+            );
+            if (parsedGuarantor[slot]) {
+              parsedGuarantor[slot].documentUrl = docResult.secure_url;
+            }
+          }
+        }
       } catch (uploadError) {
         res.status(500);
-        throw new Error(`Failed to upload CNIC images: ${uploadError.message}`);
+        throw new Error(`Failed to upload employee images: ${uploadError.message}`);
       }
     }
 
@@ -783,32 +994,15 @@ export const updateEmployee = async (req, res, next) => {
         throw new Error("Invalid position ID");
       }
 
-      // Get old position with leave policy
-      const oldPositionDoc = await Position.findById(
-        employee.position,
-      ).populate({
-        path: "leavePolicy",
-        populate: {
-          path: "entitlements.leaveType",
-          select: "_id name",
-        },
-      });
-
-      // Get new position with leave policy
-      const newPositionDoc = await Position.findById(position).populate({
-        path: "leavePolicy",
-        populate: {
-          path: "entitlements.leaveType",
-          select: "_id name",
-        },
-      });
+      const oldPositionDoc = await Position.findById(employee.position);
+      const newPositionDoc = await Position.findById(position);
 
       if (!newPositionDoc) {
         res.status(404);
         throw new Error("Position not found");
       }
 
-      // Check employee limit for new position
+      // Check position limit for new position
       const employeeLimitStr = newPositionDoc.employeeLimit
         ?.trim()
         .toLowerCase();
@@ -817,14 +1011,13 @@ export const updateEmployee = async (req, res, next) => {
         if (!isNaN(limit) && newPositionDoc.hiredEmployees >= limit) {
           res.status(400);
           throw new Error(
-            `Employee limit reached for ${newPositionDoc.name} position. Maximum employees allowed: ${limit}`,
+            `Position limit reached for ${newPositionDoc.name} position. Maximum employees allowed: ${limit}`,
           );
         }
       }
 
       const fromPosition = employee.position;
       const effectiveDate = new Date();
-      const currentYear = effectiveDate.getFullYear();
 
       // Create position history record
       await PositionHistory.create({
@@ -858,107 +1051,6 @@ export const updateEmployee = async (req, res, next) => {
         await Department.findByIdAndUpdate(newDepartmentId, {
           $inc: { employeeCount: 1 },
         });
-      }
-
-      // Handle leave balance adjustments if leave policy changes
-      const oldLeavePolicyId = oldPositionDoc?.leavePolicy?._id?.toString();
-      const newLeavePolicyId = newPositionDoc?.leavePolicy?._id?.toString();
-
-      if (oldLeavePolicyId !== newLeavePolicyId && newPositionDoc.leavePolicy) {
-        // Calculate remaining days in the year from effective date
-        const startOfYear = new Date(currentYear, 0, 1);
-        const endOfYear = new Date(currentYear, 11, 31);
-        const totalDaysInYear =
-          Math.ceil((endOfYear - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
-        const daysRemainingInYear =
-          Math.ceil((endOfYear - effectiveDate) / (1000 * 60 * 60 * 24)) + 1;
-        const prorationFactor = daysRemainingInYear / totalDaysInYear;
-
-        // Get current leave balances for this employee and year
-        const currentBalances = await LeaveBalance.find({
-          employee: id,
-          year: currentYear,
-        });
-
-        const currentBalancesMap = new Map();
-        for (const balance of currentBalances) {
-          currentBalancesMap.set(balance.leaveType.toString(), balance);
-        }
-
-        // Process new leave policy entitlements
-        for (const entitlement of newPositionDoc.leavePolicy.entitlements) {
-          const leaveTypeId = entitlement.leaveType._id.toString();
-          const existingBalance = currentBalancesMap.get(leaveTypeId);
-
-          if (existingBalance) {
-            // Leave type exists in both policies
-            const oldEntitlement =
-              oldPositionDoc?.leavePolicy?.entitlements?.find(
-                (e) => e.leaveType._id.toString() === leaveTypeId,
-              );
-            const oldTotalDays = oldEntitlement?.days || 0;
-            const newTotalDays = entitlement.days;
-
-            if (newTotalDays > oldTotalDays) {
-              // More leaves in new policy - add prorated difference to remaining
-              const additionalDays = Math.round(
-                (newTotalDays - oldTotalDays) * prorationFactor,
-              );
-              existingBalance.totalDays = oldTotalDays + additionalDays;
-              existingBalance.remainingDays = Math.max(
-                0,
-                existingBalance.totalDays - existingBalance.usedDays,
-              );
-              await existingBalance.save();
-              leaveBalanceChanges.push({
-                leaveType: entitlement.leaveType.name,
-                action: "increased",
-                oldTotal: oldTotalDays,
-                newTotal: existingBalance.totalDays,
-                additionalDays,
-              });
-            } else if (newTotalDays < oldTotalDays) {
-              // Fewer leaves in new policy - reduce total but don't affect used days
-              const newProratedTotal =
-                Math.round(newTotalDays * prorationFactor) +
-                existingBalance.usedDays;
-              existingBalance.totalDays = Math.max(
-                existingBalance.usedDays,
-                newProratedTotal,
-              );
-              existingBalance.remainingDays = Math.max(
-                0,
-                existingBalance.totalDays - existingBalance.usedDays,
-              );
-              await existingBalance.save();
-              leaveBalanceChanges.push({
-                leaveType: entitlement.leaveType.name,
-                action: "adjusted",
-                oldTotal: oldTotalDays,
-                newTotal: existingBalance.totalDays,
-              });
-            }
-            // Remove from map to track processed leave types
-            currentBalancesMap.delete(leaveTypeId);
-          } else {
-            // New leave type - create prorated balance
-            const proratedDays = Math.round(entitlement.days * prorationFactor);
-            await LeaveBalance.create({
-              employee: id,
-              leaveType: entitlement.leaveType._id,
-              totalDays: proratedDays,
-              usedDays: 0,
-              remainingDays: proratedDays,
-              year: currentYear,
-            });
-            leaveBalanceChanges.push({
-              leaveType: entitlement.leaveType.name,
-              action: "created",
-              totalDays: proratedDays,
-              note: `Prorated for ${daysRemainingInYear} remaining days in year`,
-            });
-          }
-        }
       }
 
       employee.position = position;
@@ -995,6 +1087,14 @@ export const updateEmployee = async (req, res, next) => {
       }
 
       employee.basicSalary = nextBasicSalary;
+    }
+
+    if (employeeOf !== undefined) {
+      if (!EMPLOYEE_OF_PREFIX[employeeOf]) {
+        res.status(400);
+        throw new Error("Employee of must be Taj Agri or YD");
+      }
+      employee.employeeOf = employeeOf;
     }
 
     // Handle employment type change
@@ -1040,6 +1140,8 @@ export const updateEmployee = async (req, res, next) => {
       employee.previousExperience = parsedPreviousExperience;
     if (guarantor !== undefined)
       employee.guarantor = parsedGuarantor;
+    if (references !== undefined)
+      employee.references = parsedReferences;
     if (legal !== undefined) employee.legal = parsedLegal;
 
     if (
@@ -1049,49 +1151,58 @@ export const updateEmployee = async (req, res, next) => {
       employee.husbandName = "";
     }
 
-    // Handle allowance policy change
-    if (allowancePolicy !== undefined) {
-      const newAllowancePolicyId =
-        allowancePolicy && allowancePolicy.trim() ? allowancePolicy.trim() : null;
+    if (allowances !== undefined && nextAllowanceSignature !== currentAllowanceSignature) {
+      await EmployeeAllowanceHistory.create({
+        employee: id,
+        fromAllowances: employee.allowances || [],
+        toAllowances: nextAllowanceCandidate,
+        changedBy: req.user._id,
+        effectiveDate: parsedCompensationEffectiveDate,
+        reason: compensationChangeReason || "Updated via employee edit form",
+      });
+      employee.allowances = nextAllowanceCandidate;
+    }
 
-      if (newAllowancePolicyId) {
-        if (!mongoose.Types.ObjectId.isValid(newAllowancePolicyId)) {
-          res.status(400);
-          throw new Error("Invalid allowance policy ID");
-        }
-        const apDoc = await AllowancePolicy.findById(newAllowancePolicyId);
-        if (!apDoc) {
-          res.status(404);
-          throw new Error("Allowance policy not found");
-        }
-      }
+    if (leaveEntitlements !== undefined) {
+      const effectiveDate = compensationEffectiveDate || new Date();
+      const nextLeaveEntitlements = await normalizeLeaveEntitlements(
+        leaveEntitlements,
+        effectiveDate,
+      );
+      const currentLeaveSignature = JSON.stringify(
+        (employee.leaveEntitlements || []).map((item) => ({
+          leaveType: item.leaveType?.toString(),
+          enabled: Boolean(item.enabled),
+          annualDays: Number(item.annualDays || 0),
+          method: item.method || "Fixed",
+          autoManaged: Boolean(item.autoManaged),
+        })),
+      );
+      const nextLeaveSignature = JSON.stringify(
+        nextLeaveEntitlements.map((item) => ({
+          leaveType: item.leaveType?.toString(),
+          enabled: Boolean(item.enabled),
+          annualDays: Number(item.annualDays || 0),
+          method: item.method || "Fixed",
+          autoManaged: Boolean(item.autoManaged),
+        })),
+      );
 
-      const oldAllowancePolicyId = employee.allowancePolicy?.toString() || null;
-      if (oldAllowancePolicyId !== newAllowancePolicyId) {
-        if (newAllowancePolicyId) {
-          const existingPolicyHistoryOnSameDate = await AllowancePolicyHistory.findOne({
-            employee: id,
-            effectiveDate: parsedCompensationEffectiveDate,
-            toAllowancePolicy: { $ne: newAllowancePolicyId },
-          });
-
-          if (existingPolicyHistoryOnSameDate) {
-            res.status(400);
-            throw new Error(
-              "A different allowance policy change already exists for the same effective date"
-            );
-          }
-
-          await AllowancePolicyHistory.create({
-            employee: id,
-            fromAllowancePolicy: oldAllowancePolicyId,
-            toAllowancePolicy: newAllowancePolicyId,
-            changedBy: req.user._id,
-            effectiveDate: parsedCompensationEffectiveDate,
-            reason: compensationChangeReason || "Updated via employee edit form",
-          });
-        }
-        employee.allowancePolicy = newAllowancePolicyId;
+      if (currentLeaveSignature !== nextLeaveSignature) {
+        await EmployeeLeaveEntitlementHistory.create({
+          employee: id,
+          fromEntitlements: employee.leaveEntitlements || [],
+          toEntitlements: nextLeaveEntitlements,
+          changedBy: req.user._id,
+          effectiveDate,
+          reason: compensationChangeReason || "Updated via employee edit form",
+        });
+        employee.leaveEntitlements = nextLeaveEntitlements;
+        leaveBalanceChanges = await syncLeaveBalancesFromEntitlements(
+          id,
+          nextLeaveEntitlements,
+          new Date(effectiveDate).getFullYear(),
+        );
       }
     }
 
@@ -1103,7 +1214,8 @@ export const updateEmployee = async (req, res, next) => {
         select: "name department",
         populate: { path: "department", select: "name" },
       })
-      .populate("allowancePolicy", "name");
+      .populate("allowances.allowanceComponent", "name")
+      .populate("leaveEntitlements.leaveType", "name");
 
     res.json({
       employee: populatedEmployee,
@@ -1212,37 +1324,22 @@ export const changeEmployeePosition = async (req, res, next) => {
       throw new Error("Employee not found");
     }
 
-    // Get old position with leave policy
-    const oldPositionDoc = await Position.findById(employee.position).populate({
-      path: "leavePolicy",
-      populate: {
-        path: "entitlements.leaveType",
-        select: "_id name",
-      },
-    });
-
-    // Get new position with leave policy
-    const newPositionDoc = await Position.findById(newPosition).populate({
-      path: "leavePolicy",
-      populate: {
-        path: "entitlements.leaveType",
-        select: "_id name",
-      },
-    });
+    const oldPositionDoc = await Position.findById(employee.position);
+    const newPositionDoc = await Position.findById(newPosition);
 
     if (!newPositionDoc) {
       res.status(404);
       throw new Error("Position not found");
     }
 
-    // Check employee limit for new position
+    // Check position limit for new position
     const employeeLimitStr = newPositionDoc.employeeLimit?.trim().toLowerCase();
     if (employeeLimitStr && employeeLimitStr !== "unlimited") {
       const limit = parseInt(employeeLimitStr, 10);
       if (!isNaN(limit) && newPositionDoc.hiredEmployees >= limit) {
         res.status(400);
         throw new Error(
-          `Employee limit reached for ${newPositionDoc.name} position. Maximum employees allowed: ${limit}`,
+          `Position limit reached for ${newPositionDoc.name} position. Maximum employees allowed: ${limit}`,
         );
       }
     }
@@ -1251,7 +1348,6 @@ export const changeEmployeePosition = async (req, res, next) => {
     const parsedEffectiveDate = effectiveDate
       ? new Date(effectiveDate)
       : new Date();
-    const currentYear = parsedEffectiveDate.getFullYear();
 
     // Create position history record
     await PositionHistory.create({
@@ -1287,112 +1383,6 @@ export const changeEmployeePosition = async (req, res, next) => {
       });
     }
 
-    // Handle leave balance adjustments if leave policy changes
-    let leaveBalanceChanges = [];
-    const oldLeavePolicyId = oldPositionDoc?.leavePolicy?._id?.toString();
-    const newLeavePolicyId = newPositionDoc?.leavePolicy?._id?.toString();
-
-    if (oldLeavePolicyId !== newLeavePolicyId && newPositionDoc.leavePolicy) {
-      // Calculate remaining days in the year from effective date
-      const startOfYear = new Date(currentYear, 0, 1);
-      const endOfYear = new Date(currentYear, 11, 31);
-      const totalDaysInYear =
-        Math.ceil((endOfYear - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
-      const daysRemainingInYear =
-        Math.ceil((endOfYear - parsedEffectiveDate) / (1000 * 60 * 60 * 24)) +
-        1;
-      const prorationFactor = daysRemainingInYear / totalDaysInYear;
-
-      // Get current leave balances for this employee and year
-      const currentBalances = await LeaveBalance.find({
-        employee: id,
-        year: currentYear,
-      });
-
-      const currentBalancesMap = new Map();
-      for (const balance of currentBalances) {
-        currentBalancesMap.set(balance.leaveType.toString(), balance);
-      }
-
-      // Process new leave policy entitlements
-      for (const entitlement of newPositionDoc.leavePolicy.entitlements) {
-        const leaveTypeId = entitlement.leaveType._id.toString();
-        const existingBalance = currentBalancesMap.get(leaveTypeId);
-
-        if (existingBalance) {
-          // Leave type exists in both policies
-          const oldEntitlement =
-            oldPositionDoc?.leavePolicy?.entitlements?.find(
-              (e) => e.leaveType._id.toString() === leaveTypeId,
-            );
-          const oldTotalDays = oldEntitlement?.days || 0;
-          const newTotalDays = entitlement.days;
-
-          if (newTotalDays > oldTotalDays) {
-            // More leaves in new policy - add prorated difference to remaining
-            const additionalDays = Math.round(
-              (newTotalDays - oldTotalDays) * prorationFactor,
-            );
-            existingBalance.totalDays = oldTotalDays + additionalDays;
-            existingBalance.remainingDays = Math.max(
-              0,
-              existingBalance.totalDays - existingBalance.usedDays,
-            );
-            await existingBalance.save();
-            leaveBalanceChanges.push({
-              leaveType: entitlement.leaveType.name,
-              action: "increased",
-              oldTotal: oldTotalDays,
-              newTotal: existingBalance.totalDays,
-              additionalDays,
-            });
-          } else if (newTotalDays < oldTotalDays) {
-            // Fewer leaves in new policy - reduce total but don't affect used days
-            const newProratedTotal =
-              Math.round(newTotalDays * prorationFactor) +
-              existingBalance.usedDays;
-            existingBalance.totalDays = Math.max(
-              existingBalance.usedDays,
-              newProratedTotal,
-            );
-            existingBalance.remainingDays = Math.max(
-              0,
-              existingBalance.totalDays - existingBalance.usedDays,
-            );
-            await existingBalance.save();
-            leaveBalanceChanges.push({
-              leaveType: entitlement.leaveType.name,
-              action: "adjusted",
-              oldTotal: oldTotalDays,
-              newTotal: existingBalance.totalDays,
-            });
-          }
-          // Remove from map to track processed leave types
-          currentBalancesMap.delete(leaveTypeId);
-        } else {
-          // New leave type - create prorated balance
-          const proratedDays = Math.round(entitlement.days * prorationFactor);
-          await LeaveBalance.create({
-            employee: id,
-            leaveType: entitlement.leaveType._id,
-            totalDays: proratedDays,
-            usedDays: 0,
-            remainingDays: proratedDays,
-            year: currentYear,
-          });
-          leaveBalanceChanges.push({
-            leaveType: entitlement.leaveType.name,
-            action: "created",
-            totalDays: proratedDays,
-            note: `Prorated for ${daysRemainingInYear} remaining days in year`,
-          });
-        }
-      }
-
-      // Leave types no longer in new policy - keep them but mark as frozen (no new accrual)
-      // We don't delete used balances as employee may have already used some leaves
-    }
-
     // Update employee
     employee.position = newPosition;
     const updatedEmployee = await employee.save();
@@ -1400,17 +1390,13 @@ export const changeEmployeePosition = async (req, res, next) => {
     const populatedEmployee = await Employee.findById(updatedEmployee._id)
       .populate({
         path: "position",
-        select: "name department allowancePolicy",
-        populate: [
-          { path: "department", select: "name" },
-          { path: "allowancePolicy", select: "name" },
-        ],
+        select: "name department",
+        populate: { path: "department", select: "name" },
       });
 
     res.json({
       message: "Employee position changed successfully",
       employee: populatedEmployee,
-      leaveBalanceChanges,
       effectiveDate: parsedEffectiveDate,
     });
   } catch (err) {
@@ -1457,7 +1443,7 @@ export const getEmployeePositionHistory = async (req, res, next) => {
   }
 };
 
-// @description     Get employee compensation history (salary + allowance policy)
+// @description     Get employee compensation history (salary + allowances)
 // @route           GET /api/employees/:id/compensation-history
 // @access          Admin
 export const getEmployeeCompensationHistory = async (req, res, next) => {
@@ -1475,13 +1461,13 @@ export const getEmployeeCompensationHistory = async (req, res, next) => {
       throw new Error("Employee not found");
     }
 
-    const [basicSalaryHistory, allowancePolicyHistory] = await Promise.all([
+    const [basicSalaryHistory, allowanceHistory] = await Promise.all([
       BasicSalaryHistory.find({ employee: id })
         .populate("changedBy", "name")
         .sort({ effectiveDate: -1, changedAt: -1 }),
-      AllowancePolicyHistory.find({ employee: id })
-        .populate("fromAllowancePolicy", "name")
-        .populate("toAllowancePolicy", "name")
+      EmployeeAllowanceHistory.find({ employee: id })
+        .populate("fromAllowances.allowanceComponent", "name")
+        .populate("toAllowances.allowanceComponent", "name")
         .populate("changedBy", "name")
         .sort({ effectiveDate: -1, changedAt: -1 }),
     ]);
@@ -1493,7 +1479,7 @@ export const getEmployeeCompensationHistory = async (req, res, next) => {
         employeeID: employee.employeeID,
       },
       basicSalaryHistory,
-      allowancePolicyHistory,
+      allowanceHistory,
     });
   } catch (err) {
     console.log(err);
@@ -1546,27 +1532,11 @@ export const renewEmployeeLeaveBalances = async (req, res, next) => {
 
     const targetYear = year || new Date().getFullYear();
 
-    const employee = await Employee.findById(id).populate({
-      path: "position",
-      populate: {
-        path: "leavePolicy",
-        populate: {
-          path: "entitlements.leaveType",
-          select: "_id name",
-        },
-      },
-    });
+    const employee = await Employee.findById(id).populate("leaveEntitlements.leaveType", "name");
 
     if (!employee) {
       res.status(404);
       throw new Error("Employee not found");
-    }
-
-    if (!employee.position?.leavePolicy) {
-      res.status(400);
-      throw new Error(
-        "Employee's position does not have a leave policy assigned",
-      );
     }
 
     // Check if leave balances already exist for this year
@@ -1582,22 +1552,15 @@ export const renewEmployeeLeaveBalances = async (req, res, next) => {
       );
     }
 
-    // Create new leave balances based on current position's leave policy
-    const newBalances = [];
-    for (const entitlement of employee.position.leavePolicy.entitlements) {
-      const balance = await LeaveBalance.create({
-        employee: id,
-        leaveType: entitlement.leaveType._id,
-        totalDays: entitlement.days,
-        usedDays: 0,
-        remainingDays: entitlement.days,
-        year: targetYear,
-      });
-      newBalances.push({
-        leaveType: entitlement.leaveType.name,
-        totalDays: entitlement.days,
-      });
-    }
+    const createdBalances = await syncLeaveBalancesFromEntitlements(
+      id,
+      employee.leaveEntitlements,
+      targetYear,
+    );
+    const newBalances = createdBalances.map((balance) => ({
+      leaveType: balance.leaveType?.name || balance.leaveType?.toString(),
+      totalDays: balance.totalDays,
+    }));
 
     res.status(201).json({
       message: `Leave balances renewed for year ${targetYear}`,
@@ -1623,17 +1586,10 @@ export const renewAllEmployeesLeaveBalances = async (req, res, next) => {
     const { year } = req.body;
     const targetYear = year || new Date().getFullYear();
 
-    // Get all active employees with their positions and leave policies
-    const employees = await Employee.find({ status: "Active" }).populate({
-      path: "position",
-      populate: {
-        path: "leavePolicy",
-        populate: {
-          path: "entitlements.leaveType",
-          select: "_id name",
-        },
-      },
-    });
+    const employees = await Employee.find({ status: "Active" }).populate(
+      "leaveEntitlements.leaveType",
+      "name",
+    );
 
     const results = {
       success: [],
@@ -1643,11 +1599,11 @@ export const renewAllEmployeesLeaveBalances = async (req, res, next) => {
 
     for (const employee of employees) {
       try {
-        if (!employee.position?.leavePolicy) {
+        if (!employee.leaveEntitlements?.length) {
           results.skipped.push({
             employeeID: employee.employeeID,
             fullName: employee.fullName,
-            reason: "No leave policy assigned to position",
+            reason: "No leave entitlements configured",
           });
           continue;
         }
@@ -1667,24 +1623,16 @@ export const renewAllEmployeesLeaveBalances = async (req, res, next) => {
           continue;
         }
 
-        // Create new leave balances
-        const balancesToCreate = employee.position.leavePolicy.entitlements.map(
-          (entitlement) => ({
-            employee: employee._id,
-            leaveType: entitlement.leaveType._id,
-            totalDays: entitlement.days,
-            usedDays: 0,
-            remainingDays: entitlement.days,
-            year: targetYear,
-          }),
+        const createdBalances = await syncLeaveBalancesFromEntitlements(
+          employee._id,
+          employee.leaveEntitlements,
+          targetYear,
         );
-
-        await LeaveBalance.insertMany(balancesToCreate);
 
         results.success.push({
           employeeID: employee.employeeID,
           fullName: employee.fullName,
-          balancesCreated: balancesToCreate.length,
+          balancesCreated: createdBalances.length,
         });
       } catch (error) {
         results.errors.push({

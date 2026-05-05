@@ -153,6 +153,15 @@ const AttendanceCellEditModal = ({
   );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Split-shift segment state — populated when selected shift has 2 segments
+  const initialSegments = Array.isArray(record?.segments) && record.segments.length === 2
+    ? record.segments
+    : null;
+  const [seg1In, setSeg1In] = useState(() => toTimeStr(initialSegments?.[0]?.checkIn) || "");
+  const [seg1Out, setSeg1Out] = useState(() => toTimeStr(initialSegments?.[0]?.checkOut) || "");
+  const [seg2In, setSeg2In] = useState(() => toTimeStr(initialSegments?.[1]?.checkIn) || "");
+  const [seg2Out, setSeg2Out] = useState(() => toTimeStr(initialSegments?.[1]?.checkOut) || "");
+
   // The actual stored status value derived from mainStatus + modifier
   const effectiveStatus = mainStatus === "Present" && modifier !== "None" ? modifier : mainStatus;
 
@@ -255,15 +264,36 @@ const AttendanceCellEditModal = ({
     const checkInISO = combineDateAndTime(dateStr, checkInTime);
     const checkOutISO = combineDateAndTime(dateStr, checkOutTime);
 
+    // Status that suppresses time tracking
+    const isTimeless = mainStatus === "Absent" || mainStatus === "Off" || mainStatus === "Leave";
+
+    // Build segments payload for split shifts
+    const selShift = shiftsList.find((s) => s._id === shiftId);
+    const isSplit = !!selShift && Array.isArray(selShift.segments) && selShift.segments.length === 2;
+    let segmentsPayload;
+    if (isSplit && !isTimeless) {
+      segmentsPayload = [
+        {
+          checkIn: combineDateAndTime(dateStr, seg1In),
+          checkOut: combineDateAndTime(dateStr, seg1Out),
+        },
+        {
+          checkIn: combineDateAndTime(dateStr, seg2In),
+          checkOut: combineDateAndTime(dateStr, seg2Out),
+        },
+      ];
+    }
+
     if (isNewRecord) {
       createMutation.mutate({
         employeeId,
         date: dateStr,
         status: effectiveStatus,
         shiftId: shiftId || undefined,
-        checkIn: checkInISO || undefined,
-        checkOut: checkOutISO || undefined,
+        checkIn: isSplit || isTimeless ? undefined : (checkInISO || undefined),
+        checkOut: isSplit || isTimeless ? undefined : (checkOutISO || undefined),
         lateDurationMinutes: effectiveStatus === "Late" ? Number(lateDurationMinutes) || 0 : 0,
+        segments: segmentsPayload,
       });
     } else {
       updateMutation.mutate({
@@ -271,9 +301,10 @@ const AttendanceCellEditModal = ({
         payload: {
           status: effectiveStatus,
           shiftId: shiftId || null,
-          checkIn: checkInISO || null,
-          checkOut: checkOutISO || null,
+          checkIn: isSplit || isTimeless ? null : (checkInISO || null),
+          checkOut: isSplit || isTimeless ? null : (checkOutISO || null),
           lateDurationMinutes: effectiveStatus === "Late" ? Number(lateDurationMinutes) || 0 : 0,
+          segments: segmentsPayload,
         },
       });
     }
@@ -296,6 +327,40 @@ const AttendanceCellEditModal = ({
   // ---------------------------------------------------------------------------
 
   const selectedShiftObj = shiftsList.find((s) => s._id === shiftId);
+
+  const isSplitShiftSelected =
+    !!selectedShiftObj &&
+    Array.isArray(selectedShiftObj.segments) &&
+    selectedShiftObj.segments.length === 2;
+
+  const dayNameForOff = date
+    ? date.toLocaleString("en-GB", { weekday: "long", timeZone: "UTC" })
+    : "";
+  const isOffDayForSelectedShift =
+    selectedShiftObj && dayNameForOff
+      ? !(selectedShiftObj.workingDays || []).includes(dayNameForOff)
+      : false;
+
+  // Auto-fill segment times when shift becomes split or check-in/out changes
+  const segShift1Start = selectedShiftObj?.segments?.[0]?.startTime;
+  const segShift1End = selectedShiftObj?.segments?.[0]?.endTime;
+  const segShift2Start = selectedShiftObj?.segments?.[1]?.startTime;
+  const segShift2End = selectedShiftObj?.segments?.[1]?.endTime;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const _ = useMemo(() => {
+    if (!isSplitShiftSelected) return null;
+    if (!seg1In && segShift1Start) setSeg1In(segShift1Start.slice(0, 5));
+    if (!seg1Out && segShift1End) setSeg1Out(segShift1End.slice(0, 5));
+    if (!seg2In && segShift2Start) setSeg2In(segShift2Start.slice(0, 5));
+    if (!seg2Out && segShift2End) setSeg2Out(segShift2End.slice(0, 5));
+    return null;
+  }, [isSplitShiftSelected, segShift1Start, segShift1End, segShift2Start, segShift2End]);
+
+  // Off-day rule: if off-day, force status to Present and lock to Present-only
+  if (isOffDayForSelectedShift && mainStatus !== "Present" && mainStatus !== "Leave") {
+    // schedule synchronous correction (avoid setState during render)
+    queueMicrotask(() => setMainStatus("Present"));
+  }
 
   const halfDayEarlyMinutes = useMemo(() => {
     if (!selectedShiftObj?.endTime || !checkOutTime) return 0;
@@ -465,15 +530,19 @@ const AttendanceCellEditModal = ({
             {/* Status */}
             <div className="grid gap-2">
               <Label>Status</Label>
-              <Select value={mainStatus} onValueChange={(val) => { setMainStatus(val); if (val !== "Present") setModifier("None"); }} disabled={isApprovedLeaveLocked}>
+              <Select value={mainStatus} onValueChange={(val) => { setMainStatus(val); if (val !== "Present") { setModifier("None"); setLateDurationMinutes(0); } }} disabled={isApprovedLeaveLocked}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="Present">Present</SelectItem>
-                    <SelectItem value="Absent">Absent</SelectItem>
-                    <SelectItem value="Off">Off</SelectItem>
+                    {!isOffDayForSelectedShift && (
+                      <SelectItem value="Absent">Absent</SelectItem>
+                    )}
+                    {!isOffDayForSelectedShift && (
+                      <SelectItem value="Off">Off</SelectItem>
+                    )}
                     {mainStatus === "Leave" && (
                       <SelectItem value="Leave" disabled>
                         Leave
@@ -484,8 +553,8 @@ const AttendanceCellEditModal = ({
               </Select>
             </div>
 
-            {/* Modifier (only when Present) */}
-            {mainStatus === "Present" && (
+            {/* Modifier (only when Present and not a split shift) */}
+            {mainStatus === "Present" && !isSplitShiftSelected && (
               <div className="grid gap-2">
                 <Label>Attendance Modifier</Label>
                 <Select value={modifier} onValueChange={handleModifierChange} disabled={isApprovedLeaveLocked}>
@@ -502,6 +571,18 @@ const AttendanceCellEditModal = ({
                 </Select>
               </div>
             )}
+
+            {/* Resolved status preview */}
+            <p className="rounded-md border border-input bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Resolved status:{" "}
+              <span className="font-medium text-foreground">{effectiveStatus}</span>
+              {effectiveStatus === "Late" && lateDurationMinutes > 0 ? (
+                <span> · {lateDurationMinutes} min late</span>
+              ) : null}
+              {effectiveStatus === "Half Day" && halfDayEarlyMinutes > 0 ? (
+                <span> · left {halfDayEarlyMinutes} min early</span>
+              ) : null}
+            </p>
 
             {/* Shift */}
             <div className="grid gap-2">
@@ -524,12 +605,18 @@ const AttendanceCellEditModal = ({
                           — No shift selected —
                         </span>
                       </SelectItem>
-                      {shiftsList.map((shift) => (
-                        <SelectItem key={shift._id} value={shift._id}>
-                          {shift.name} ({formatTimeToAMPM(shift.startTime)} —{" "}
-                          {formatTimeToAMPM(shift.endTime)})
-                        </SelectItem>
-                      ))}
+                      {shiftsList.map((shift) => {
+                        const isSplit =
+                          Array.isArray(shift.segments) && shift.segments.length === 2;
+                        return (
+                          <SelectItem key={shift._id} value={shift._id}>
+                            {shift.name}{" "}
+                            {isSplit
+                              ? `(${formatTimeToAMPM(shift.segments[0].startTime)}–${formatTimeToAMPM(shift.segments[0].endTime)} | ${formatTimeToAMPM(shift.segments[1].startTime)}–${formatTimeToAMPM(shift.segments[1].endTime)})`
+                              : `(${formatTimeToAMPM(shift.startTime)} — ${formatTimeToAMPM(shift.endTime)})`}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -548,31 +635,84 @@ const AttendanceCellEditModal = ({
               )}
             </div>
 
-            {/* Check In */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="checkIn">Check In</Label>
-                <input
-                  id="checkIn"
-                  type="time"
-                  value={checkInTime}
-                  onChange={(e) => handleCheckInChange(e.target.value)}
-                  disabled={isApprovedLeaveLocked}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="checkOut">Check Out</Label>
-                <input
-                  id="checkOut"
-                  type="time"
-                  value={checkOutTime}
-                  onChange={(e) => handleCheckOutChange(e.target.value)}
-                  disabled={isApprovedLeaveLocked}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-            </div>
+            {/* Check In / Out — hidden when Absent/Off; split-shift shows segments */}
+            {mainStatus !== "Absent" && mainStatus !== "Off" && (
+              isSplitShiftSelected ? (
+                <div className="grid gap-3">
+                  <div className="grid gap-2">
+                    <Label className="text-foreground text-xs uppercase tracking-wide">
+                      Segment 1
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="time"
+                        value={seg1In}
+                        onChange={(e) => setSeg1In(e.target.value)}
+                        disabled={isApprovedLeaveLocked}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                      <input
+                        type="time"
+                        value={seg1Out}
+                        onChange={(e) => setSeg1Out(e.target.value)}
+                        disabled={isApprovedLeaveLocked}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-foreground text-xs uppercase tracking-wide">
+                      Segment 2
+                    </Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="time"
+                        value={seg2In}
+                        onChange={(e) => setSeg2In(e.target.value)}
+                        disabled={isApprovedLeaveLocked}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                      <input
+                        type="time"
+                        value={seg2Out}
+                        onChange={(e) => setSeg2Out(e.target.value)}
+                        disabled={isApprovedLeaveLocked}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Status is computed automatically: both segments attended →
+                    Present; one missing → Half Day; both missing → Absent.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="checkIn">Check In</Label>
+                    <input
+                      id="checkIn"
+                      type="time"
+                      value={checkInTime}
+                      onChange={(e) => handleCheckInChange(e.target.value)}
+                      disabled={isApprovedLeaveLocked}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="checkOut">Check Out</Label>
+                    <input
+                      id="checkOut"
+                      type="time"
+                      value={checkOutTime}
+                      onChange={(e) => handleCheckOutChange(e.target.value)}
+                      disabled={isApprovedLeaveLocked}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+                </div>
+              )
+            )}
 
             {/* Late Duration (shown when modifier is Late) */}
             {effectiveStatus === "Late" && (

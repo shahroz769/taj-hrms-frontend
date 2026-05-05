@@ -544,3 +544,35 @@
   pointer-events: none;
   z-index: 1;
 }
+
+.cornerBadgeHoliday {
+  position: absolute;
+  bottom: -7px;
+  right: -12px;
+  background-color: #ecfeff;
+  color: #0e7490;
+  border: 1px solid #67e8f9;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cornerBadgeSplit {
+  position: absolute;
+  top: -7px;
+  left: -12px;
+  background-color: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+  font-size: 8px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}

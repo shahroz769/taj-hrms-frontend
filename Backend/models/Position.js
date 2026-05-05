@@ -16,14 +16,9 @@ const positionSchema = new mongoose.Schema(
     reportsTo: {
       type: String,
     },
-    leavePolicy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "LeavePolicy",
-      required: true,
-    },
     employeeLimit: {
       type: String,
-      required: [true, "Employee Limit is required"],
+      required: [true, "Position limit is required"],
     },
     hiredEmployees: {
       type: Number,

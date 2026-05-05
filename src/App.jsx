@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import DepartmentsSetups from "./pages/Setups/DepartmentsSetups";
 import PositionsSetups from "./pages/Setups/PositionsSetups";
 import ShiftsSetups from "./pages/Setups/ShiftsSetups";
+import AttendanceRulesSetups from "./pages/Setups/AttendanceRulesSetups";
 import AllEmployees from "./pages/Workforce/AllEmployees";
 import AddEmployee from "./pages/Workforce/AddEmployee";
 import EditEmployee from "./pages/Workforce/EditEmployee";
@@ -20,7 +21,6 @@ import ContractPayments from "./pages/Workforce/ContractPayments";
 import AttendanceRecords from "./pages/Attendance/AttendanceRecords";
 import LeavesApplications from "./pages/Leaves/LeavesApplications";
 import LeavesTypes from "./pages/Leaves/LeavesTypes";
-import LeavesPolicies from "./pages/Leaves/LeavesPolicies";
 import WorkProgressReports from "./pages/Compliance/WorkProgressReports";
 import DisciplinaryActions from "./pages/Compliance/DisciplinaryActions";
 import WarningTypes from "./pages/Compliance/WarningTypes";
@@ -35,7 +35,6 @@ import AuthLayout from "./layouts/AuthLayout";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { Toaster } from "@/components/ui/sonner";
 import AllowanceComponents from "./pages/Allowances/AllowanceComponents";
-import AllowancePolicies from "./pages/Allowances/AllowancePolicies";
 
 function App() {
   const dispatch = useDispatch();
@@ -91,6 +90,10 @@ function App() {
                 />
                 <Route path="/setups/positions" element={<PositionsSetups />} />
                 <Route path="/setups/shifts" element={<ShiftsSetups />} />
+                <Route
+                  path="/setups/attendance-rules"
+                  element={<AttendanceRulesSetups />}
+                />
               </Route>
 
               <Route
@@ -136,7 +139,6 @@ function App() {
 
                 {/* Leaves */}
                 <Route path="/leaves/types" element={<LeavesTypes />} />
-                <Route path="/leaves/policies" element={<LeavesPolicies />} />
                 <Route
                   path="/leaves/applications"
                   element={<LeavesApplications />}
@@ -146,10 +148,6 @@ function App() {
                 <Route
                   path="/allowances/components"
                   element={<AllowanceComponents />}
-                />
-                <Route
-                  path="/allowances/policies"
-                  element={<AllowancePolicies />}
                 />
                 <Route path="/salary/payroll" element={<PayrollMonths />} />
                 <Route path="/salary/payroll/:year/:month" element={<Payroll />} />

@@ -328,7 +328,7 @@ export const getEmployeesByShift = async (req, res, next) => {
 export const getShiftsList = async (req, res, next) => {
   try {
     const shifts = await Shift.find({ status: "Approved" })
-      .select("name startTime endTime workingDays")
+      .select("name startTime endTime workingDays segments isSplit")
       .sort({ name: 1 });
 
     res.json({ shifts });
@@ -366,7 +366,7 @@ export const getEmployeeShiftOnDate = async (req, res, next) => {
       effectiveDate: { $lte: targetDate },
       $or: [{ endDate: null }, { endDate: { $gte: new Date(date) } }],
     })
-      .populate("shift", "name startTime endTime workingDays")
+      .populate("shift", "name startTime endTime workingDays segments isSplit")
       .sort({ effectiveDate: -1 });
 
     res.json({

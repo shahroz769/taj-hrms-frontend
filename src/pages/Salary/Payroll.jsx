@@ -420,13 +420,14 @@ const Payroll = () => {
       render: (row) => `${monthLabel(row.month)} (${row.year || "-"})`,
     },
     {
-      key: "employeeNameId",
-      label: "Employee Name (ID)",
-      render: (row) => {
-        const fullName = row.employeeSnapshot?.fullName || "-";
-        const employeeID = row.employeeSnapshot?.employeeID || "-";
-        return `${fullName} (${employeeID})`;
-      },
+      key: "employeeID",
+      label: "Employee ID",
+      render: (row) => row.employeeSnapshot?.employeeID || "-",
+    },
+    {
+      key: "employeeName",
+      label: "Employee Name",
+      render: (row) => row.employeeSnapshot?.fullName || "-",
     },
     {
       key: "basicSalary",

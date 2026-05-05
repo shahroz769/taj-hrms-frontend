@@ -100,7 +100,6 @@ import {
   fetchEmployeeLeaveBalance,
 } from "@/services/leaveApplicationsApi";
 import { fetchEmployeesList } from "@/services/employeesApi";
-import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
 
 // Utils
 import { formatDate } from "@/utils/dateUtils";
@@ -265,13 +264,6 @@ const LeavesApplications = () => {
     placeholderData: (previous) => previous,
   });
 
-  // Fetch Leave Types List (for dropdown)
-  const { data: leaveTypesData } = useQuery({
-    queryKey: ["leave-types-list"],
-    queryFn: fetchLeaveTypesList,
-    enabled: dialogOpen,
-  });
-
   // Fetch Employee Leave Balance
   const { data: balanceData, isPending: balanceLoading } = useQuery({
     queryKey: ["employee-leave-balance", selectedEmployeeId],
@@ -282,10 +274,6 @@ const LeavesApplications = () => {
   const employeesList = useMemo(
     () => employeesData?.employees || [],
     [employeesData]
-  );
-  const leaveTypesList = useMemo(
-    () => leaveTypesData || [],
-    [leaveTypesData]
   );
   const balances = useMemo(
     () => balanceData?.balances || [],
@@ -405,14 +393,15 @@ const LeavesApplications = () => {
   // ===========================================================================
   const columns = [
     {
-      key: "employee",
-      label: "Employee",
+      key: "employeeID",
+      label: "Employee ID",
+      render: (row) => row.employee?.employeeID || "-",
+    },
+    {
+      key: "employeeName",
+      label: "Employee Name",
       fontWeight: "medium",
-      render: (row) => {
-        const name = row.employee?.fullName || "-";
-        const id = row.employee?.employeeID || "";
-        return id ? `${name} (${id})` : name;
-      },
+      render: (row) => row.employee?.fullName || "-",
     },
     {
       key: "leaveType",
@@ -876,11 +865,23 @@ const LeavesApplications = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {leaveTypesList.map((lt) => (
-                          <SelectItem key={lt._id} value={lt._id}>
-                            {lt.name}
-                          </SelectItem>
-                        ))}
+                        {balances.map((balance) => {
+                          const remaining = Number(balance.remainingDays || 0);
+                          const total = Number(balance.totalDays || 0);
+                          return (
+                            <SelectItem
+                              key={balance.leaveType._id}
+                              value={balance.leaveType._id}
+                            >
+                              <span className="flex items-center justify-between gap-3 w-full">
+                                <span>{balance.leaveType.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {remaining.toFixed(1)} / {total.toFixed(1)} days
+                                </span>
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectGroup>
                     </SelectContent>
                   </Select>

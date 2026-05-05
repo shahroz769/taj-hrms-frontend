@@ -33,10 +33,12 @@ const upload = multer({
   },
 });
 
-// Middleware for uploading CNIC images (front and back)
-export const uploadCnicImages = upload.fields([
+// Middleware for uploading employee images (picture and CNIC front/back)
+export const uploadEmployeeImages = upload.fields([
+  { name: "employeePicture", maxCount: 1 },
   { name: "cnicFront", maxCount: 1 },
   { name: "cnicBack", maxCount: 1 },
+  { name: "guarantorDocuments", maxCount: 10 },
 ]);
 
 // Error handling middleware for multer
@@ -50,7 +52,7 @@ export const handleMulterError = (err, req, res, next) => {
     if (err.code === "LIMIT_UNEXPECTED_FILE") {
       return res.status(400).json({
         message:
-          "Unexpected file field. Only cnicFront and cnicBack are allowed.",
+          "Unexpected file field. Only employeePicture, cnicFront, cnicBack and guarantorDocuments are allowed.",
       });
     }
     return res.status(400).json({

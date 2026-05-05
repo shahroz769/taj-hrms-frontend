@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+const attendanceSegmentSchema = new mongoose.Schema(
+  {
+    checkIn: { type: Date, default: null },
+    checkOut: { type: Date, default: null },
+    lateDurationMinutes: { type: Number, default: 0 },
+    // Per-segment status: "Present" | "Late" | "Half Day" | "Absent" | "Missed"
+    // "Missed" = employee did not check in for this segment.
+    status: { type: String, default: "Missed" },
+  },
+  { _id: false },
+);
+
 const attendanceSchema = new mongoose.Schema(
   {
     employee: {
@@ -51,6 +63,16 @@ const attendanceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "LeaveApplication",
       default: null,
+    },
+    workingOnHoliday: {
+      type: Boolean,
+      default: false,
+    },
+    // Split-shift segment-level attendance (when shift.isSplit === true).
+    // For non-split shifts this is undefined and the top-level checkIn/checkOut fields apply.
+    segments: {
+      type: [attendanceSegmentSchema],
+      default: undefined,
     },
     markedBy: {
       type: mongoose.Schema.Types.ObjectId,

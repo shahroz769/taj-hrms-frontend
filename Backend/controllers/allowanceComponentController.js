@@ -1,5 +1,5 @@
 import AllowanceComponent from "../models/AllowanceComponent.js";
-import AllowancePolicy from "../models/AllowancePolicy.js";
+import Employee from "../models/Employee.js";
 import mongoose from "mongoose";
 import { ROLES } from "../utils/roles.js";
 
@@ -241,17 +241,15 @@ export const deleteAllowanceComponent = async (req, res, next) => {
       throw new Error("Allowance component not found");
     }
 
-    // Check if allowance component is used in any allowance policies
-    const allowancePolicyCount = await AllowancePolicy.countDocuments({
-      "components.allowanceComponent": id,
+    // Check if allowance component is used by any employee allowance setup
+    const employeeCount = await Employee.countDocuments({
+      "allowances.allowanceComponent": id,
     });
 
-    if (allowancePolicyCount > 0) {
+    if (employeeCount > 0) {
       res.status(400);
       throw new Error(
-        `Cannot delete allowance component. It is currently used in ${allowancePolicyCount} allowance ${
-          allowancePolicyCount === 1 ? "policy" : "policies"
-        }. Please remove it from all allowance policies first.`
+        `Cannot delete allowance component. It is currently assigned to ${employeeCount} employee(s). Please remove it from employees first.`,
       );
     }
 

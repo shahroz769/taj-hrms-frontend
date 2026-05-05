@@ -5,8 +5,11 @@ import Employee from "../models/Employee.js";
 import EmployeeShift from "../models/EmployeeShift.js";
 import Shift from "../models/Shift.js";
 import LeaveApplication from "../models/LeaveApplication.js";
+import LeaveType from "../models/LeaveType.js";
+import LeaveBalance from "../models/LeaveBalance.js";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { PAKISTAN_TZ } from "../utils/timezone.js";
+import { getAttendanceRules } from "./attendanceRuleController.js";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -85,13 +88,172 @@ const getEmploymentBoundaryError = (dateUTC, employee) => {
   return null;
 };
 
-const ATTENDANCE_RULES = {
+// Fallback values used when no rules document is provided. The live values
+// come from the AttendanceRule singleton via getAttendanceRules().
+const DEFAULT_ATTENDANCE_RULES = {
   graceMinutes: 15,
+  earlyCheckInMinutes: 30,
   absentAfterLateMinutes: 60,
-  halfDayEarlyLeaveMinutes: 60,
+  halfDayEarlyCheckOutMinutes: 60,
+  lateCheckOutMinutes: 30,
 };
 
 const TIMED_STATUSES = ["Present", "Late", "Half Day"];
+const EARNED_LEAVE_NAME = "Earned Leave";
+const EARNED_LEAVE_YEAR = 0;
+
+// ---------------------------------------------------------------------------
+// Split-shift helpers
+// ---------------------------------------------------------------------------
+
+const isSplitShift = (shift) =>
+  !!shift && Array.isArray(shift.segments) && shift.segments.length === 2;
+
+const getShiftSegments = (shift) => {
+  if (!shift) return [];
+  if (Array.isArray(shift.segments) && shift.segments.length > 0) {
+    return shift.segments;
+  }
+  // Legacy single-segment shifts: synthesize one segment from startTime/endTime
+  if (shift.startTime && shift.endTime) {
+    return [{ startTime: shift.startTime, endTime: shift.endTime }];
+  }
+  return [];
+};
+
+/**
+ * Given a list of incoming segment objects { checkIn, checkOut } and the shift
+ * segment definitions, compute per-segment status and the overall day status.
+ *
+ * Rules (per agreed specification):
+ *  - Both segments fully attended (checkIn AND checkOut on each)         -> Present (modulated by Late/Half Day)
+ *  - Exactly one segment attended (checkIn AND checkOut on that segment) -> Half Day
+ *  - Neither segment attended                                            -> Absent
+ *  - A segment with check-in delayed >= absentAfterLateMinutes counts as missed.
+ *  - Late on any segment >= graceMinutes -> overall day "Late" (still counts as attended).
+ *  - Early checkout on any segment by >= halfDayEarlyCheckOutMinutes -> overall "Half Day".
+ */
+const computeSplitShiftStatus = ({
+  shift,
+  date,
+  inputSegments,
+  rules,
+  requestedStatus,
+}) => {
+  const activeRules = rules || DEFAULT_ATTENDANCE_RULES;
+  const nonTimedStatuses = ["Leave", "Off", "Absent"];
+  if (requestedStatus && nonTimedStatuses.includes(requestedStatus)) {
+    return {
+      status: requestedStatus,
+      segments: [],
+      lateDurationMinutes: 0,
+    };
+  }
+
+  const shiftSegments = getShiftSegments(shift);
+  if (shiftSegments.length !== 2) {
+    return null; // not a split shift
+  }
+
+  const inputs = [0, 1].map((i) => inputSegments?.[i] || {});
+
+  const segmentResults = shiftSegments.map((seg, idx) => {
+    const segStart = buildDateTimeFromShiftTime(date, seg.startTime);
+    const segEnd = buildDateTimeFromShiftTime(date, seg.endTime);
+    const inp = inputs[idx] || {};
+    const checkIn = inp.checkIn ? safeDateParse(inp.checkIn) : null;
+    const checkOut = inp.checkOut ? safeDateParse(inp.checkOut) : null;
+
+    if (!checkIn || !checkOut) {
+      return {
+        startTime: seg.startTime,
+        endTime: seg.endTime,
+        checkIn: null,
+        checkOut: null,
+        lateDurationMinutes: 0,
+        status: "Missed",
+        attended: false,
+        late: false,
+        earlyOut: false,
+      };
+    }
+
+    let segStatus = "Present";
+    let lateMins = 0;
+    let attended = true;
+
+    if (segStart) {
+      lateMins = Math.max(0, Math.floor((checkIn.getTime() - segStart.getTime()) / 60000));
+      if (lateMins >= activeRules.absentAfterLateMinutes) {
+        // Treat segment as missed (employee too late to count for this segment).
+        return {
+          startTime: seg.startTime,
+          endTime: seg.endTime,
+          checkIn,
+          checkOut,
+          lateDurationMinutes: lateMins,
+          status: "Missed",
+          attended: false,
+          late: true,
+          earlyOut: false,
+        };
+      }
+      if (lateMins > activeRules.graceMinutes) {
+        segStatus = "Late";
+      }
+    }
+
+    let earlyOutMins = 0;
+    if (segEnd) {
+      earlyOutMins = Math.max(0, Math.floor((segEnd.getTime() - checkOut.getTime()) / 60000));
+    }
+    const earlyOutFlag = earlyOutMins >= activeRules.halfDayEarlyCheckOutMinutes;
+    if (earlyOutFlag && segStatus !== "Late") {
+      segStatus = "Half Day";
+    } else if (earlyOutFlag && segStatus === "Late") {
+      segStatus = "Half Day";
+    }
+
+    return {
+      startTime: seg.startTime,
+      endTime: seg.endTime,
+      checkIn,
+      checkOut,
+      lateDurationMinutes: lateMins,
+      status: segStatus,
+      attended,
+      late: segStatus === "Late",
+      earlyOut: earlyOutFlag,
+    };
+  });
+
+  const attendedCount = segmentResults.filter((r) => r.attended).length;
+  let dayStatus;
+  if (attendedCount === 0) dayStatus = "Absent";
+  else if (attendedCount === 1) dayStatus = "Half Day";
+  else {
+    // Both attended
+    if (segmentResults.some((r) => r.earlyOut)) dayStatus = "Half Day";
+    else if (segmentResults.some((r) => r.late)) dayStatus = "Late";
+    else dayStatus = "Present";
+  }
+
+  const totalLate = segmentResults.reduce(
+    (acc, r) => acc + (r.lateDurationMinutes || 0),
+    0,
+  );
+
+  return {
+    status: dayStatus,
+    segments: segmentResults.map((r) => ({
+      checkIn: r.checkIn,
+      checkOut: r.checkOut,
+      lateDurationMinutes: r.lateDurationMinutes,
+      status: r.status,
+    })),
+    lateDurationMinutes: totalLate,
+  };
+};
 
 const computeStatusFromCheckTimes = ({
   requestedStatus,
@@ -99,7 +261,10 @@ const computeStatusFromCheckTimes = ({
   date,
   checkIn,
   checkOut,
+  rules,
 }) => {
+  const activeRules = rules || DEFAULT_ATTENDANCE_RULES;
+
   const nonTimedStatuses = ["Leave", "Off", "Absent"];
   if (requestedStatus && nonTimedStatuses.includes(requestedStatus)) {
     return requestedStatus;
@@ -120,17 +285,17 @@ const computeStatusFromCheckTimes = ({
 
   if (checkIn) {
     const lateMinutes = Math.floor((checkIn.getTime() - shiftStart.getTime()) / 60000);
-    if (lateMinutes >= ATTENDANCE_RULES.absentAfterLateMinutes) {
+    if (lateMinutes >= activeRules.absentAfterLateMinutes) {
       return "Absent";
     }
-    if (lateMinutes > ATTENDANCE_RULES.graceMinutes) {
+    if (lateMinutes > activeRules.graceMinutes) {
       computedStatus = "Late";
     }
   }
 
   if (checkOut) {
     const earlyLeaveMinutes = Math.floor((shiftEnd.getTime() - checkOut.getTime()) / 60000);
-    if (earlyLeaveMinutes >= ATTENDANCE_RULES.halfDayEarlyLeaveMinutes) {
+    if (earlyLeaveMinutes >= activeRules.halfDayEarlyCheckOutMinutes) {
       if (computedStatus !== "Absent") {
         computedStatus = "Half Day";
       }
@@ -197,6 +362,54 @@ const hasApprovedLeaveOnDate = async (employeeId, dateUTC) => {
   }).select("_id");
 
   return !!approvedLeave;
+};
+
+const ensureEarnedLeaveType = async () => {
+  return LeaveType.findOneAndUpdate(
+    { name: { $regex: new RegExp(`^${EARNED_LEAVE_NAME}$`, "i") } },
+    {
+      $setOnInsert: {
+        name: EARNED_LEAVE_NAME,
+        isPaid: true,
+        status: "Approved",
+        createdBy: "system",
+      },
+    },
+    { upsert: true, new: true },
+  );
+};
+
+const adjustEarnedLeaveBalance = async (employeeId, delta) => {
+  if (!employeeId || !delta) return;
+  const earnedLeave = await ensureEarnedLeaveType();
+  await LeaveBalance.findOneAndUpdate(
+    { employee: employeeId, leaveType: earnedLeave._id, year: EARNED_LEAVE_YEAR },
+    {
+      $inc: {
+        totalDays: delta,
+        remainingDays: delta,
+      },
+      $setOnInsert: { usedDays: 0 },
+    },
+    { upsert: true },
+  );
+};
+
+const isHolidayWorkAttendance = ({ status, shift, date }) => {
+  if (!["Present", "Late", "Half Day"].includes(status)) return false;
+  if (!shift?.workingDays?.length || !date) return false;
+  return !shift.workingDays.includes(getDayName(date));
+};
+
+const persistAttendanceWithEarnedLeave = async (operation) => {
+  const before = operation.before || null;
+  const after = operation.after || null;
+  const beforeEarned = before?.workingOnHoliday ? 1 : 0;
+  const afterEarned = after?.workingOnHoliday ? 1 : 0;
+  await adjustEarnedLeaveBalance(
+    (after?.employee || before?.employee)?.toString(),
+    afterEarned - beforeEarned,
+  );
 };
 
 /**
@@ -291,6 +504,10 @@ export const bulkMarkAttendance = async (req, res, next) => {
       forceApplyShift,
       overwrite,
       markAllDaysPresent,
+      manualStatus,
+      manualCheckIn,
+      manualCheckOut,
+      manualSegments,
     } = req.body;
 
     // --- Validate required fields ---
@@ -472,19 +689,48 @@ export const bulkMarkAttendance = async (req, res, next) => {
           continue;
         }
         try {
+          const dayName = getDayName(date);
+          const isWorkingDay = shiftToUse.workingDays.includes(dayName);
+
           // Determine status
           let status;
-          if (markAllDaysPresent) {
+          if (manualStatus) {
+            // Off-day enforcement: if employee is off on this day, only "Present"
+            // is allowed (working on holiday). Reject Absent/Leave on off-day.
+            if (!isWorkingDay && manualStatus !== "Present" && manualStatus !== "Off") {
+              errors.push({
+                employeeId,
+                date: date.toISOString().split("T")[0],
+                error: `Only "Present" status is allowed on an off day for ${shiftToUse.name}.`,
+              });
+              continue;
+            }
+            status = manualStatus;
+          } else if (markAllDaysPresent) {
             status = "Present";
           } else {
-            const dayName = getDayName(date);
-            const isWorkingDay = shiftToUse.workingDays.includes(dayName);
             status = isWorkingDay ? "Present" : "Off";
           }
 
           // Build checkIn / checkOut from shift times (null if status is Off or times are missing)
-          let checkIn = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.startTime) : null;
-          let checkOut = status !== "Off" ? buildDateTimeFromShiftTime(date, shiftToUse.endTime) : null;
+          let checkIn = status !== "Off" && status !== "Absent" && status !== "Leave"
+            ? buildDateTimeFromShiftTime(date, shiftToUse.startTime)
+            : null;
+          let checkOut = status !== "Off" && status !== "Absent" && status !== "Leave"
+            ? buildDateTimeFromShiftTime(date, shiftToUse.endTime)
+            : null;
+
+          // Apply manual overrides for non-split shift only
+          if (manualStatus && !isSplitShift(shiftToUse)) {
+            if (manualCheckIn && status !== "Off" && status !== "Absent" && status !== "Leave") {
+              const parsed = new Date(manualCheckIn);
+              if (!Number.isNaN(parsed.getTime())) checkIn = parsed;
+            }
+            if (manualCheckOut && status !== "Off" && status !== "Absent" && status !== "Leave") {
+              const parsed = new Date(manualCheckOut);
+              if (!Number.isNaN(parsed.getTime())) checkOut = parsed;
+            }
+          }
 
           if (TIMED_STATUSES.includes(status)) {
             ({ checkIn, checkOut } = ensureCheckTimesForTimedStatus({
@@ -495,6 +741,61 @@ export const bulkMarkAttendance = async (req, res, next) => {
               checkOut,
             }));
           }
+
+          // Split-shift: auto-fill both segments with shift-defined times.
+          let attendanceSegments;
+          let computedLateMinutes = 0;
+          if (isSplitShift(shiftToUse) && status !== "Off" && status !== "Leave" && status !== "Absent") {
+            // If manualSegments supplied, use them (validate length matches)
+            if (Array.isArray(manualSegments) && manualSegments.length === shiftToUse.segments.length) {
+              const rules = await getAttendanceRules();
+              const inputSegs = manualSegments.map((seg) => ({
+                checkIn: seg.checkIn ? new Date(seg.checkIn) : null,
+                checkOut: seg.checkOut ? new Date(seg.checkOut) : null,
+              }));
+              const computed = computeSplitShiftStatus({
+                shift: shiftToUse,
+                date,
+                inputSegments: inputSegs,
+                rules,
+                requestedStatus: status,
+              });
+              if (computed) {
+                status = computed.status;
+                attendanceSegments = computed.segments;
+                computedLateMinutes = computed.lateDurationMinutes;
+                // Recompute top-level checkIn/checkOut from min/max
+                const ins = attendanceSegments
+                  .map((s) => s.checkIn)
+                  .filter(Boolean);
+                const outs = attendanceSegments
+                  .map((s) => s.checkOut)
+                  .filter(Boolean);
+                checkIn = ins.length ? new Date(Math.min(...ins.map((d) => d.getTime()))) : null;
+                checkOut = outs.length ? new Date(Math.max(...outs.map((d) => d.getTime()))) : null;
+              }
+            } else {
+              attendanceSegments = shiftToUse.segments.map((seg) => ({
+                checkIn: buildDateTimeFromShiftTime(date, seg.startTime),
+                checkOut: buildDateTimeFromShiftTime(date, seg.endTime),
+                lateDurationMinutes: 0,
+                status: "Present",
+              }));
+            }
+          } else if (isSplitShift(shiftToUse) && status === "Absent") {
+            attendanceSegments = shiftToUse.segments.map((seg) => ({
+              checkIn: null,
+              checkOut: null,
+              lateDurationMinutes: 0,
+              status: "Missed",
+            }));
+          }
+
+          const workingOnHoliday = isHolidayWorkAttendance({
+            status,
+            shift: shiftToUse,
+            date,
+          });
 
           const existing = await Attendance.findOne({
             employee: employeeId,
@@ -515,7 +816,7 @@ export const bulkMarkAttendance = async (req, res, next) => {
           // Handle overwrite logic
           if (overwrite) {
             // Upsert — replace existing or create new
-            await Attendance.findOneAndUpdate(
+            const updated = await Attendance.findOneAndUpdate(
               { employee: employeeId, date },
               {
                 employee: employeeId,
@@ -524,34 +825,46 @@ export const bulkMarkAttendance = async (req, res, next) => {
                 shift: shiftToUse._id,
                 checkIn,
                 checkOut,
-                lateDurationMinutes: 0,
+                lateDurationMinutes: computedLateMinutes,
                 workHours: null,
                 source: "manual",
                 lockReason: null,
                 linkedLeaveApplication: null,
+                workingOnHoliday,
+                segments: attendanceSegments,
                 markedBy: req.user._id,
               },
               { upsert: true, returnDocument: "after" },
             );
+            await persistAttendanceWithEarnedLeave({
+              before: existing,
+              after: updated,
+            });
           } else {
             // Skip if record exists
             if (existing) {
               skipped++;
               continue;
             }
-            await Attendance.create({
+            const createdAttendance = await Attendance.create({
               employee: employeeId,
               date,
               status,
               shift: shiftToUse._id,
               checkIn,
               checkOut,
-              lateDurationMinutes: 0,
+              lateDurationMinutes: computedLateMinutes,
               workHours: null,
               source: "manual",
               lockReason: null,
               linkedLeaveApplication: null,
+              workingOnHoliday,
+              segments: attendanceSegments,
               markedBy: req.user._id,
+            });
+            await persistAttendanceWithEarnedLeave({
+              before: null,
+              after: createdAttendance,
             });
           }
 
@@ -689,7 +1002,7 @@ export const getMonthlyAttendance = async (req, res, next) => {
       employee: { $in: employeeIds },
       date: { $gte: startOfMonth, $lte: endOfMonth },
     })
-      .select("employee date status shift checkIn checkOut lateDurationMinutes source lockReason linkedLeaveApplication")
+      .select("employee date status shift checkIn checkOut lateDurationMinutes source lockReason linkedLeaveApplication workingOnHoliday segments")
       .lean();
 
     const linkedLeaveIds = [
@@ -739,9 +1052,11 @@ export const getMonthlyAttendance = async (req, res, next) => {
         source: rec.source,
         lockReason: rec.lockReason || null,
         linkedLeaveApplication: rec.linkedLeaveApplication || null,
+        workingOnHoliday: Boolean(rec.workingOnHoliday),
         isLocked: isApprovedLeaveLockedRecord(rec),
         leaveTypeName: leaveMeta?.leaveTypeName || null,
         leaveIsPaid: leaveMeta?.leaveIsPaid ?? null,
+        segments: rec.segments || null,
       };
     }
 
@@ -896,7 +1211,7 @@ export const getEmployeeMonthlyAttendance = async (req, res, next) => {
       employee: id,
       date: { $gte: startOfMonth, $lte: endOfMonth },
     })
-      .populate("shift", "name startTime endTime workingDays")
+      .populate("shift", "name startTime endTime workingDays segments isSplit")
       .sort({ date: 1 });
 
     res.json({ records });
@@ -922,6 +1237,7 @@ export const updateAttendance = async (req, res, next) => {
       res.status(404);
       throw new Error("Attendance record not found");
     }
+    const previousAttendance = attendance.toObject();
 
     const employee = await Employee.findById(attendance.employee).select(
       "joiningDate resignationDate",
@@ -942,7 +1258,7 @@ export const updateAttendance = async (req, res, next) => {
       );
     }
 
-    const { status, shiftId, checkIn, checkOut, lateDurationMinutes } =
+    const { status, shiftId, checkIn, checkOut, lateDurationMinutes, segments: bodySegments } =
       req.body;
 
     const allowedStatuses = [
@@ -981,42 +1297,87 @@ export const updateAttendance = async (req, res, next) => {
     let shiftForRules = null;
     if (attendance.shift) {
       shiftForRules = await Shift.findById(attendance.shift).select(
-        "startTime endTime",
+        "startTime endTime workingDays segments isSplit",
       );
     }
 
-    attendance.status = computeStatusFromCheckTimes({
-      requestedStatus: attendance.status,
-      shift: shiftForRules,
-      date: attendance.date,
-      checkIn: attendance.checkIn,
-      checkOut: attendance.checkOut,
-    });
+    const attendanceRules = await getAttendanceRules();
 
-    if (TIMED_STATUSES.includes(attendance.status)) {
-      const ensuredTimes = ensureCheckTimesForTimedStatus({
-        status: attendance.status,
-        date: attendance.date,
+    if (
+      isSplitShift(shiftForRules) &&
+      attendance.status !== "Off" &&
+      attendance.status !== "Leave" &&
+      bodySegments
+    ) {
+      // Split-shift: derive everything from segment-level inputs.
+      const splitResult = computeSplitShiftStatus({
         shift: shiftForRules,
+        date: attendance.date,
+        inputSegments: bodySegments,
+        rules: attendanceRules,
+        requestedStatus: status,
+      });
+      if (splitResult) {
+        attendance.status = splitResult.status;
+        attendance.segments = splitResult.segments;
+        attendance.lateDurationMinutes = splitResult.lateDurationMinutes;
+
+        const checkIns = splitResult.segments.map((s) => s.checkIn).filter(Boolean);
+        const checkOuts = splitResult.segments.map((s) => s.checkOut).filter(Boolean);
+        attendance.checkIn = checkIns.length
+          ? new Date(Math.min(...checkIns.map((d) => d.getTime())))
+          : null;
+        attendance.checkOut = checkOuts.length
+          ? new Date(Math.max(...checkOuts.map((d) => d.getTime())))
+          : null;
+      }
+    } else {
+      attendance.status = computeStatusFromCheckTimes({
+        requestedStatus: attendance.status,
+        shift: shiftForRules,
+        date: attendance.date,
         checkIn: attendance.checkIn,
         checkOut: attendance.checkOut,
+        rules: attendanceRules,
       });
-      attendance.checkIn = ensuredTimes.checkIn;
-      attendance.checkOut = ensuredTimes.checkOut;
+
+      if (TIMED_STATUSES.includes(attendance.status)) {
+        const ensuredTimes = ensureCheckTimesForTimedStatus({
+          status: attendance.status,
+          date: attendance.date,
+          shift: shiftForRules,
+          checkIn: attendance.checkIn,
+          checkOut: attendance.checkOut,
+        });
+        attendance.checkIn = ensuredTimes.checkIn;
+        attendance.checkOut = ensuredTimes.checkOut;
+      }
+
+      const computedLateMinutes = computeLateMinutesFromCheckIn({
+        shift: shiftForRules,
+        date: attendance.date,
+        checkIn: attendance.checkIn,
+      });
+
+      attendance.lateDurationMinutes = computedLateMinutes;
+      // Clear segments on non-split shift
+      attendance.segments = undefined;
     }
 
-    const computedLateMinutes = computeLateMinutesFromCheckIn({
+    attendance.workingOnHoliday = isHolidayWorkAttendance({
+      status: attendance.status,
       shift: shiftForRules,
       date: attendance.date,
-      checkIn: attendance.checkIn,
     });
-
-    attendance.lateDurationMinutes = computedLateMinutes;
 
     attendance.markedBy = req.user._id;
     attendance.source = "manual";
 
     await attendance.save();
+    await persistAttendanceWithEarnedLeave({
+      before: previousAttendance,
+      after: attendance,
+    });
 
     // Refresh monthly summary
     const date = new Date(attendance.date);
@@ -1028,7 +1389,7 @@ export const updateAttendance = async (req, res, next) => {
 
     const updated = await Attendance.findById(id).populate(
       "shift",
-      "name startTime endTime workingDays",
+      "name startTime endTime workingDays segments isSplit",
     );
 
     res.json({
@@ -1045,7 +1406,7 @@ export const updateAttendance = async (req, res, next) => {
 // @access       Admin
 export const markSingleAttendance = async (req, res, next) => {
   try {
-    const { employeeId, date, status, shiftId, checkIn, checkOut, lateDurationMinutes } =
+    const { employeeId, date, status, shiftId, checkIn, checkOut, segments: bodySegments } =
       req.body;
 
     if (!employeeId || !date || !status) {
@@ -1145,30 +1506,73 @@ export const markSingleAttendance = async (req, res, next) => {
       if (checkOut) resolvedCheckOut = safeDateParse(checkOut);
     }
 
-    const computedStatus = computeStatusFromCheckTimes({
-      requestedStatus: status,
-      shift: resolvedShift,
-      date: parsedDate,
-      checkIn: resolvedCheckIn,
-      checkOut: resolvedCheckOut,
-    });
+    const attendanceRules = await getAttendanceRules();
 
-    if (TIMED_STATUSES.includes(computedStatus)) {
-      const ensuredTimes = ensureCheckTimesForTimedStatus({
-        status: computedStatus,
-        date: parsedDate,
+    let attendanceSegments;
+    let computedStatus;
+    let computedLateMinutes;
+
+    if (isSplitShift(resolvedShift) && status !== "Off" && status !== "Leave") {
+      // Split-shift path: derive everything from per-segment check times.
+      const splitResult = computeSplitShiftStatus({
         shift: resolvedShift,
+        date: parsedDate,
+        inputSegments: bodySegments,
+        rules: attendanceRules,
+        requestedStatus: status,
+      });
+      if (!splitResult) {
+        res.status(400);
+        throw new Error("Failed to compute split-shift attendance");
+      }
+      computedStatus = splitResult.status;
+      attendanceSegments = splitResult.segments;
+      computedLateMinutes = splitResult.lateDurationMinutes;
+      // For split shifts, top-level checkIn/checkOut mirror earliest checkIn / latest checkOut
+      const validCheckIns = splitResult.segments
+        .map((s) => s.checkIn)
+        .filter(Boolean);
+      const validCheckOuts = splitResult.segments
+        .map((s) => s.checkOut)
+        .filter(Boolean);
+      resolvedCheckIn = validCheckIns.length
+        ? new Date(Math.min(...validCheckIns.map((d) => d.getTime())))
+        : null;
+      resolvedCheckOut = validCheckOuts.length
+        ? new Date(Math.max(...validCheckOuts.map((d) => d.getTime())))
+        : null;
+    } else {
+      computedStatus = computeStatusFromCheckTimes({
+        requestedStatus: status,
+        shift: resolvedShift,
+        date: parsedDate,
         checkIn: resolvedCheckIn,
         checkOut: resolvedCheckOut,
+        rules: attendanceRules,
       });
-      resolvedCheckIn = ensuredTimes.checkIn;
-      resolvedCheckOut = ensuredTimes.checkOut;
-    }
 
-    const computedLateMinutes = computeLateMinutesFromCheckIn({
+      if (TIMED_STATUSES.includes(computedStatus)) {
+        const ensuredTimes = ensureCheckTimesForTimedStatus({
+          status: computedStatus,
+          date: parsedDate,
+          shift: resolvedShift,
+          checkIn: resolvedCheckIn,
+          checkOut: resolvedCheckOut,
+        });
+        resolvedCheckIn = ensuredTimes.checkIn;
+        resolvedCheckOut = ensuredTimes.checkOut;
+      }
+
+      computedLateMinutes = computeLateMinutesFromCheckIn({
+        shift: resolvedShift,
+        date: parsedDate,
+        checkIn: resolvedCheckIn,
+      });
+    }
+    const workingOnHoliday = isHolidayWorkAttendance({
+      status: computedStatus,
       shift: resolvedShift,
       date: parsedDate,
-      checkIn: resolvedCheckIn,
     });
 
     const attendance = await Attendance.create({
@@ -1183,8 +1587,11 @@ export const markSingleAttendance = async (req, res, next) => {
       source: "manual",
       lockReason: null,
       linkedLeaveApplication: null,
+      workingOnHoliday,
+      segments: attendanceSegments,
       markedBy: req.user._id,
     });
+    await persistAttendanceWithEarnedLeave({ before: null, after: attendance });
 
     // Refresh monthly summary
     await refreshMonthlySummary(
@@ -1195,7 +1602,7 @@ export const markSingleAttendance = async (req, res, next) => {
 
     const created = await Attendance.findById(attendance._id).populate(
       "shift",
-      "name startTime endTime workingDays",
+      "name startTime endTime workingDays segments isSplit",
     );
 
     res.status(201).json({
@@ -1236,6 +1643,7 @@ export const deleteAttendance = async (req, res, next) => {
     const employeeId = attendance.employee.toString();
 
     await Attendance.findByIdAndDelete(id);
+    await persistAttendanceWithEarnedLeave({ before: attendance, after: null });
 
     // Refresh monthly summary
     await refreshMonthlySummary(

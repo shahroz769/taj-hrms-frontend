@@ -6,7 +6,6 @@ import Employee from "../models/Employee.js";
 import Attendance from "../models/Attendance.js";
 import Payroll from "../models/Payroll.js";
 import PayrollArrearsLedger from "../models/PayrollArrearsLedger.js";
-import AllowancePolicy from "../models/AllowancePolicy.js";
 import Loan from "../models/Loan.js";
 import Deduction from "../models/Deduction.js";
 import {
@@ -572,7 +571,6 @@ const runPayrollMutationForEmployee = async ({
         mode,
         includeArrears: true,
         skipArrearsSync: false,
-        AllowancePolicyModel: AllowancePolicy,
         session,
       });
 
@@ -848,10 +846,7 @@ export const generatePayrolls = async (req, res, next) => {
           select: "name department",
           populate: { path: "department", select: "name" },
         })
-        .populate({
-          path: "allowancePolicy",
-          populate: { path: "components.allowanceComponent", select: "name" },
-        });
+        .populate("allowances.allowanceComponent", "name");
 
       const existingPayrolls = await Payroll.find({
         employee: { $in: employeeIds },
@@ -980,10 +975,7 @@ export const regenerateEmployeePayroll = async (req, res, next) => {
         select: "name department",
         populate: { path: "department", select: "name" },
       })
-      .populate({
-        path: "allowancePolicy",
-        populate: { path: "components.allowanceComponent", select: "name" },
-      });
+      .populate("allowances.allowanceComponent", "name");
 
     if (!employee) {
       res.status(404);

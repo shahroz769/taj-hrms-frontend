@@ -151,6 +151,9 @@ const ShiftsSetups = () => {
   const [selectedWorkingDays, setSelectedWorkingDays] = useState([]);
   const [approvingShiftId, setApprovingShiftId] = useState(null);
   const [rejectingShiftId, setRejectingShiftId] = useState(null);
+  const [isSplitShift, setIsSplitShift] = useState(false);
+  const [segment1, setSegment1] = useState({ startTime: "09:00", endTime: "13:00" });
+  const [segment2, setSegment2] = useState({ startTime: "14:00", endTime: "18:00" });
 
   // ===========================================================================
   // EFFECTS
@@ -321,13 +324,31 @@ const ShiftsSetups = () => {
     },
     {
       key: "startTime",
-      label: "Start Time",
-      render: (row) => formatTimeToAMPM(row.startTime),
+      label: "Timing",
+      render: (row) => {
+        const segs = Array.isArray(row.segments) && row.segments.length > 0
+          ? row.segments
+          : [{ startTime: row.startTime, endTime: row.endTime }];
+        if (segs.length === 2) {
+          return (
+            <span className="text-xs leading-tight">
+              <span className="font-medium">S1:</span> {formatTimeToAMPM(segs[0].startTime)} - {formatTimeToAMPM(segs[0].endTime)}
+              <br />
+              <span className="font-medium">S2:</span> {formatTimeToAMPM(segs[1].startTime)} - {formatTimeToAMPM(segs[1].endTime)}
+            </span>
+          );
+        }
+        return `${formatTimeToAMPM(segs[0].startTime)} - ${formatTimeToAMPM(segs[0].endTime)}`;
+      },
     },
     {
-      key: "endTime",
-      label: "End Time",
-      render: (row) => formatTimeToAMPM(row.endTime),
+      key: "type",
+      label: "Type",
+      render: (row) => row.isSplit ? (
+        <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Split</Badge>
+      ) : (
+        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Single</Badge>
+      ),
     },
     {
       key: "workingDays",
@@ -337,7 +358,16 @@ const ShiftsSetups = () => {
     {
       key: "shiftHours",
       label: "Shift Hrs",
-      render: (row) => calculateShiftHours(row.startTime, row.endTime),
+      render: (row) => {
+        const segs = Array.isArray(row.segments) && row.segments.length > 0
+          ? row.segments
+          : [{ startTime: row.startTime, endTime: row.endTime }];
+        const total = segs.reduce(
+          (sum, s) => sum + calculateShiftHours(s.startTime, s.endTime),
+          0,
+        );
+        return total;
+      },
     },
     {
       key: "createdBy",
@@ -410,6 +440,18 @@ const ShiftsSetups = () => {
     // Set all the editing states
     setEditingShift(row);
     setSelectedWorkingDays(row.workingDays || []);
+    const segs = Array.isArray(row.segments) && row.segments.length > 0
+      ? row.segments
+      : [{ startTime: row.startTime, endTime: row.endTime }];
+    if (segs.length === 2) {
+      setIsSplitShift(true);
+      setSegment1({ startTime: (segs[0].startTime || "").slice(0, 5), endTime: (segs[0].endTime || "").slice(0, 5) });
+      setSegment2({ startTime: (segs[1].startTime || "").slice(0, 5), endTime: (segs[1].endTime || "").slice(0, 5) });
+    } else {
+      setIsSplitShift(false);
+      setSegment1({ startTime: (segs[0].startTime || "").slice(0, 5), endTime: (segs[0].endTime || "").slice(0, 5) });
+      setSegment2({ startTime: "14:00", endTime: "18:00" });
+    }
     setDialogOpen(true);
   };
 
@@ -496,8 +538,6 @@ const ShiftsSetups = () => {
 
     const formData = new FormData(e.target);
     const shiftName = formData.get("shift-name");
-    const startTime = formData.get("shift-start-time");
-    const endTime = formData.get("shift-end-time");
     const notes = formData.get("shift-notes");
 
     // Validate
@@ -518,15 +558,59 @@ const ShiftsSetups = () => {
       newErrors.notes = "Notes must not exceed 250 characters";
     }
 
+    // ---------------- Segments validation ----------------
+    const toMin = (t) => {
+      if (!t) return null;
+      const [h, m] = t.split(":").map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return null;
+      return h * 60 + m;
+    };
+
+    const seg1Start = toMin(segment1.startTime);
+    const seg1End = toMin(segment1.endTime);
+
+    if (seg1Start === null || seg1End === null) {
+      newErrors.segments = "Segment 1: start and end times are required";
+    } else if (seg1End <= seg1Start) {
+      newErrors.segments = "Segment 1: end time must be after start time";
+    }
+
+    if (isSplitShift && !newErrors.segments) {
+      const seg2Start = toMin(segment2.startTime);
+      const seg2End = toMin(segment2.endTime);
+      if (seg2Start === null || seg2End === null) {
+        newErrors.segments = "Segment 2: start and end times are required";
+      } else if (seg2End <= seg2Start) {
+        newErrors.segments = "Segment 2: end time must be after start time";
+      } else if (seg2Start <= seg1End) {
+        if (seg2Start < seg1End) {
+          newErrors.segments = "Split shift segments must not overlap";
+        } else {
+          newErrors.segments = "Split shift segments must have at least 1 hour gap";
+        }
+      } else if (seg2Start - seg1End < 60) {
+        newErrors.segments = "Split shift segments must have at least 1 hour gap between them";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
+    const segments = isSplitShift
+      ? [
+          { startTime: segment1.startTime, endTime: segment1.endTime },
+          { startTime: segment2.startTime, endTime: segment2.endTime },
+        ]
+      : [{ startTime: segment1.startTime, endTime: segment1.endTime }];
+
     const payload = {
       name: shiftName,
-      startTime: startTime,
-      endTime: endTime,
+      segments,
+      // Keep top-level for backward compat with other consumers
+      startTime: segments[0].startTime,
+      endTime: segments[segments.length - 1].endTime,
       workingDays: selectedWorkingDays,
       notes: notes || "",
     };
@@ -539,6 +623,7 @@ const ShiftsSetups = () => {
           onSuccess: () => {
             e.target.reset();
             setSelectedWorkingDays([]);
+            setIsSplitShift(false);
           },
         },
       );
@@ -548,6 +633,7 @@ const ShiftsSetups = () => {
         onSuccess: () => {
           e.target.reset();
           setSelectedWorkingDays([]);
+          setIsSplitShift(false);
         },
       });
     }
@@ -571,6 +657,9 @@ const ShiftsSetups = () => {
               setTimeout(() => {
                 setEditingShift(null);
                 setSelectedWorkingDays([]);
+                setIsSplitShift(false);
+                setSegment1({ startTime: "09:00", endTime: "13:00" });
+                setSegment2({ startTime: "14:00", endTime: "18:00" });
               }, 200);
             }
           }}
@@ -615,38 +704,99 @@ const ShiftsSetups = () => {
                     <p className="text-sm text-red-500 mt-1">{errors.name}</p>
                   )}
                 </div>
-                {/* Select Shift Start & End Time */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col gap-3 flex-1">
-                    <Label
-                      htmlFor="shift-start-time"
-                      className="text-foreground"
+                {/* Split Shift Toggle */}
+                <div className="flex items-start gap-3 rounded-md border border-input p-3 bg-muted/30">
+                  <Checkbox
+                    id="split-shift"
+                    checked={isSplitShift}
+                    onCheckedChange={(checked) => setIsSplitShift(!!checked)}
+                    className="mt-0.5"
+                  />
+                  <div className="grid gap-0.5">
+                    <label
+                      htmlFor="split-shift"
+                      className="text-sm font-medium leading-none cursor-pointer"
                     >
-                      Shift Start Time
-                    </Label>
-                    <Input
-                      type="time"
-                      id="shift-start-time"
-                      name="shift-start-time"
-                      step="1"
-                      defaultValue={editingShift?.startTime || "09:00:00"}
-                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-3 flex-1">
-                    <Label htmlFor="shift-end-time" className="text-foreground">
-                      Shift End Time
-                    </Label>
-                    <Input
-                      type="time"
-                      id="shift-end-time"
-                      name="shift-end-time"
-                      step="1"
-                      defaultValue={editingShift?.endTime || "17:00:00"}
-                      className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                    />
+                      Split Shift (two segments per day)
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Two non-overlapping segments with at least 1 hour gap.
+                      Employee must check in/out on both. Missing one counts as
+                      Half Day; missing both counts as Absent.
+                    </p>
                   </div>
                 </div>
+
+                {/* Segment 1 Times */}
+                <div className="grid gap-2">
+                  <Label className="text-foreground text-xs uppercase tracking-wide">
+                    {isSplitShift ? "Segment 1" : "Shift Time"}
+                  </Label>
+                  <div className="flex gap-4">
+                    <div className="flex flex-col gap-2 flex-1">
+                      <Label htmlFor="seg1-start" className="text-foreground">
+                        Start Time
+                      </Label>
+                      <Input
+                        type="time"
+                        id="seg1-start"
+                        value={segment1.startTime}
+                        onChange={(e) => setSegment1((s) => ({ ...s, startTime: e.target.value }))}
+                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2 flex-1">
+                      <Label htmlFor="seg1-end" className="text-foreground">
+                        End Time
+                      </Label>
+                      <Input
+                        type="time"
+                        id="seg1-end"
+                        value={segment1.endTime}
+                        onChange={(e) => setSegment1((s) => ({ ...s, endTime: e.target.value }))}
+                        className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Segment 2 (only when split) */}
+                {isSplitShift && (
+                  <div className="grid gap-2">
+                    <Label className="text-foreground text-xs uppercase tracking-wide">
+                      Segment 2
+                    </Label>
+                    <div className="flex gap-4">
+                      <div className="flex flex-col gap-2 flex-1">
+                        <Label htmlFor="seg2-start" className="text-foreground">
+                          Start Time
+                        </Label>
+                        <Input
+                          type="time"
+                          id="seg2-start"
+                          value={segment2.startTime}
+                          onChange={(e) => setSegment2((s) => ({ ...s, startTime: e.target.value }))}
+                          className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 flex-1">
+                        <Label htmlFor="seg2-end" className="text-foreground">
+                          End Time
+                        </Label>
+                        <Input
+                          type="time"
+                          id="seg2-end"
+                          value={segment2.endTime}
+                          onChange={(e) => setSegment2((s) => ({ ...s, endTime: e.target.value }))}
+                          className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {errors.segments && (
+                  <p className="text-sm text-red-500 -mt-2">{errors.segments}</p>
+                )}
                 {/* Working Days */}
                 <div className="grid gap-3">
                   <Label htmlFor="working-days" className="text-foreground">
