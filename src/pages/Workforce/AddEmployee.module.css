@@ -185,9 +185,21 @@
   gap: 0.75rem;
 }
 
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.allowanceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
 .policyRow {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) minmax(140px, 180px);
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
 }
@@ -260,6 +272,14 @@
 
   .policyRow {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .allowanceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
   }
 }
 

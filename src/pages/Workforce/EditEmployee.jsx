@@ -6,7 +6,7 @@ import { useNavigate, useParams } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import PlusIcon from "lucide-react/dist/esm/icons/plus";
 import TrashIcon from "lucide-react/dist/esm/icons/trash";
@@ -95,6 +95,8 @@ const EditEmployee = () => {
 
   // Reset state when employee ID changes (for navigation between different employees)
   useEffect(() => {
+    // This state mirrors route identity and file inputs, so it must reset when the id changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDataLoaded(false);
     setSelectedDepartment("");
     setEmployeePicturePreview(null);
@@ -115,7 +117,6 @@ const EditEmployee = () => {
     handleSubmit,
     control,
     setValue,
-    watch,
     reset,
     formState: { errors },
   } = useForm({
@@ -125,7 +126,6 @@ const EditEmployee = () => {
       gender: "",
       department: "",
       position: "",
-      employeeOf: "Taj Agri",
       basicSalary: "",
       leaveEntitlements: [],
       leaveAnnualDays: "",
@@ -226,13 +226,27 @@ const EditEmployee = () => {
   const [guarantorDocFiles, setGuarantorDocFiles] = useState([]);
 
   // Watch values
-  const watchMedical = watch("medical");
-  const watchLegal = watch("legal");
-  const watchGender = watch("gender");
-  const watchMaritalStatus = watch("maritalStatus");
-  const watchEmployeeOf = watch("employeeOf");
-  const watchLeaveEntitlements = watch("leaveEntitlements") || [];
-  const watchAllowances = watch("allowances") || [];
+  const watchMedical = useWatch({ control, name: "medical" });
+  const watchLegal = useWatch({ control, name: "legal" });
+  const watchGender = useWatch({ control, name: "gender" });
+  const watchMaritalStatus = useWatch({ control, name: "maritalStatus" });
+  const watchProvince = useWatch({ control, name: "province" });
+  const watchPosition = useWatch({ control, name: "position" });
+  const watchEmploymentType = useWatch({ control, name: "employmentType" });
+  const watchDob = useWatch({ control, name: "dob" });
+  const watchJoiningDate = useWatch({ control, name: "joiningDate" });
+  const watchCompensationEffectiveDate = useWatch({
+    control,
+    name: "compensationEffectiveDate",
+  });
+  const watchLeaveMethod = useWatch({ control, name: "leaveMethod" });
+  const watchLeaveEntitlements =
+    useWatch({ control, name: "leaveEntitlements" }) || [];
+  const watchAllowances = useWatch({ control, name: "allowances" }) || [];
+  const watchedEducation = useWatch({ control, name: "education" }) || [];
+  const watchedPreviousExperience =
+    useWatch({ control, name: "previousExperience" }) || [];
+  const watchedGuarantors = useWatch({ control, name: "guarantor" }) || [];
 
   useEffect(() => {
     if (!(watchGender === "Female" && watchMaritalStatus === "Married")) {
@@ -302,7 +316,6 @@ const EditEmployee = () => {
         gender: emp.gender || "",
         department: emp.position?.department?._id || "",
         position: emp.position?._id || "",
-        employeeOf: emp.employeeOf || "Taj Agri",
         basicSalary: emp.basicSalary ?? "",
         leaveEntitlements: (leaveTypesData || [])
           .filter((leaveType) => leaveType.name !== "Earned Leave")
@@ -411,6 +424,8 @@ const EditEmployee = () => {
       });
 
       // Set image previews
+      // These previews mirror the loaded employee record before any new local file is selected.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmployeePicturePreview(emp.employeePicture || null);
       if (emp.cnicImages?.front) {
         setCnicFrontPreview(emp.cnicImages.front);
@@ -718,11 +733,11 @@ const EditEmployee = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    data-empty={!watch("dob")}
+                    data-empty={!watchDob}
                     className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
                   >
-                    {watch("dob") ? (
-                      format(watch("dob"), "PPP")
+                    {watchDob ? (
+                      format(watchDob, "PPP")
                     ) : (
                       <span>Pick a date</span>
                     )}
@@ -732,9 +747,9 @@ const EditEmployee = () => {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={watch("dob")}
+                    selected={watchDob}
                     onSelect={(date) => setValue("dob", date)}
-                    defaultMonth={watch("dob")}
+                    defaultMonth={watchDob}
                     captionLayout="dropdown"
                     fromYear={1950}
                     toYear={new Date().getFullYear()}
@@ -812,7 +827,7 @@ const EditEmployee = () => {
             <div className={styles.formGroup}>
               {renderLabel("Province", true)}
               <Select
-                value={watch("province")}
+                value={watchProvince}
                 onValueChange={(value) => setValue("province", value)}
               >
                 <SelectTrigger className="w-full">
@@ -886,7 +901,7 @@ const EditEmployee = () => {
             <div className={styles.formGroup}>
               {renderLabel("Position", true)}
               <Select
-                value={watch("position")}
+                value={watchPosition}
                 onValueChange={(value) => setValue("position", value)}
                 disabled={!departmentIdForPositions || isLoadingPositions}
               >
@@ -914,31 +929,13 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              {renderLabel("Employee of", true)}
-              <Select
-                value={watchEmployeeOf}
-                onValueChange={(value) => setValue("employeeOf", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select company" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Taj Agri">Taj Agri</SelectItem>
-                  <SelectItem value="YD">YD</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.employeeOf && (
-                <span className={styles.error}>{errors.employeeOf.message}</span>
-              )}
-            </div>
-            <div className={styles.formGroup}>
               {renderLabel("Employee ID")}
               <Input value={employee?.employeeID || ""} readOnly />
             </div>
             <div className={styles.formGroup}>
               {renderLabel("Employment Type", true)}
               <Select
-                value={watch("employmentType")}
+                value={watchEmploymentType}
                 onValueChange={(value) => setValue("employmentType", value)}
               >
                 <SelectTrigger className="w-full">
@@ -976,11 +973,11 @@ const EditEmployee = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    data-empty={!watch("joiningDate")}
+                    data-empty={!watchJoiningDate}
                     className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
                   >
-                    {watch("joiningDate") ? (
-                      format(watch("joiningDate"), "PPP")
+                    {watchJoiningDate ? (
+                      format(watchJoiningDate, "PPP")
                     ) : (
                       <span>Pick a date</span>
                     )}
@@ -990,9 +987,9 @@ const EditEmployee = () => {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={watch("joiningDate")}
+                    selected={watchJoiningDate}
                     onSelect={(date) => setValue("joiningDate", date)}
-                    defaultMonth={watch("joiningDate")}
+                    defaultMonth={watchJoiningDate}
                     captionLayout="dropdown"
                     fromYear={1990}
                     toYear={new Date().getFullYear() + 1}
@@ -1011,11 +1008,11 @@ const EditEmployee = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    data-empty={!watch("compensationEffectiveDate")}
+                    data-empty={!watchCompensationEffectiveDate}
                     className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
                   >
-                    {watch("compensationEffectiveDate") ? (
-                      format(watch("compensationEffectiveDate"), "PPP")
+                    {watchCompensationEffectiveDate ? (
+                      format(watchCompensationEffectiveDate, "PPP")
                     ) : (
                       <span>Pick a date</span>
                     )}
@@ -1025,9 +1022,9 @@ const EditEmployee = () => {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={watch("compensationEffectiveDate")}
+                    selected={watchCompensationEffectiveDate}
                     onSelect={(date) => setValue("compensationEffectiveDate", date)}
-                    defaultMonth={watch("compensationEffectiveDate")}
+                    defaultMonth={watchCompensationEffectiveDate}
                     captionLayout="dropdown"
                     fromYear={1990}
                     toYear={new Date().getFullYear() + 1}
@@ -1165,7 +1162,7 @@ const EditEmployee = () => {
             <div className={styles.formGroup}>
               {renderLabel("Method", true)}
               <Select
-                value={watch("leaveMethod") || "Fixed"}
+                value={watchLeaveMethod || "Fixed"}
                 onValueChange={(value) => setValue("leaveMethod", value)}
               >
                 <SelectTrigger className="w-full">
@@ -1208,7 +1205,7 @@ const EditEmployee = () => {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Allowances</h2>
           </div>
-          <div className={styles.policyList}>
+          <div className={styles.allowanceGrid}>
             {(allowanceComponentsData || []).map((allowance, index) => {
               const enabled = watchAllowances[index]?.enabled;
               return (
@@ -1442,7 +1439,7 @@ const EditEmployee = () => {
                 <div className={styles.formGroup}>
                   <Label className={styles.label}>Status</Label>
                   <Select
-                    value={watch(`education.${index}.status`)}
+                    value={watchedEducation[index]?.status || ""}
                     onValueChange={(value) =>
                       setValue(`education.${index}.status`, value)
                     }
@@ -1494,7 +1491,9 @@ const EditEmployee = () => {
               Add Experience
             </Button>
           </div>
-          {experienceFields.map((field, index) => (
+          {experienceFields.map((field, index) => {
+            const experience = watchedPreviousExperience[index] || {};
+            return (
             <div key={field.id} className={styles.dynamicEntry}>
               <div className={styles.dynamicEntryFields5}>
                 <div className={styles.formGroup}>
@@ -1517,14 +1516,11 @@ const EditEmployee = () => {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        data-empty={!watch(`previousExperience.${index}.from`)}
+                        data-empty={!experience.from}
                         className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
                       >
-                        {watch(`previousExperience.${index}.from`) ? (
-                          format(
-                            watch(`previousExperience.${index}.from`),
-                            "PPP",
-                          )
+                        {experience.from ? (
+                          format(experience.from, "PPP")
                         ) : (
                           <span>Pick a date</span>
                         )}
@@ -1534,11 +1530,11 @@ const EditEmployee = () => {
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={watch(`previousExperience.${index}.from`)}
+                        selected={experience.from}
                         onSelect={(date) =>
                           setValue(`previousExperience.${index}.from`, date)
                         }
-                        defaultMonth={watch(`previousExperience.${index}.from`)}
+                        defaultMonth={experience.from}
                         captionLayout="dropdown"
                         fromYear={1990}
                         toYear={new Date().getFullYear()}
@@ -1552,11 +1548,11 @@ const EditEmployee = () => {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        data-empty={!watch(`previousExperience.${index}.to`)}
+                        data-empty={!experience.to}
                         className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
                       >
-                        {watch(`previousExperience.${index}.to`) ? (
-                          format(watch(`previousExperience.${index}.to`), "PPP")
+                        {experience.to ? (
+                          format(experience.to, "PPP")
                         ) : (
                           <span>Pick a date</span>
                         )}
@@ -1566,11 +1562,11 @@ const EditEmployee = () => {
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={watch(`previousExperience.${index}.to`)}
+                        selected={experience.to}
                         onSelect={(date) =>
                           setValue(`previousExperience.${index}.to`, date)
                         }
-                        defaultMonth={watch(`previousExperience.${index}.to`)}
+                        defaultMonth={experience.to}
                         captionLayout="dropdown"
                         fromYear={1990}
                         toYear={new Date().getFullYear()}
@@ -1597,7 +1593,8 @@ const EditEmployee = () => {
                 </button>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Reference Information */}
@@ -1720,7 +1717,7 @@ const EditEmployee = () => {
             </Button>
           </div>
           {guarantorFields.map((field, index) => {
-            const existingDocUrl = watch(`guarantor.${index}.documentUrl`);
+            const existingDocUrl = watchedGuarantors[index]?.documentUrl;
             const newDocFile = guarantorDocFiles[index];
             return (
               <div key={field.id} className={styles.dynamicEntry}>

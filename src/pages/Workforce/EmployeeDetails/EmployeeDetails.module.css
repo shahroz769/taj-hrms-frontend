@@ -1,0 +1,343 @@
+.container {
+  padding: 18px 22px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: var(--foreground);
+}
+
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.profileIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.profileName {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.profileMeta {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+}
+
+.profileBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.profileActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-self: flex-start;
+}
+
+.tabsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--muted);
+  padding: 4px;
+  border-radius: 10px;
+  height: auto;
+}
+
+.tabContent {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.sectionTitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted-foreground);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.viewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+
+.viewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.viewLabel {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.viewValue {
+  font-size: 14px;
+  color: #1d2939;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.sectionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sectionDivider {
+  margin: 4px 0;
+}
+
+.subTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.subTable th,
+.subTable td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.subTable th {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.balanceCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--accent);
+}
+
+.balanceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 6px;
+}
+
+.balanceRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.balanceRowValue {
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendarToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.calendarToolbarSelectors {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendarHeader {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 6px 0;
+}
+
+.calendarCell {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.calendarCellEmpty {
+  background: transparent;
+  border-style: dashed;
+  border-color: transparent;
+}
+
+.calendarCellToday {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.calendarDay {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.calendarStatus {
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 6px;
+  align-self: flex-start;
+}
+
+.calendarMeta {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  line-height: 1.2;
+  margin-top: auto;
+}
+
+.statePresent { background: #dcfce7; color: #166534; }
+.stateAbsent { background: #fee2e2; color: #991b1b; }
+.stateLeave { background: #fef3c7; color: #92400e; }
+.stateLate { background: #fde68a; color: #92400e; }
+.stateHalfDay { background: #ede9fe; color: #5b21b6; }
+.stateDayOff { background: #e0e7ff; color: #3730a3; }
+.stateHoliday { background: #cffafe; color: #155e75; }
+.stateNone { background: #f3f4f6; color: #374151; }
+
+.empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.spinnerWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px;
+}
+
+.dialogGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.dialogFull {
+  grid-column: 1 / -1;
+}
+
+.tableActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.alertSpacing {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .viewGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dialogGrid {
+    grid-template-columns: 1fr;
+  }
+  .calendarGrid {
+    grid-template-columns: repeat(7, minmax(40px, 1fr));
+  }
+  .calendarCell {
+    min-height: 56px;
+    padding: 4px;
+  }
+}
+
+@media (max-width: 520px) {
+  .viewGrid {
+    grid-template-columns: 1fr;
+  }
+}

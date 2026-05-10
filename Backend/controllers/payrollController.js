@@ -347,6 +347,12 @@ const getEligibleEmployeeIds = async ({ year, month }) => {
     $or: [{ joiningDate: null }, { joiningDate: { $lt: nextMonthStartUtc } }],
   }).select("_id");
 
+  const endedEmployees = await Employee.find({
+    status: { $in: ["Resigned", "Terminated"] },
+    resignationDate: { $gte: monthStartUtc, $lt: nextMonthStartUtc },
+    $or: [{ joiningDate: null }, { joiningDate: { $lt: nextMonthStartUtc } }],
+  }).select("_id");
+
   const attendanceEmployees = await Attendance.distinct("employee", {
     date: { $gte: monthStartUtc, $lt: nextMonthStartUtc },
   });
@@ -358,6 +364,7 @@ const getEligibleEmployeeIds = async ({ year, month }) => {
   return [
     ...new Set([
       ...activeEmployees.map((item) => item._id.toString()),
+      ...endedEmployees.map((item) => item._id.toString()),
       ...attendanceEmployees.map((item) => item.toString()),
       ...arrearsEmployees.map((item) => item.toString()),
     ]),
@@ -409,20 +416,31 @@ export const applyDeductionStateOnPayrollGeneration = ({
   year,
   month,
 }) => {
-  deduction.status = "Approved";
   deduction.deductedAt = null;
   deduction.deductedByPayroll = null;
 
-  if (deductionEntry.status !== "deducted") {
+  if (deductionEntry.status === "deducted") {
+    deduction.status = "Deducted";
     deduction.currentDueYear =
-      deductionEntry.deferredToYear ||
+      deductionEntry.sourceDueYear ||
       deduction.currentDueYear ||
       year;
     deduction.currentDueMonth =
-      deductionEntry.deferredToMonth ||
+      deductionEntry.sourceDueMonth ||
       deduction.currentDueMonth ||
       month;
+    return deduction;
   }
+
+  deduction.status = "Approved";
+  deduction.currentDueYear =
+    deductionEntry.deferredToYear ||
+    deduction.currentDueYear ||
+    year;
+  deduction.currentDueMonth =
+    deductionEntry.deferredToMonth ||
+    deduction.currentDueMonth ||
+    month;
 
   return deduction;
 };

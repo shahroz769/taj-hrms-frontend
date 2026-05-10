@@ -610,8 +610,11 @@ export const calculateEmployeePayroll = async ({
         .lean()
     : [];
 
+  const latePenaltyInfo = calculateLatePenalty(lateDayRates);
+  const latePenaltyAmount = roundMoney(latePenaltyInfo.totalPenaltyAmount);
+
   const salaryBeforeManualDeductions = roundMoney(
-    grossSalary - attendanceDeductionAmount + arrearsAmount,
+    grossSalary - attendanceDeductionAmount - latePenaltyAmount + arrearsAmount,
   );
   const manualDeductionPlan = calculateManualDeductionPlan({
     deductions: deductionRecords,
@@ -639,6 +642,7 @@ export const calculateEmployeePayroll = async ({
   const salaryBeforeLoan = roundMoney(
     grossSalary -
       attendanceDeductionAmount -
+      latePenaltyAmount -
       manualDeductionAmount +
       arrearsAmount,
   );
@@ -650,8 +654,6 @@ export const calculateEmployeePayroll = async ({
       salaryAvailable: salaryBeforeLoan,
     });
 
-  const latePenaltyInfo = calculateLatePenalty(lateDayRates);
-  const latePenaltyAmount = roundMoney(latePenaltyInfo.totalPenaltyAmount);
   const totalSalary = roundMoney(
     grossSalary -
       attendanceDeductionAmount -

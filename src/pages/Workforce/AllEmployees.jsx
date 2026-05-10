@@ -401,6 +401,18 @@ const AllEmployees = () => {
       render: (row) => (row.joiningDate ? formatDate(row.joiningDate) : "-"),
     },
     {
+      key: "details",
+      label: "Details",
+      align: "center",
+      render: (row) => (
+        <div className="flex justify-center">
+          <Button variant="link" asChild>
+            <Link to={`/workforce/employees/${row._id}`}>View</Link>
+          </Button>
+        </div>
+      ),
+    },
+    {
       key: "actions",
       label: "Actions",
       align: "center",

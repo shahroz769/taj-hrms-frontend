@@ -20,6 +20,10 @@ import {
   renewEmployeeLeaveBalances,
   renewAllEmployeesLeaveBalances,
   getEmployeeLeaveBalances,
+  endEmployment,
+  rejoinEmployee,
+  getEmployeePayrolls,
+  getEmployeeLeaveApplications,
 } from "../controllers/employeeController.js";
 
 const router = express.Router();
@@ -63,8 +67,13 @@ router.post(
 
 // @route           GET /api/employees/:id
 // @description     Get single employee
-// @access          Admin
-router.get("/:id", protect, authorize(ROLES.admin), getEmployeeById);
+// @access          Admin, Supervisor
+router.get(
+  "/:id",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getEmployeeById,
+);
 
 // @route           POST /api/employees
 // @description     Create new employee
@@ -112,31 +121,31 @@ router.patch(
 
 // @route           GET /api/employees/:id/position-history
 // @description     Get employee position history
-// @access          Admin
+// @access          Admin, Supervisor
 router.get(
   "/:id/position-history",
   protect,
-  authorize(ROLES.admin),
+  authorize(ROLES.admin, ROLES.supervisor),
   getEmployeePositionHistory
 );
 
 // @route           GET /api/employees/:id/compensation-history
 // @description     Get employee compensation history (salary + allowance policy)
-// @access          Admin
+// @access          Admin, Supervisor
 router.get(
   "/:id/compensation-history",
   protect,
-  authorize(ROLES.admin),
+  authorize(ROLES.admin, ROLES.supervisor),
   getEmployeeCompensationHistory
 );
 
 // @route           GET /api/employees/:id/leave-balances
 // @description     Get employee leave balances (with optional year query param)
-// @access          Admin
+// @access          Admin, Supervisor
 router.get(
   "/:id/leave-balances",
   protect,
-  authorize(ROLES.admin),
+  authorize(ROLES.admin, ROLES.supervisor),
   getEmployeeLeaveBalances
 );
 
@@ -148,6 +157,46 @@ router.post(
   protect,
   authorize(ROLES.admin),
   renewEmployeeLeaveBalances
+);
+
+// @route           POST /api/employees/:id/end-employment
+// @description     Terminate or resign an employee with effective date and reason
+// @access          Admin only
+router.post(
+  "/:id/end-employment",
+  protect,
+  authorize(ROLES.admin),
+  endEmployment,
+);
+
+// @route           POST /api/employees/:id/rejoin
+// @description     Rejoin a previously ended employee
+// @access          Admin only
+router.post(
+  "/:id/rejoin",
+  protect,
+  authorize(ROLES.admin),
+  rejoinEmployee,
+);
+
+// @route           GET /api/employees/:id/payrolls
+// @description     Get payroll list for a single employee
+// @access          Admin, Supervisor
+router.get(
+  "/:id/payrolls",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getEmployeePayrolls,
+);
+
+// @route           GET /api/employees/:id/leave-applications
+// @description     Get leave applications for a single employee
+// @access          Admin, Supervisor
+router.get(
+  "/:id/leave-applications",
+  protect,
+  authorize(ROLES.admin, ROLES.supervisor),
+  getEmployeeLeaveApplications,
 );
 
 export default router;

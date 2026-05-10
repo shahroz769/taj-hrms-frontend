@@ -148,10 +148,6 @@ export const employeeSchema = z
     // Employment Information - Required
     department: z.string().min(1, "Department is required"),
     position: z.string().min(1, "Position is required"),
-    employeeOf: z.enum(["Taj Agri", "YD"], {
-      required_error: "Employee of is required",
-      invalid_type_error: "Employee of is required",
-    }),
     employmentType: z.enum(["Permanent", "Contract", "Part Time"], {
       required_error: "Employment type is required",
       invalid_type_error: "Employment type is required",

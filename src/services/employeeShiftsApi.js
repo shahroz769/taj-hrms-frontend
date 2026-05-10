@@ -16,3 +16,8 @@ export const fetchEmployeeShiftOnDate = async ({ employeeId, date }) => {
   });
   return res.data.shift; // shift object or null
 };
+
+export const fetchEmployeeShiftHistory = async (employeeId) => {
+  const res = await API.get(`/api/employee-shifts/employee/${employeeId}/history`);
+  return res.data;
+};

@@ -9,6 +9,8 @@ import EmployeeShift from "../models/EmployeeShift.js";
 import EmployeeAllowanceHistory from "../models/EmployeeAllowanceHistory.js";
 import EmployeeLeaveEntitlementHistory from "../models/EmployeeLeaveEntitlementHistory.js";
 import BasicSalaryHistory from "../models/BasicSalaryHistory.js";
+import LeaveApplication from "../models/LeaveApplication.js";
+import Payroll from "../models/Payroll.js";
 import { uploadToCloudinary } from "../config/cloudinaryConfig.js";
 import mongoose from "mongoose";
 
@@ -23,35 +25,47 @@ const VALID_PROVINCES = [
 const CNIC_REGEX = /^\d{13}$/;
 const PAKISTAN_MOBILE_REGEX = /^03\d{9}$/;
 
-const EMPLOYEE_OF_PREFIX = {
-  "Taj Agri": "TA",
-  YD: "YD",
-};
 const EARNED_LEAVE_NAME = "Earned Leave";
 const EARNED_LEAVE_YEAR = 0;
 
 // Helper function to generate employee ID
-const generateEmployeeId = async (employeeOf) => {
-  const prefix = EMPLOYEE_OF_PREFIX[employeeOf] || EMPLOYEE_OF_PREFIX["Taj Agri"];
-  const lastEmployee = await Employee.findOne({
-    employeeID: { $regex: new RegExp(`^${prefix}\\d{5}$`) },
-  })
-    .sort({ employeeID: -1 })
-    .select("employeeID");
+const generateEmployeeId = async () => {
+  const [lastEmployee] = await Employee.aggregate([
+    {
+      $match: {
+        employeeID: { $regex: /^(?:[A-Z]{2})?\d{5}$/ },
+      },
+    },
+    {
+      $addFields: {
+        employeeSequence: {
+          $toInt: {
+            $substr: [
+              "$employeeID",
+              { $subtract: [{ $strLenCP: "$employeeID" }, 5] },
+              5,
+            ],
+          },
+        },
+      },
+    },
+    { $sort: { employeeSequence: -1 } },
+    { $limit: 1 },
+    { $project: { employeeSequence: 1 } },
+  ]);
 
-  if (!lastEmployee?.employeeID) {
-    return `${prefix}00001`;
+  if (!lastEmployee?.employeeSequence) {
+    return "00001";
   }
 
-  const lastNumber = parseInt(lastEmployee.employeeID.slice(prefix.length), 10);
+  const lastNumber = lastEmployee.employeeSequence;
   const newNumber = (lastNumber + 1).toString().padStart(5, "0");
-  return `${prefix}${newNumber}`;
+  return newNumber;
 };
 
 export const getNextEmployeeId = async (req, res, next) => {
   try {
-    const employeeOf = req.query.employeeOf || "Taj Agri";
-    res.json({ employeeID: await generateEmployeeId(employeeOf) });
+    res.json({ employeeID: await generateEmployeeId() });
   } catch (err) {
     next(err);
   }
@@ -404,11 +418,6 @@ export const createEmployee = async (req, res, next) => {
       throw new Error("Position not found");
     }
 
-    if (!EMPLOYEE_OF_PREFIX[employeeOf]) {
-      res.status(400);
-      throw new Error("Employee of must be Taj Agri or YD");
-    }
-
     const effectiveDate = joiningDate ? new Date(joiningDate) : new Date();
     const resolvedAllowances = await normalizeAllowances(allowances, effectiveDate);
     const resolvedLeaveEntitlements = await normalizeLeaveEntitlements(
@@ -438,7 +447,7 @@ export const createEmployee = async (req, res, next) => {
     }
 
     // Generate employee ID
-    const employeeID = await generateEmployeeId(employeeOf);
+    const employeeID = await generateEmployeeId();
 
     // Handle employee image uploads
     let employeePicture = null;
@@ -763,9 +772,22 @@ export const getEmployeeById = async (req, res, next) => {
       .populate("leaveType", "name isPaid")
       .sort({ year: -1 });
 
+    const currentShiftAssignment = await EmployeeShift.findOne({
+      employee: id,
+      endDate: null,
+    })
+      .populate("shift", "name startTime endTime")
+      .lean();
+
     res.json({
       employee,
       leaveBalances,
+      currentShift: currentShiftAssignment?.shift
+        ? {
+            ...currentShiftAssignment.shift,
+            effectiveDate: currentShiftAssignment.effectiveDate,
+          }
+        : null,
     });
   } catch (err) {
     console.log(err);
@@ -948,6 +970,7 @@ export const updateEmployee = async (req, res, next) => {
             `taj-hrms/employees/${employee.employeeID}/cnic`,
             "front",
           );
+          employee.cnicImages = employee.cnicImages || {};
           employee.cnicImages.front = frontResult.secure_url;
         }
 
@@ -957,6 +980,7 @@ export const updateEmployee = async (req, res, next) => {
             `taj-hrms/employees/${employee.employeeID}/cnic`,
             "back",
           );
+          employee.cnicImages = employee.cnicImages || {};
           employee.cnicImages.back = backResult.secure_url;
         }
 
@@ -1006,7 +1030,7 @@ export const updateEmployee = async (req, res, next) => {
       const employeeLimitStr = newPositionDoc.employeeLimit
         ?.trim()
         .toLowerCase();
-      if (employeeLimitStr && employeeLimitStr !== "unlimited") {
+      if (employee.status === "Active" && employeeLimitStr && employeeLimitStr !== "unlimited") {
         const limit = parseInt(employeeLimitStr, 10);
         if (!isNaN(limit) && newPositionDoc.hiredEmployees >= limit) {
           res.status(400);
@@ -1029,28 +1053,30 @@ export const updateEmployee = async (req, res, next) => {
         reason: "Updated via employee edit form",
       });
 
-      // Decrement count from old position
-      await Position.findByIdAndUpdate(fromPosition, {
-        $inc: { hiredEmployees: -1 },
-      });
-      // Increment count for new position
-      await Position.findByIdAndUpdate(position, {
-        $inc: { hiredEmployees: 1 },
-      });
-
-      // Handle department employee count if department changes
-      const oldDepartmentId = oldPositionDoc?.department?.toString();
-      const newDepartmentId = newPositionDoc.department?.toString();
-
-      if (oldDepartmentId !== newDepartmentId) {
-        // Decrement count from old department
-        await Department.findByIdAndUpdate(oldDepartmentId, {
-          $inc: { employeeCount: -1 },
+      if (employee.status === "Active") {
+        // Decrement count from old position
+        await Position.findByIdAndUpdate(fromPosition, {
+          $inc: { hiredEmployees: -1 },
         });
-        // Increment count for new department
-        await Department.findByIdAndUpdate(newDepartmentId, {
-          $inc: { employeeCount: 1 },
+        // Increment count for new position
+        await Position.findByIdAndUpdate(position, {
+          $inc: { hiredEmployees: 1 },
         });
+
+        // Handle department employee count if department changes
+        const oldDepartmentId = oldPositionDoc?.department?.toString();
+        const newDepartmentId = newPositionDoc.department?.toString();
+
+        if (oldDepartmentId && newDepartmentId && oldDepartmentId !== newDepartmentId) {
+          // Decrement count from old department
+          await Department.findByIdAndUpdate(oldDepartmentId, {
+            $inc: { employeeCount: -1 },
+          });
+          // Increment count for new department
+          await Department.findByIdAndUpdate(newDepartmentId, {
+            $inc: { employeeCount: 1 },
+          });
+        }
       }
 
       employee.position = position;
@@ -1089,11 +1115,7 @@ export const updateEmployee = async (req, res, next) => {
       employee.basicSalary = nextBasicSalary;
     }
 
-    if (employeeOf !== undefined) {
-      if (!EMPLOYEE_OF_PREFIX[employeeOf]) {
-        res.status(400);
-        throw new Error("Employee of must be Taj Agri or YD");
-      }
+    if (employeeOf !== undefined && employeeOf !== "") {
       employee.employeeOf = employeeOf;
     }
 
@@ -1324,8 +1346,39 @@ export const changeEmployeePosition = async (req, res, next) => {
       throw new Error("Employee not found");
     }
 
+    if (employee.status !== "Active") {
+      res.status(400);
+      throw new Error("Only active employees can be transferred");
+    }
+
+    if (employee.position?.toString() === newPosition.toString()) {
+      res.status(400);
+      throw new Error("New position must be different from current position");
+    }
+
+    const parsedEffectiveDate = effectiveDate
+      ? new Date(effectiveDate)
+      : new Date();
+    if (Number.isNaN(parsedEffectiveDate.getTime())) {
+      res.status(400);
+      throw new Error("Invalid effective date");
+    }
+
+    if (
+      employee.joiningDate &&
+      parsedEffectiveDate < new Date(employee.joiningDate)
+    ) {
+      res.status(400);
+      throw new Error("Effective date cannot be before joining date");
+    }
+
     const oldPositionDoc = await Position.findById(employee.position);
     const newPositionDoc = await Position.findById(newPosition);
+
+    if (!oldPositionDoc) {
+      res.status(404);
+      throw new Error("Current position not found");
+    }
 
     if (!newPositionDoc) {
       res.status(404);
@@ -1345,9 +1398,6 @@ export const changeEmployeePosition = async (req, res, next) => {
     }
 
     const fromPosition = employee.position;
-    const parsedEffectiveDate = effectiveDate
-      ? new Date(effectiveDate)
-      : new Date();
 
     // Create position history record
     await PositionHistory.create({
@@ -1704,6 +1754,299 @@ export const getEmployeeLeaveBalances = async (req, res, next) => {
         employeeID: employee.employeeID,
       },
       leaveBalances: balancesByYear,
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     End employment (terminate or resign) with an effective date.
+//                  Sets final status and reason for payroll cut-off.
+// @route           POST /api/employees/:id/end-employment
+// @access          Admin
+export const endEmployment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { effectiveDate, reason, mode } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+    if (!effectiveDate) {
+      res.status(400);
+      throw new Error("Effective date is required");
+    }
+    if (!reason || !String(reason).trim()) {
+      res.status(400);
+      throw new Error("Reason is required");
+    }
+    const endStatus = mode === "Terminated" ? "Terminated" : "Resigned";
+
+    const parsedDate = new Date(effectiveDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      res.status(400);
+      throw new Error("Invalid effective date");
+    }
+
+    const employee = await Employee.findById(id).populate(
+      "position",
+      "department",
+    );
+    if (!employee) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+
+    if (employee.status !== "Active") {
+      res.status(400);
+      throw new Error("Only active employees can be ended");
+    }
+
+    if (employee.joiningDate && parsedDate < new Date(employee.joiningDate)) {
+      res.status(400);
+      throw new Error("Effective date cannot be before joining date");
+    }
+
+    const previousStatus = employee.status;
+    employee.status = endStatus;
+    employee.resignationDate = parsedDate;
+    employee.resignationReason = String(reason).trim();
+    await employee.save();
+
+    if (previousStatus === "Active") {
+      if (employee.position?._id) {
+        await Position.findByIdAndUpdate(employee.position._id, {
+          $inc: { hiredEmployees: -1 },
+        });
+      }
+      if (employee.position?.department) {
+        await Department.findByIdAndUpdate(employee.position.department, {
+          $inc: { employeeCount: -1 },
+        });
+      }
+    }
+
+    res.json({
+      message: "Employment ended successfully",
+      employee: {
+        _id: employee._id,
+        status: employee.status,
+        resignationDate: employee.resignationDate,
+        resignationReason: employee.resignationReason,
+      },
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Rejoin a previously ended employee. Records the prior
+//                  employment spell, clears resignation, sets a new joining
+//                  date and resets current-year leave balances.
+// @route           POST /api/employees/:id/rejoin
+// @access          Admin
+export const rejoinEmployee = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { joiningDate } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+    if (!joiningDate) {
+      res.status(400);
+      throw new Error("Rejoin date is required");
+    }
+    const parsedJoining = new Date(joiningDate);
+    if (Number.isNaN(parsedJoining.getTime())) {
+      res.status(400);
+      throw new Error("Invalid rejoin date");
+    }
+
+    const employee = await Employee.findById(id).populate(
+      "position",
+      "department employeeLimit hiredEmployees name",
+    );
+    if (!employee) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+
+    if (employee.status === "Active") {
+      res.status(400);
+      throw new Error("Employee is already active");
+    }
+
+    if (
+      employee.resignationDate &&
+      parsedJoining <= new Date(employee.resignationDate)
+    ) {
+      res.status(400);
+      throw new Error("Rejoin date must be after the previous leaving date");
+    }
+
+    // Re-check position capacity before reactivating.
+    if (employee.position?._id) {
+      const positionDoc = employee.position;
+      const limitStr = positionDoc.employeeLimit?.trim().toLowerCase();
+      if (limitStr && limitStr !== "unlimited") {
+        const limit = parseInt(limitStr, 10);
+        if (!Number.isNaN(limit) && positionDoc.hiredEmployees >= limit) {
+          res.status(400);
+          throw new Error(
+            `Position limit reached for ${positionDoc.name}. Cannot rejoin.`,
+          );
+        }
+      }
+    }
+
+    // Snapshot the prior employment spell.
+    employee.employmentHistory = employee.employmentHistory || [];
+    employee.employmentHistory.push({
+      joiningDate: employee.joiningDate || null,
+      resignationDate: employee.resignationDate || null,
+      status: ["Resigned", "Terminated"].includes(employee.status)
+        ? employee.status
+        : "Resigned",
+      resignationReason: employee.resignationReason || "",
+      endedBy: req.user?._id,
+      rejoinedAt: new Date(),
+      rejoinedBy: req.user?._id,
+    });
+
+    employee.status = "Active";
+    employee.joiningDate = parsedJoining;
+    employee.resignationDate = null;
+    employee.resignationReason = "";
+    await employee.save();
+
+    // Bump capacity counters back up.
+    if (employee.position?._id) {
+      await Position.findByIdAndUpdate(employee.position._id, {
+        $inc: { hiredEmployees: 1 },
+      });
+      if (employee.position.department) {
+        await Department.findByIdAndUpdate(employee.position.department, {
+          $inc: { employeeCount: 1 },
+        });
+      }
+    }
+
+    // Reset current-year leave balances based on entitlements.
+    const populatedEmp = await Employee.findById(id).populate(
+      "leaveEntitlements.leaveType",
+      "name",
+    );
+    const targetYear = parsedJoining.getFullYear();
+    await LeaveBalance.deleteMany({ employee: id, year: targetYear });
+    await syncLeaveBalancesFromEntitlements(
+      id,
+      populatedEmp.leaveEntitlements,
+      targetYear,
+    );
+
+    res.json({
+      message: "Employee rejoined successfully",
+      employee: {
+        _id: employee._id,
+        status: employee.status,
+        joiningDate: employee.joiningDate,
+      },
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Get payroll list for an employee (paginated).
+// @route           GET /api/employees/:id/payrolls
+// @access          Admin, Supervisor
+export const getEmployeePayrolls = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 50);
+    const skip = (page - 1) * limit;
+
+    const filter = { employee: id };
+    if (req.query.year) filter.year = Number(req.query.year);
+    if (req.query.month) filter.month = Number(req.query.month);
+
+    const [payrolls, total] = await Promise.all([
+      Payroll.find(filter)
+        .select(
+          "year month calculations.netSalary calculations.totalSalary calculations.grossSalary calculations.basicSalaryAmount calculations.allowanceAmount calculations.totalDeductions isPaid paidAt generatedAt",
+        )
+        .sort({ year: -1, month: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Payroll.countDocuments(filter),
+    ]);
+
+    res.json({
+      payrolls,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
+};
+
+// @description     Get all leave applications for an employee (paginated).
+// @route           GET /api/employees/:id/leave-applications
+// @access          Admin, Supervisor
+export const getEmployeeLeaveApplications = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const limit = Math.min(Math.max(Number(req.query.limit || 10), 1), 50);
+    const skip = (page - 1) * limit;
+
+    const filter = { employee: id };
+    if (req.query.status) filter.status = req.query.status;
+
+    const [applications, total] = await Promise.all([
+      LeaveApplication.find(filter)
+        .populate("leaveType", "name isPaid")
+        .populate("appliedBy", "name")
+        .populate("approvedBy", "name")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      LeaveApplication.countDocuments(filter),
+    ]);
+
+    res.json({
+      applications,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
     });
   } catch (err) {
     console.log(err);

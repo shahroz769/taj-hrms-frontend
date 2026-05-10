@@ -13,6 +13,7 @@ import AttendanceRulesSetups from "./pages/Setups/AttendanceRulesSetups";
 import AllEmployees from "./pages/Workforce/AllEmployees";
 import AddEmployee from "./pages/Workforce/AddEmployee";
 import EditEmployee from "./pages/Workforce/EditEmployee";
+import EmployeeDetails from "./pages/Workforce/EmployeeDetails/EmployeeDetails";
 import ShiftsRequests from "./pages/Workforce/ShiftsRequests";
 import ShiftsAssignments from "./pages/Workforce/ShiftsAssignments";
 import Contracts from "./pages/Workforce/Contracts";
@@ -112,6 +113,10 @@ function App() {
                 <Route
                   path="/workforce/employees/:id/edit"
                   element={<EditEmployee />}
+                />
+                <Route
+                  path="/workforce/employees/:id"
+                  element={<EmployeeDetails />}
                 />
                 <Route
                   path="/workforce/shift-requests"

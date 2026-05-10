@@ -9,7 +9,6 @@ const employeeSchema = new mongoose.Schema(
     },
     employeeOf: {
       type: String,
-      enum: ["Taj Agri", "YD"],
       required: true,
       default: "Taj Agri",
     },
@@ -94,6 +93,25 @@ const employeeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    resignationReason: {
+      type: String,
+      default: "",
+    },
+    employmentHistory: [
+      {
+        joiningDate: Date,
+        resignationDate: Date,
+        status: {
+          type: String,
+          enum: ["Resigned", "Terminated"],
+          default: "Resigned",
+        },
+        resignationReason: { type: String, default: "" },
+        endedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        rejoinedAt: { type: Date, default: null },
+        rejoinedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      },
+    ],
     employeePicture: String,
     cnic: { type: String, unique: true },
     cnicImages: { front: String, back: String },
@@ -182,8 +200,8 @@ const employeeSchema = new mongoose.Schema(
 employeeSchema.index({ status: 1, createdAt: -1 });
 // Payroll eligibility checks filter active employees by joiningDate before month end.
 employeeSchema.index({ status: 1, joiningDate: 1 });
-// generateEmployeeId() calls findOne().sort({ createdAt: -1 }) with no filter;
-// a standalone index allows this to resolve in a single entry lookup instead of a collection scan
+// generateEmployeeId() finds the latest numeric employeeID.
+// A standalone index helps resolve that lookup without a collection scan.
 employeeSchema.index({ createdAt: -1 });
 
 const Employee = mongoose.model("Employee", employeeSchema);

@@ -382,17 +382,18 @@ const ensureEarnedLeaveType = async () => {
 const adjustEarnedLeaveBalance = async (employeeId, delta) => {
   if (!employeeId || !delta) return;
   const earnedLeave = await ensureEarnedLeaveType();
-  await LeaveBalance.findOneAndUpdate(
+  const balance = await LeaveBalance.findOneAndUpdate(
     { employee: employeeId, leaveType: earnedLeave._id, year: EARNED_LEAVE_YEAR },
     {
-      $inc: {
-        totalDays: delta,
-        remainingDays: delta,
-      },
-      $setOnInsert: { usedDays: 0 },
+      $setOnInsert: { totalDays: 0, usedDays: 0, remainingDays: 0 },
     },
-    { upsert: true },
+    { upsert: true, new: true },
   );
+
+  const usedDays = Math.max(0, Number(balance.usedDays || 0));
+  balance.totalDays = Math.max(0, Number(balance.totalDays || 0) + delta);
+  balance.remainingDays = Math.max(0, balance.totalDays - usedDays);
+  await balance.save();
 };
 
 const isHolidayWorkAttendance = ({ status, shift, date }) => {
@@ -783,7 +784,7 @@ export const bulkMarkAttendance = async (req, res, next) => {
               }));
             }
           } else if (isSplitShift(shiftToUse) && status === "Absent") {
-            attendanceSegments = shiftToUse.segments.map((seg) => ({
+            attendanceSegments = shiftToUse.segments.map(() => ({
               checkIn: null,
               checkOut: null,
               lateDurationMinutes: 0,

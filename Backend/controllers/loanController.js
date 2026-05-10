@@ -6,9 +6,6 @@ import { PAKISTAN_TZ } from "../utils/timezone.js";
 
 // ── Helpers ──
 
-const round2 = (value) =>
-  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-
 /** Floor to whole number — no decimals in installments */
 const floorInt = (value) => Math.floor(Number(value));
 
@@ -329,6 +326,10 @@ export const createLoan = async (req, res, next) => {
         res.status(400);
         throw new Error("Total months must be a positive integer");
       }
+      if (parsed > parsedAmount) {
+        res.status(400);
+        throw new Error("Total months cannot exceed loan amount");
+      }
       computedMonths = parsed;
       computedInstallment = floorInt(parsedAmount / parsed);
     } else {
@@ -436,6 +437,26 @@ export const approveLoan = async (req, res, next) => {
     if (loan.status !== "Pending") {
       res.status(400);
       throw new Error("Only pending loans can be approved");
+    }
+
+    const employeeDoc = await Employee.findById(loan.employee);
+    if (!employeeDoc) {
+      res.status(404);
+      throw new Error("Employee not found");
+    }
+    if (employeeDoc.status !== "Active") {
+      res.status(400);
+      throw new Error("Only active employees can have loans approved");
+    }
+
+    const activeLoan = await Loan.findOne({
+      _id: { $ne: loan._id },
+      employee: loan.employee,
+      status: { $in: ["Pending", "Approved"] },
+    });
+    if (activeLoan) {
+      res.status(400);
+      throw new Error(`${employeeDoc.fullName} already has an active loan`);
     }
 
     const start = getNextMonth();

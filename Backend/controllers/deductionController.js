@@ -235,6 +235,10 @@ export const createDeduction = async (req, res, next) => {
         res.status(404);
         throw new Error("Employee not found");
       }
+      if (employeeDoc.status !== "Active") {
+        res.status(400);
+        throw new Error("Deductions can only be created for active employees");
+      }
     }
 
     if (amount === undefined || amount === null) {
@@ -343,6 +347,10 @@ export const updateDeduction = async (req, res, next) => {
       if (!employeeDoc) {
         res.status(404);
         throw new Error("Employee not found");
+      }
+      if (employeeDoc.status !== "Active") {
+        res.status(400);
+        throw new Error("Deductions can only be assigned to active employees");
       }
       deduction.employee = employee;
     }

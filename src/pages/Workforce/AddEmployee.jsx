@@ -108,7 +108,6 @@ const AddEmployee = () => {
       gender: "",
       department: "",
       position: "",
-      employeeOf: "Taj Agri",
       basicSalary: "",
       leaveEntitlements: [],
       leaveAnnualDays: "",
@@ -211,7 +210,6 @@ const AddEmployee = () => {
   const watchLegal = watch("legal");
   const watchGender = watch("gender");
   const watchMaritalStatus = watch("maritalStatus");
-  const watchEmployeeOf = watch("employeeOf");
   const watchLeaveEntitlements = watch("leaveEntitlements") || [];
   const watchAllowances = watch("allowances") || [];
 
@@ -247,9 +245,8 @@ const AddEmployee = () => {
   });
 
   const { data: nextEmployeeIdData } = useQuery({
-    queryKey: ["nextEmployeeId", watchEmployeeOf],
-    queryFn: () => fetchNextEmployeeId(watchEmployeeOf),
-    enabled: !!watchEmployeeOf,
+    queryKey: ["nextEmployeeId"],
+    queryFn: fetchNextEmployeeId,
   });
 
   useEffect(() => {
@@ -730,24 +727,6 @@ const AddEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
-              {renderLabel("Employee of", true)}
-              <Select
-                value={watchEmployeeOf}
-                onValueChange={(value) => setValue("employeeOf", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select company" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Taj Agri">Taj Agri</SelectItem>
-                  <SelectItem value="YD">YD</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.employeeOf && (
-                <span className={styles.error}>{errors.employeeOf.message}</span>
-              )}
-            </div>
-            <div className={styles.formGroup}>
               {renderLabel("Employee ID")}
               <Input value={nextEmployeeIdData?.employeeID || ""} readOnly />
             </div>
@@ -987,7 +966,7 @@ const AddEmployee = () => {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Allowances</h2>
           </div>
-          <div className={styles.policyList}>
+          <div className={styles.allowanceGrid}>
             {(allowanceComponentsData || []).map((allowance, index) => {
               const enabled = watchAllowances[index]?.enabled;
               return (
