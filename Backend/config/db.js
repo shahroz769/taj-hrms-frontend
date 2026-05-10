@@ -5,6 +5,7 @@ dotenv.config();
 
 // Cache the connection promise so warm Vercel invocations reuse the existing connection
 let connectionPromise = null;
+const databaseName = process.env.MONGO_DB_NAME || "tajHRMS";
 
 const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) return;
@@ -12,6 +13,7 @@ const connectDB = async () => {
 
   try {
     connectionPromise = mongoose.connect(process.env.MONGO_URI, {
+      dbName: databaseName,
       maxPoolSize: 5,               // Small pool per serverless instance — each Vercel invocation has its own pool
       minPoolSize: 0,               // Don't hold idle connections between requests on serverless
       maxIdleTimeMS: 10000,         // Release unused connections after 10s to avoid exhausting Atlas limits
@@ -20,7 +22,7 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,       // Cover typical HRMS OLTP operations (payroll, attendance, etc.)
     });
     const conn = await connectionPromise;
-    console.log(chalk.bgGreen(`MongoDB Connected: ${conn.connection.host}`));
+    console.log(chalk.bgGreen(`MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`));
   } catch (error) {
     connectionPromise = null; // Reset so the next cold start can retry
     console.error(`Error: ${error.message}`);
