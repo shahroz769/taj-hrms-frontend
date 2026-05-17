@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 
 // React Router
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 
 // External Libraries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +45,7 @@ import {
 import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchAllowanceComponentsList } from "@/services/allowanceComponentsApi";
 import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
+import { fetchPositions } from "@/services/positionsApi";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -110,7 +111,6 @@ const AddEmployee = () => {
       position: "",
       basicSalary: "",
       leaveEntitlements: [],
-      leaveAnnualDays: "",
       leaveMethod: "Fixed",
       allowances: [],
       employmentType: "Permanent",
@@ -244,10 +244,19 @@ const AddEmployee = () => {
     queryFn: fetchLeaveTypesList,
   });
 
+  // Lightweight prerequisite probe — just need to know if any positions exist.
+  const { data: positionsCountData, isLoading: isLoadingPositionsCount } =
+    useQuery({
+      queryKey: ["positionsExistenceCheck"],
+      queryFn: () => fetchPositions({ page: 1, limit: 1, search: "" }),
+    });
+
   const { data: nextEmployeeIdData } = useQuery({
     queryKey: ["nextEmployeeId"],
     queryFn: fetchNextEmployeeId,
   });
+
+  const [leaveMethod, setLeaveMethod] = useState("Fixed");
 
   useEffect(() => {
     const nonEarnedLeaveTypes =
@@ -257,6 +266,7 @@ const AddEmployee = () => {
       nonEarnedLeaveTypes.map((item) => ({
         leaveType: item._id,
         enabled: false,
+        annualDays: "",
       })),
     );
   }, [leaveTypesData, setValue]);
@@ -388,25 +398,41 @@ const AddEmployee = () => {
   };
 
   const onSubmit = (data) => {
+    // Validate required file uploads (not part of RHF state)
+    let hasFileError = false;
+    if (!employeePictureFile) {
+      setEmployeePictureError("Employee picture is required");
+      hasFileError = true;
+    }
+    const nextCnicErrors = { front: "", back: "" };
+    if (!cnicFrontFile) {
+      nextCnicErrors.front = "CNIC front image is required";
+      hasFileError = true;
+    }
+    if (!cnicBackFile) {
+      nextCnicErrors.back = "CNIC back image is required";
+      hasFileError = true;
+    }
+    setCnicImageErrors(nextCnicErrors);
+    if (hasFileError) {
+      toast.error("Please upload the required employee picture and CNIC images");
+      return;
+    }
+
     const formData = new FormData();
 
-    // Expand the single annual days + method into per-entitlement values
-    const annualDays = data.leaveAnnualDays;
-    const method = data.leaveMethod || "Fixed";
+    // Expand per-type annual days into entitlement payload
     const expandedEntitlements = (data.leaveEntitlements || [])
       .filter((entry) => entry.enabled)
       .map((entry) => ({
         leaveType: entry.leaveType,
         enabled: true,
-        annualDays,
-        method,
+        annualDays: Number(entry.annualDays) || 0,
+        method: leaveMethod || "Fixed",
       }));
 
     // Append simple fields
     Object.keys(data).forEach((key) => {
-      if (key === "leaveAnnualDays" || key === "leaveMethod") {
-        return;
-      }
       if (key === "leaveEntitlements") {
         formData.append("leaveEntitlements", JSON.stringify(expandedEntitlements));
         return;
@@ -481,8 +507,107 @@ const AddEmployee = () => {
   );
 
   // ===========================================================================
+  // PREREQUISITES GATE
+  // ===========================================================================
+  const prerequisitesLoading =
+    departmentsData === undefined ||
+    allowanceComponentsData === undefined ||
+    leaveTypesData === undefined ||
+    isLoadingPositionsCount;
+
+  const nonEarnedLeaveTypesCount = (leaveTypesData || []).filter(
+    (item) => item.name !== "Earned Leave",
+  ).length;
+
+  const missingPrerequisites = [
+    {
+      label: "Departments",
+      missing: !departmentsData || departmentsData.length === 0,
+      path: "/setups/departments",
+      description: "Create at least one department before adding employees.",
+    },
+    {
+      label: "Positions",
+      missing:
+        !positionsCountData ||
+        !positionsCountData.positions ||
+        positionsCountData.positions.length === 0,
+      path: "/setups/positions",
+      description: "Create at least one position so an employee can be assigned.",
+    },
+    {
+      label: "Leave Types",
+      missing: nonEarnedLeaveTypesCount === 0,
+      path: "/leaves/types",
+      description:
+        "Create at least one leave type to configure leave entitlements.",
+    },
+    {
+      label: "Allowance Components",
+      missing:
+        !allowanceComponentsData || allowanceComponentsData.length === 0,
+      path: "/allowances/components",
+      description:
+        "Create at least one allowance component to assign allowances.",
+    },
+  ].filter((item) => item.missing);
+
+  // ===========================================================================
   // RENDER
   // ===========================================================================
+
+  if (prerequisitesLoading) {
+    return (
+      <div className={styles.container}>
+        <div className="flex items-center justify-center py-20">
+          <Spinner />
+        </div>
+      </div>
+    );
+  }
+
+  if (missingPrerequisites.length > 0) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <h1 className={styles.title}>Add Employee</h1>
+          </div>
+        </div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-6">
+          <h2 className="text-base font-semibold text-amber-900">
+            Setup required before adding an employee
+          </h2>
+          <p className="mt-1 text-sm text-amber-800">
+            The following must be created first. Use the links below to set
+            them up, then come back to add an employee.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {missingPrerequisites.map((item) => (
+              <li
+                key={item.label}
+                className="flex flex-col gap-1 rounded-md border border-amber-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Create {item.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.description}
+                  </p>
+                </div>
+                <Link to={item.path}>
+                  <Button variant="green" size="sm" className="cursor-pointer">
+                    Go to {item.label}
+                  </Button>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -766,6 +891,27 @@ const AddEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
+              {renderLabel("Gross Salary")}
+              <Input
+                type="text"
+                readOnly
+                value={(() => {
+                  const basic = Number(watch("basicSalary")) || 0;
+                  const allowanceTotal = (watchAllowances || []).reduce(
+                    (sum, a) =>
+                      sum + (a?.enabled ? Number(a?.amount) || 0 : 0),
+                    0,
+                  );
+                  return (basic + allowanceTotal).toLocaleString();
+                })()}
+                tabIndex={-1}
+                className="bg-muted cursor-not-allowed"
+              />
+              <span className={styles.imageHint}>
+                Auto-calculated as Basic Salary + enabled Allowances
+              </span>
+            </div>
+            <div className={styles.formGroup}>
               {renderLabel("Joining Date", true)}
               <Popover>
                 <PopoverTrigger asChild>
@@ -825,7 +971,7 @@ const AddEmployee = () => {
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>Employee Picture (Optional)</Label>
+              {renderLabel("Employee Picture", true)}
               <div className={styles.imageUpload}>
                 <label className={`${styles.imagePreview} ${styles.employeePicturePreview}`}>
                   <input
@@ -852,7 +998,7 @@ const AddEmployee = () => {
               ) : null}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>CNIC Images</Label>
+              {renderLabel("CNIC Images", true)}
               <div className={styles.imageUpload}>
                 <label className={styles.imagePreview}>
                   <input
@@ -907,24 +1053,10 @@ const AddEmployee = () => {
           </div>
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              {renderLabel("Annual Days (applies to all selected leaves)", true)}
-              <Input
-                type="number"
-                min="0"
-                placeholder="e.g. 14"
-                {...register("leaveAnnualDays")}
-              />
-              {errors.leaveAnnualDays ? (
-                <span className={styles.error}>
-                  {errors.leaveAnnualDays.message}
-                </span>
-              ) : null}
-            </div>
-            <div className={styles.formGroup}>
-              {renderLabel("Method", true)}
+              {renderLabel("Method (applies to all selected leaves)", true)}
               <Select
-                value={watch("leaveMethod") || "Fixed"}
-                onValueChange={(value) => setValue("leaveMethod", value)}
+                value={leaveMethod}
+                onValueChange={(value) => setLeaveMethod(value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Method" />
@@ -941,15 +1073,44 @@ const AddEmployee = () => {
               .filter((leaveType) => leaveType.name !== "Earned Leave")
               .map((leaveType, index) => {
                 const enabled = watchLeaveEntitlements[index]?.enabled;
+                const entitlementError =
+                  errors.leaveEntitlements?.[index]?.annualDays;
                 return (
-                  <div key={leaveType._id} className={styles.checkboxGroup}>
-                    <Checkbox
-                      checked={Boolean(enabled)}
-                      onCheckedChange={(checked) =>
-                        setValue(`leaveEntitlements.${index}.enabled`, Boolean(checked))
-                      }
-                    />
-                    <Label className={styles.label}>{leaveType.name}</Label>
+                  <div key={leaveType._id} className={styles.policyRow}>
+                    <div className={styles.checkboxGroup}>
+                      <Checkbox
+                        checked={Boolean(enabled)}
+                        onCheckedChange={(checked) => {
+                          setValue(
+                            `leaveEntitlements.${index}.enabled`,
+                            Boolean(checked),
+                          );
+                          if (!checked) {
+                            setValue(
+                              `leaveEntitlements.${index}.annualDays`,
+                              "",
+                            );
+                          }
+                        }}
+                      />
+                      <Label className={styles.label}>{leaveType.name}</Label>
+                    </div>
+                    <div>
+                      <Input
+                        type="number"
+                        min="0"
+                        disabled={!enabled}
+                        placeholder="Days / year"
+                        {...register(
+                          `leaveEntitlements.${index}.annualDays`,
+                        )}
+                      />
+                      {entitlementError && (
+                        <span className={styles.error}>
+                          {entitlementError.message}
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="hidden"
                       {...register(`leaveEntitlements.${index}.leaveType`)}

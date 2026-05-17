@@ -6,10 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test",
-    "test:payroll": "node --test tests/payroll.rules.test.js",
-    "payroll:backfill-history": "node scripts/backfillCompensationHistory.js",
-    "payroll:validate-data": "node scripts/validatePayrollData.js"
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

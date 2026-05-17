@@ -816,18 +816,20 @@ export const getEmployeeProgressReports = async (req, res, next) => {
       }
     }
 
-    // Build date range for the time period
+    // Build UTC date range for the selected time period. Using UTC keeps the
+    // bucket boundaries stable regardless of server timezone and aligns with
+    // how Mongo stores Date values.
     let dateStart, dateEnd;
     if (periodType === "monthly") {
-      dateStart = new Date(year, month - 1, 1);
-      dateEnd = new Date(year, month, 1);
+      dateStart = new Date(Date.UTC(year, month - 1, 1));
+      dateEnd = new Date(Date.UTC(year, month, 1));
     } else if (periodType === "quarterly") {
       const quarterStartMonth = (quarter - 1) * 3;
-      dateStart = new Date(year, quarterStartMonth, 1);
-      dateEnd = new Date(year, quarterStartMonth + 3, 1);
+      dateStart = new Date(Date.UTC(year, quarterStartMonth, 1));
+      dateEnd = new Date(Date.UTC(year, quarterStartMonth + 3, 1));
     } else {
-      dateStart = new Date(year, 0, 1);
-      dateEnd = new Date(year + 1, 0, 1);
+      dateStart = new Date(Date.UTC(year, 0, 1));
+      dateEnd = new Date(Date.UTC(year + 1, 0, 1));
     }
 
     const skip = limit > 0 ? (page - 1) * limit : 0;
@@ -855,13 +857,15 @@ export const getEmployeeProgressReports = async (req, res, next) => {
       "Closed (Late)",
     ];
 
-    // Aggregate work progress reports for these employees within date range
+    // Aggregate work progress reports for these employees within the period.
+    // Filter by `completionDate` (when the task was actually completed) so
+    // results reflect work done in that period rather than any later edits.
     const progressAggregation = await WorkProgressReport.aggregate([
       {
         $match: {
           employees: { $in: employeeIds },
           status: { $in: CLOSED_STATUSES },
-          updatedAt: { $gte: dateStart, $lt: dateEnd },
+          completionDate: { $gte: dateStart, $lt: dateEnd },
         },
       },
       { $unwind: "$employees" },

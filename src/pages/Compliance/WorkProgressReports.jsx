@@ -298,7 +298,6 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
   const [remarksDatePickerOpen, setRemarksDatePickerOpen] = useState(false);
   const [closingRemarks, setClosingRemarks] = useState("");
   const [rating, setRating] = useState(0);
-  const [showCloseSection, setShowCloseSection] = useState(false);
 
   const isAdmin = userRole === ROLES.admin;
   const isSupervisor = userRole === ROLES.supervisor;
@@ -362,7 +361,6 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
       });
       setClosingRemarks("");
       setRating(0);
-      setShowCloseSection(false);
       toast.success("Task closed successfully");
     },
     onError: (error) => {
@@ -424,7 +422,6 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
           setRemarksText("");
           setClosingRemarks("");
           setRating(0);
-          setShowCloseSection(false);
         }
       }}
     >
@@ -651,21 +648,15 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
                     Complete Task
                   </Button>
                 )}
-                {canClose && !showCloseSection && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer"
-                    onClick={() => setShowCloseSection(true)}
-                  >
-                    <StarIcon size={14} />
-                    Close Task
-                  </Button>
+                {canClose && (
+                  <Badge className="bg-amber-50 text-amber-700 border border-amber-200">
+                    Awaiting Admin Closure
+                  </Badge>
                 )}
               </div>
 
-              {/* Close Task Section */}
-              {canClose && showCloseSection && (
+              {/* Close Task Section — auto-shown for completed tasks awaiting closure */}
+              {canClose && (
                 <div className="border rounded-md p-4 space-y-3 bg-gray-50">
                   <h4 className="font-semibold text-sm text-primary">
                     Close Task
@@ -714,18 +705,6 @@ const ViewDetailsModal = ({ open, onOpenChange, reportId, userRole }) => {
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setShowCloseSection(false);
-                        setClosingRemarks("");
-                        setRating(0);
-                      }}
-                    >
-                      Cancel
-                    </Button>
                     <Button
                       size="sm"
                       variant="green"

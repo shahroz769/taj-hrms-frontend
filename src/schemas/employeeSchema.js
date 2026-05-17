@@ -91,12 +91,33 @@ const legalSchema = z.object({
   availableAnywhereInPakistan: z.boolean(),
 });
 
-const leaveEntitlementSchema = z.object({
-  leaveType: z.string().min(1),
-  enabled: z.boolean(),
-  annualDays: z.union([z.string(), z.number()]).optional(),
-  method: z.enum(["Fixed", "Prorata"]).default("Fixed"),
-});
+const leaveEntitlementSchema = z
+  .object({
+    leaveType: z.string().min(1),
+    enabled: z.boolean(),
+    annualDays: z.union([z.string(), z.number()]).optional().nullable(),
+    method: z.enum(["Fixed", "Prorata"]).default("Fixed").optional(),
+  })
+  .superRefine((entry, ctx) => {
+    if (!entry.enabled) return;
+    const raw = entry.annualDays;
+    if (raw === "" || raw === null || raw === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["annualDays"],
+        message: "Annual days is required for enabled leave types",
+      });
+      return;
+    }
+    const num = Number(raw);
+    if (Number.isNaN(num) || num < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["annualDays"],
+        message: "Annual days must be a non-negative number",
+      });
+    }
+  });
 
 const allowanceSchema = z.object({
   allowanceComponent: z.string().min(1),
@@ -157,8 +178,6 @@ export const employeeSchema = z
       { message: "Basic salary must be a non-negative number" },
     ),
     leaveEntitlements: z.array(leaveEntitlementSchema).optional(),
-    leaveAnnualDays: z.union([z.string(), z.number()]).optional(),
-    leaveMethod: z.enum(["Fixed", "Prorata"]).default("Fixed").optional(),
     allowances: z.array(allowanceSchema).optional(),
     compensationEffectiveDate: z
       .union([z.string(), z.date()])
@@ -197,6 +216,45 @@ export const employeeSchema = z
         message: "Husband name is required for married female employees",
       });
     }
+
+    // Cross-field contact number uniqueness across all contact fields for the same employee
+    const seen = new Map(); // number -> first location path label
+    const register = (rawValue, path, label) => {
+      const value = typeof rawValue === "string" ? rawValue.trim() : "";
+      if (!value) return;
+      if (seen.has(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path,
+          message: `Contact number is already used in ${seen.get(value)}`,
+        });
+      } else {
+        seen.set(value, label);
+      }
+    };
+
+    register(data.contactNumber, ["contactNumber"], "Primary contact");
+    (data.emergencyContact || []).forEach((entry, i) => {
+      register(
+        entry?.number,
+        ["emergencyContact", i, "number"],
+        `Emergency contact #${i + 1}`,
+      );
+    });
+    (data.references || []).forEach((entry, i) => {
+      register(
+        entry?.contactNumber,
+        ["references", i, "contactNumber"],
+        `Reference #${i + 1}`,
+      );
+    });
+    (data.guarantor || []).forEach((entry, i) => {
+      register(
+        entry?.contactNumber,
+        ["guarantor", i, "contactNumber"],
+        `Guarantor #${i + 1}`,
+      );
+    });
   });
 
 export default employeeSchema;

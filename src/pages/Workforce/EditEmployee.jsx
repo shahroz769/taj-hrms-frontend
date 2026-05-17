@@ -128,7 +128,6 @@ const EditEmployee = () => {
       position: "",
       basicSalary: "",
       leaveEntitlements: [],
-      leaveAnnualDays: "",
       leaveMethod: "Fixed",
       allowances: [],
       compensationEffectiveDate: new Date(),
@@ -326,10 +325,9 @@ const EditEmployee = () => {
             return {
               leaveType: leaveType._id,
               enabled: Boolean(existing?.enabled),
+              annualDays: existing?.annualDays ?? "",
             };
           }),
-        leaveAnnualDays:
-          emp.leaveEntitlements?.find((item) => item.enabled)?.annualDays ?? "",
         leaveMethod:
           emp.leaveEntitlements?.find((item) => item.enabled)?.method || "Fixed",
         allowances: (allowanceComponentsData || []).map((allowance) => {
@@ -550,23 +548,46 @@ const EditEmployee = () => {
       return;
     }
 
+    // Require photo + CNIC images (either newly uploaded or already saved)
+    let hasFileError = false;
+    const existingPicture = employeeData?.employee?.employeePicture;
+    const existingCnicFront = employeeData?.employee?.cnicImages?.front;
+    const existingCnicBack = employeeData?.employee?.cnicImages?.back;
+    if (!employeePictureFile && !existingPicture) {
+      setEmployeePictureError("Employee picture is required");
+      hasFileError = true;
+    }
+    const nextCnicErrors = { front: "", back: "" };
+    if (!cnicFrontFile && !existingCnicFront) {
+      nextCnicErrors.front = "CNIC front image is required";
+      hasFileError = true;
+    }
+    if (!cnicBackFile && !existingCnicBack) {
+      nextCnicErrors.back = "CNIC back image is required";
+      hasFileError = true;
+    }
+    setCnicImageErrors(nextCnicErrors);
+    if (hasFileError) {
+      toast.error("Please upload the required employee picture and CNIC images");
+      return;
+    }
+
     const formData = new FormData();
 
-    // Expand the single annual days + method into per-entitlement values
-    const annualDays = data.leaveAnnualDays;
+    // Expand per-type annual days into entitlement payload
     const method = data.leaveMethod || "Fixed";
     const expandedEntitlements = (data.leaveEntitlements || [])
       .filter((entry) => entry.enabled)
       .map((entry) => ({
         leaveType: entry.leaveType,
         enabled: true,
-        annualDays,
+        annualDays: Number(entry.annualDays) || 0,
         method,
       }));
 
     // Append simple fields
     Object.keys(data).forEach((key) => {
-      if (key === "leaveAnnualDays" || key === "leaveMethod") {
+      if (key === "leaveMethod") {
         return;
       }
       if (key === "leaveEntitlements") {
@@ -968,6 +989,27 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={styles.formGroup}>
+              {renderLabel("Gross Salary")}
+              <Input
+                type="text"
+                readOnly
+                value={(() => {
+                  const basic = Number(watch("basicSalary")) || 0;
+                  const allowanceTotal = (watchAllowances || []).reduce(
+                    (sum, a) =>
+                      sum + (a?.enabled ? Number(a?.amount) || 0 : 0),
+                    0,
+                  );
+                  return (basic + allowanceTotal).toLocaleString();
+                })()}
+                tabIndex={-1}
+                className="bg-muted cursor-not-allowed"
+              />
+              <span className={styles.imageHint}>
+                Auto-calculated as Basic Salary + enabled Allowances
+              </span>
+            </div>
+            <div className={styles.formGroup}>
               {renderLabel("Joining Date", true)}
               <Popover>
                 <PopoverTrigger asChild>
@@ -1064,7 +1106,9 @@ const EditEmployee = () => {
               )}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>Employee Picture (Optional)</Label>
+              <Label className={styles.label}>
+                Employee Picture<span className={styles.requiredMark}> *</span>
+              </Label>
               <div className={styles.imageUpload}>
                 <label className={`${styles.imagePreview} ${styles.employeePicturePreview}`}>
                   <input
@@ -1091,7 +1135,9 @@ const EditEmployee = () => {
               ) : null}
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
-              <Label className={styles.label}>CNIC Images</Label>
+              <Label className={styles.label}>
+                CNIC Images<span className={styles.requiredMark}> *</span>
+              </Label>
               <div className={styles.imageUpload}>
                 <label className={styles.imagePreview}>
                   <input
@@ -1146,21 +1192,7 @@ const EditEmployee = () => {
           </div>
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              {renderLabel("Annual Days (applies to all selected leaves)", true)}
-              <Input
-                type="number"
-                min="0"
-                placeholder="e.g. 14"
-                {...register("leaveAnnualDays")}
-              />
-              {errors.leaveAnnualDays ? (
-                <span className={styles.error}>
-                  {errors.leaveAnnualDays.message}
-                </span>
-              ) : null}
-            </div>
-            <div className={styles.formGroup}>
-              {renderLabel("Method", true)}
+              {renderLabel("Method (applies to all selected leaves)", true)}
               <Select
                 value={watchLeaveMethod || "Fixed"}
                 onValueChange={(value) => setValue("leaveMethod", value)}
@@ -1180,15 +1212,44 @@ const EditEmployee = () => {
               .filter((leaveType) => leaveType.name !== "Earned Leave")
               .map((leaveType, index) => {
                 const enabled = watchLeaveEntitlements[index]?.enabled;
+                const entitlementError =
+                  errors.leaveEntitlements?.[index]?.annualDays;
                 return (
-                  <div key={leaveType._id} className={styles.checkboxGroup}>
-                    <Checkbox
-                      checked={Boolean(enabled)}
-                      onCheckedChange={(checked) =>
-                        setValue(`leaveEntitlements.${index}.enabled`, Boolean(checked))
-                      }
-                    />
-                    <Label className={styles.label}>{leaveType.name}</Label>
+                  <div key={leaveType._id} className={styles.policyRow}>
+                    <div className={styles.checkboxGroup}>
+                      <Checkbox
+                        checked={Boolean(enabled)}
+                        onCheckedChange={(checked) => {
+                          setValue(
+                            `leaveEntitlements.${index}.enabled`,
+                            Boolean(checked),
+                          );
+                          if (!checked) {
+                            setValue(
+                              `leaveEntitlements.${index}.annualDays`,
+                              "",
+                            );
+                          }
+                        }}
+                      />
+                      <Label className={styles.label}>{leaveType.name}</Label>
+                    </div>
+                    <div>
+                      <Input
+                        type="number"
+                        min="0"
+                        disabled={!enabled}
+                        placeholder="Days / year"
+                        {...register(
+                          `leaveEntitlements.${index}.annualDays`,
+                        )}
+                      />
+                      {entitlementError && (
+                        <span className={styles.error}>
+                          {entitlementError.message}
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="hidden"
                       {...register(`leaveEntitlements.${index}.leaveType`)}

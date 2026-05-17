@@ -339,6 +339,37 @@ const validateReferences = (references) => {
   });
 };
 
+// Ensure no two contact-number fields on the same employee share the same value.
+const validateContactNumberUniqueness = ({
+  contactNumber,
+  emergencyContact = [],
+  references = [],
+  guarantor = [],
+}) => {
+  const seen = new Map();
+  const register = (rawValue, label) => {
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
+    if (!value) return;
+    if (seen.has(value)) {
+      throw new Error(
+        `${label} duplicates the number used in ${seen.get(value)}. Each contact number must be unique for an employee.`,
+      );
+    }
+    seen.set(value, label);
+  };
+
+  register(contactNumber, "Primary contact");
+  (emergencyContact || []).forEach((entry, i) =>
+    register(entry?.number, `Emergency contact #${i + 1}`),
+  );
+  (references || []).forEach((entry, i) =>
+    register(entry?.contactNumber, `Reference #${i + 1}`),
+  );
+  (guarantor || []).forEach((entry, i) =>
+    register(entry?.contactNumber, `Guarantor #${i + 1}`),
+  );
+};
+
 // @description     Create new employee
 // @route           POST /api/employees
 // @access          Admin
@@ -404,6 +435,12 @@ export const createEmployee = async (req, res, next) => {
     validateEmergencyContacts(parsedEmergencyContact);
     validateGuarantors(parsedGuarantor);
     validateReferences(parsedReferences);
+    validateContactNumberUniqueness({
+      contactNumber,
+      emergencyContact: parsedEmergencyContact,
+      references: parsedReferences,
+      guarantor: parsedGuarantor,
+    });
 
     // Validate position ID
     if (!mongoose.Types.ObjectId.isValid(position)) {
@@ -939,6 +976,12 @@ export const updateEmployee = async (req, res, next) => {
     if (references !== undefined) {
       validateReferences(parsedReferences);
     }
+    validateContactNumberUniqueness({
+      contactNumber: nextContactNumber,
+      emergencyContact: parsedEmergencyContact,
+      references: parsedReferences,
+      guarantor: parsedGuarantor,
+    });
 
     // Check for duplicate CNIC if changed
     if (cnic && cnic.trim() !== employee.cnic) {

@@ -139,6 +139,9 @@ workProgressReportSchema.index({ createdAt: -1 });
 // status equality ($in), and updatedAt range — ESR order: equality → sort → range
 workProgressReportSchema.index({ employees: 1, status: 1, updatedAt: 1 });
 
+// Same query but filtered by `completionDate` (period bucket for closed tasks).
+workProgressReportSchema.index({ employees: 1, status: 1, completionDate: 1 });
+
 const WorkProgressReport = mongoose.model(
   "WorkProgressReport",
   workProgressReportSchema,
