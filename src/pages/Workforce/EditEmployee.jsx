@@ -45,6 +45,11 @@ import {
 import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchAllowanceComponentsList } from "@/services/allowanceComponentsApi";
 import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
+import {
+  ACCEPTED_EMPLOYEE_IMAGE_TYPES,
+  buildEmployeeFormData,
+  isAcceptedEmployeeImageFile,
+} from "@/utils/employeeFormData";
 
 // Schema
 import { employeeSchema } from "@/schemas/employeeSchema";
@@ -65,6 +70,18 @@ const EMPLOYEE_PICTURE_MAX_SIZE = 1 * 1024 * 1024;
 
 const sanitizeDigits = (value, maxLength) =>
   value.replace(/\D/g, "").slice(0, maxLength);
+
+const getImageFileError = (file, label, maxSize) => {
+  if (!isAcceptedEmployeeImageFile(file)) {
+    return `${label} must be a JPG, PNG, or WebP image`;
+  }
+
+  if (file.size > maxSize) {
+    return `${label} size must be 1MB or less`;
+  }
+
+  return "";
+};
 
 // ============================================================================
 // COMPONENT
@@ -475,8 +492,12 @@ const EditEmployee = () => {
       return;
     }
 
-    if (file.size > EMPLOYEE_PICTURE_MAX_SIZE) {
-      const errorMessage = "Employee picture size must be 1MB or less";
+    const errorMessage = getImageFileError(
+      file,
+      "Employee picture",
+      EMPLOYEE_PICTURE_MAX_SIZE,
+    );
+    if (errorMessage) {
       setEmployeePicturePreview(employee?.employeePicture || null);
       setEmployeePictureFile(null);
       setEmployeePictureError(errorMessage);
@@ -500,9 +521,12 @@ const EditEmployee = () => {
       return;
     }
 
-    if (file.size > CNIC_IMAGE_MAX_SIZE) {
-      const errorMessage = "CNIC image size must be 1MB or less";
-
+    const errorMessage = getImageFileError(
+      file,
+      "CNIC image",
+      CNIC_IMAGE_MAX_SIZE,
+    );
+    if (errorMessage) {
       setCnicImageErrors((prev) => ({
         ...prev,
         [type]: errorMessage,
@@ -573,71 +597,14 @@ const EditEmployee = () => {
       return;
     }
 
-    const formData = new FormData();
-
-    // Expand per-type annual days into entitlement payload
-    const method = data.leaveMethod || "Fixed";
-    const expandedEntitlements = (data.leaveEntitlements || [])
-      .filter((entry) => entry.enabled)
-      .map((entry) => ({
-        leaveType: entry.leaveType,
-        enabled: true,
-        annualDays: Number(entry.annualDays) || 0,
-        method,
-      }));
-
-    // Append simple fields
-    Object.keys(data).forEach((key) => {
-      if (key === "leaveMethod") {
-        return;
-      }
-      if (key === "leaveEntitlements") {
-        formData.append("leaveEntitlements", JSON.stringify(expandedEntitlements));
-        return;
-      }
-      if (
-        key === "emergencyContact" ||
-        key === "education" ||
-        key === "previousExperience" ||
-        key === "guarantor" ||
-        key === "references" ||
-        key === "medical" ||
-        key === "legal" ||
-        key === "allowances"
-      ) {
-        formData.append(key, JSON.stringify(data[key]));
-      } else if (key !== "department") {
-        if (key === "compensationEffectiveDate") {
-          formData.append(key, data[key] ? new Date(data[key]).toISOString() : "");
-        } else {
-          formData.append(key, data[key]);
-        }
-      }
+    const formData = buildEmployeeFormData({
+      data,
+      leaveMethod: data.leaveMethod || "Fixed",
+      employeePictureFile,
+      cnicFrontFile,
+      cnicBackFile,
+      guarantorDocFiles,
     });
-
-    // Append files only if new ones were selected
-    if (employeePictureFile) {
-      formData.append("employeePicture", employeePictureFile);
-    }
-    if (cnicFrontFile) {
-      formData.append("cnicFront", cnicFrontFile);
-    }
-    if (cnicBackFile) {
-      formData.append("cnicBack", cnicBackFile);
-    }
-
-    // Append guarantor documents along with parallel index mapping
-    const docIndices = [];
-    (data.guarantor || []).forEach((_, i) => {
-      const file = guarantorDocFiles[i];
-      if (file instanceof File) {
-        formData.append("guarantorDocuments", file);
-        docIndices.push(i);
-      }
-    });
-    if (docIndices.length > 0) {
-      formData.append("guarantorDocumentIndices", JSON.stringify(docIndices));
-    }
 
     mutation.mutate(formData);
   };
@@ -647,8 +614,18 @@ const EditEmployee = () => {
     if (!file) {
       return;
     }
-    if (file.size > CNIC_IMAGE_MAX_SIZE) {
-      toast.error("Guarantor document size must be 1MB or less");
+    const errorMessage = getImageFileError(
+      file,
+      "Guarantor document",
+      CNIC_IMAGE_MAX_SIZE,
+    );
+    if (errorMessage) {
+      setGuarantorDocFiles((prev) => {
+        const next = [...prev];
+        next[index] = undefined;
+        return next;
+      });
+      toast.error(errorMessage);
       e.target.value = "";
       return;
     }
@@ -657,6 +634,13 @@ const EditEmployee = () => {
       next[index] = file;
       return next;
     });
+  };
+
+  const handleRemoveGuarantor = (index) => {
+    removeGuarantor(index);
+    setGuarantorDocFiles((prev) =>
+      prev.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
 
   const renderLabel = (text, required = false) => (
@@ -1114,7 +1098,7 @@ const EditEmployee = () => {
                 <label className={`${styles.imagePreview} ${styles.employeePicturePreview}`}>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPTED_EMPLOYEE_IMAGE_TYPES}
                     onChange={handleEmployeePictureUpload}
                     style={{ display: "none" }}
                   />
@@ -1143,7 +1127,7 @@ const EditEmployee = () => {
                 <label className={styles.imagePreview}>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPTED_EMPLOYEE_IMAGE_TYPES}
                     onChange={(e) => handleImageUpload(e, "front")}
                     style={{ display: "none" }}
                   />
@@ -1159,7 +1143,7 @@ const EditEmployee = () => {
                 <label className={styles.imagePreview}>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPTED_EMPLOYEE_IMAGE_TYPES}
                     onChange={(e) => handleImageUpload(e, "back")}
                     style={{ display: "none" }}
                   />
@@ -1864,7 +1848,7 @@ const EditEmployee = () => {
                     {renderLabel("Relevant Document")}
                     <Input
                       type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      accept={ACCEPTED_EMPLOYEE_IMAGE_TYPES}
                       onChange={(e) => handleGuarantorDocUpload(index, e)}
                     />
                     {newDocFile?.name ? (
@@ -1890,7 +1874,7 @@ const EditEmployee = () => {
                 {guarantorFields.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeGuarantor(index)}
+                    onClick={() => handleRemoveGuarantor(index)}
                     className={styles.deleteBtn}
                   >
                     <TrashIcon size={18} />
