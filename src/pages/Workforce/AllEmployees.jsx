@@ -73,7 +73,6 @@ import {
   fetchShiftsList,
 } from "@/services/employeeShiftsApi";
 import { fetchDepartmentsList } from "@/services/departmentsApi";
-import { fetchAllowancePoliciesList } from "@/services/allowancePoliciesApi";
 import { fetchPositionsFilters } from "@/services/positionsApi";
 
 // Utils
@@ -446,12 +445,6 @@ const AllEmployees = () => {
       queryKey: ["employee", row._id],
       queryFn: () => fetchEmployeeById(row._id),
       staleTime: 60 * 1000,
-    });
-
-    void queryClient.prefetchQuery({
-      queryKey: ["allowancePoliciesList"],
-      queryFn: fetchAllowancePoliciesList,
-      staleTime: 5 * 60 * 1000,
     });
 
     if (row.position?.department?._id) {

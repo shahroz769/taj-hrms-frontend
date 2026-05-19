@@ -130,7 +130,7 @@ router.get(
 );
 
 // @route           GET /api/employees/:id/compensation-history
-// @description     Get employee compensation history (salary + allowance policy)
+// @description     Get employee compensation history (salary + allowances)
 // @access          Admin, Supervisor
 router.get(
   "/:id/compensation-history",

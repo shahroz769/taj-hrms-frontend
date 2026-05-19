@@ -945,7 +945,7 @@ export const updateEmployee = async (req, res, next) => {
     if (hasCompensationChangeInput && !compensationEffectiveDate) {
       res.status(400);
       throw new Error(
-        "Compensation effective date is required when changing basic salary or allowance policy"
+        "Compensation effective date is required when changing basic salary or allowances"
       );
     }
 

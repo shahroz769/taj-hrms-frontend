@@ -234,6 +234,7 @@ const EditEmployee = () => {
   const watchEmploymentType = useWatch({ control, name: "employmentType" });
   const watchDob = useWatch({ control, name: "dob" });
   const watchJoiningDate = useWatch({ control, name: "joiningDate" });
+  const watchBasicSalary = useWatch({ control, name: "basicSalary" });
   const watchCompensationEffectiveDate = useWatch({
     control,
     name: "compensationEffectiveDate",
@@ -544,7 +545,7 @@ const EditEmployee = () => {
     const hasCompensationChange = currentBasicSalary !== nextBasicSalary;
 
     if (hasCompensationChange && !data.compensationEffectiveDate) {
-      toast.error("Compensation effective date is required for salary/policy changes");
+      toast.error("Compensation effective date is required for salary or allowance changes");
       return;
     }
 
@@ -994,7 +995,7 @@ const EditEmployee = () => {
                 type="text"
                 readOnly
                 value={(() => {
-                  const basic = Number(watch("basicSalary")) || 0;
+                  const basic = Number(watchBasicSalary) || 0;
                   const allowanceTotal = (watchAllowances || []).reduce(
                     (sum, a) =>
                       sum + (a?.enabled ? Number(a?.amount) || 0 : 0),
@@ -1078,7 +1079,7 @@ const EditEmployee = () => {
               {renderLabel("Compensation Change Reason")}
               <Textarea
                 {...register("compensationChangeReason")}
-                placeholder="Reason for salary/policy change (optional)"
+                placeholder="Reason for salary or allowance change (optional)"
               />
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
