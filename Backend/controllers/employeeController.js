@@ -1286,7 +1286,7 @@ export const updateEmployee = async (req, res, next) => {
       .populate("allowances.allowanceComponent", "name")
       .populate("leaveEntitlements.leaveType", "name");
 
-    res.json({
+    res.status(200).json({
       employee: populatedEmployee,
       positionChanged,
       leaveBalanceChanges,
