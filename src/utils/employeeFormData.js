@@ -1,11 +1,16 @@
 export const ACCEPTED_EMPLOYEE_IMAGE_TYPES =
   "image/jpeg,image/jpg,image/png,image/webp";
+export const ACCEPTED_EMPLOYEE_DOCUMENT_TYPES = `${ACCEPTED_EMPLOYEE_IMAGE_TYPES},application/pdf`;
 
 const ACCEPTED_EMPLOYEE_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/png",
   "image/webp",
+]);
+const ACCEPTED_EMPLOYEE_DOCUMENT_MIME_TYPES = new Set([
+  ...ACCEPTED_EMPLOYEE_IMAGE_MIME_TYPES,
+  "application/pdf",
 ]);
 
 const JSON_FORM_KEYS = new Set([
@@ -26,6 +31,9 @@ const OPTIONAL_ARRAY_KEYS = {
 
 export const isAcceptedEmployeeImageFile = (file) =>
   file instanceof File && ACCEPTED_EMPLOYEE_IMAGE_MIME_TYPES.has(file.type);
+
+export const isAcceptedEmployeeDocumentFile = (file) =>
+  file instanceof File && ACCEPTED_EMPLOYEE_DOCUMENT_MIME_TYPES.has(file.type);
 
 const hasValue = (value) => {
   if (value instanceof Date) {

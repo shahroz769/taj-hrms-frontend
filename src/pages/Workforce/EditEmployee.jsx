@@ -46,8 +46,10 @@ import { fetchDepartmentsList } from "@/services/departmentsApi";
 import { fetchAllowanceComponentsList } from "@/services/allowanceComponentsApi";
 import { fetchLeaveTypesList } from "@/services/leaveTypesApi";
 import {
+  ACCEPTED_EMPLOYEE_DOCUMENT_TYPES,
   ACCEPTED_EMPLOYEE_IMAGE_TYPES,
   buildEmployeeFormData,
+  isAcceptedEmployeeDocumentFile,
   isAcceptedEmployeeImageFile,
 } from "@/utils/employeeFormData";
 
@@ -74,6 +76,18 @@ const sanitizeDigits = (value, maxLength) =>
 const getImageFileError = (file, label, maxSize) => {
   if (!isAcceptedEmployeeImageFile(file)) {
     return `${label} must be a JPG, PNG, or WebP image`;
+  }
+
+  if (file.size > maxSize) {
+    return `${label} size must be 1MB or less`;
+  }
+
+  return "";
+};
+
+const getDocumentFileError = (file, label, maxSize) => {
+  if (!isAcceptedEmployeeDocumentFile(file)) {
+    return `${label} must be a JPG, PNG, WebP, or PDF file`;
   }
 
   if (file.size > maxSize) {
@@ -614,7 +628,7 @@ const EditEmployee = () => {
     if (!file) {
       return;
     }
-    const errorMessage = getImageFileError(
+    const errorMessage = getDocumentFileError(
       file,
       "Guarantor document",
       CNIC_IMAGE_MAX_SIZE,
@@ -1848,7 +1862,7 @@ const EditEmployee = () => {
                     {renderLabel("Relevant Document")}
                     <Input
                       type="file"
-                      accept={ACCEPTED_EMPLOYEE_IMAGE_TYPES}
+                      accept={ACCEPTED_EMPLOYEE_DOCUMENT_TYPES}
                       onChange={(e) => handleGuarantorDocUpload(index, e)}
                     />
                     {newDocFile?.name ? (
@@ -1866,7 +1880,7 @@ const EditEmployee = () => {
                       </a>
                     ) : (
                       <span className={styles.imageHint}>
-                        Image up to 1MB (JPG, PNG, WebP)
+                        File up to 1MB (JPG, PNG, WebP, PDF)
                       </span>
                     )}
                   </div>

@@ -3,21 +3,29 @@ import multer from "multer";
 // Configure multer for memory storage (we'll upload to Cloudinary from buffer)
 const storage = multer.memoryStorage();
 
-// File filter to accept only images
+// Employee/CNIC uploads are image-only; guarantor documents may also be PDFs.
 const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = [
+  const imageMimeTypes = [
     "image/jpeg",
     "image/png",
     "image/jpg",
     "image/webp",
   ];
+  const documentMimeTypes = [...imageMimeTypes, "application/pdf"];
+  const allowedMimeTypes =
+    file.fieldname === "guarantorDocuments" ? documentMimeTypes : imageMimeTypes;
 
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
+    const allowedLabel =
+      file.fieldname === "guarantorDocuments"
+        ? "JPEG, PNG, JPG, WebP, and PDF"
+        : "JPEG, PNG, JPG, and WebP";
+
     cb(
       new Error(
-        "Invalid file type. Only JPEG, PNG, JPG, and WebP are allowed."
+        `Invalid file type. Only ${allowedLabel} are allowed.`
       ),
       false
     );

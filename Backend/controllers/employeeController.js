@@ -526,10 +526,12 @@ export const createEmployee = async (req, res, next) => {
             const file = req.files.guarantorDocuments[i];
             if (!file) continue;
             const slot = docIndices[i] !== undefined ? Number(docIndices[i]) : i;
+            const isPdf = file.mimetype === "application/pdf";
             const docResult = await uploadToCloudinary(
               file.buffer,
               `taj-hrms/employees/${employeeID}/guarantors`,
-              `guarantor-${slot}`,
+              `guarantor-${slot}${isPdf ? ".pdf" : ""}`,
+              isPdf ? "raw" : "image",
             );
             if (parsedGuarantor[slot]) {
               parsedGuarantor[slot].documentUrl = docResult.secure_url;
@@ -1034,10 +1036,12 @@ export const updateEmployee = async (req, res, next) => {
             const file = req.files.guarantorDocuments[i];
             if (!file) continue;
             const slot = docIndices[i] !== undefined ? Number(docIndices[i]) : i;
+            const isPdf = file.mimetype === "application/pdf";
             const docResult = await uploadToCloudinary(
               file.buffer,
               `taj-hrms/employees/${employee.employeeID}/guarantors`,
-              `guarantor-${slot}-${Date.now()}`,
+              `guarantor-${slot}-${Date.now()}${isPdf ? ".pdf" : ""}`,
+              isPdf ? "raw" : "image",
             );
             if (parsedGuarantor[slot]) {
               parsedGuarantor[slot].documentUrl = docResult.secure_url;

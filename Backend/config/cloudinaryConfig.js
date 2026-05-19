@@ -14,13 +14,19 @@ cloudinary.config({
  * @param {Buffer} fileBuffer - The file buffer to upload
  * @param {string} folder - The folder path in Cloudinary
  * @param {string} publicId - Optional public ID for the file
+ * @param {string} resourceType - Cloudinary resource type
  * @returns {Promise<object>} - Cloudinary upload result
  */
-export const uploadToCloudinary = (fileBuffer, folder, publicId = null) => {
+export const uploadToCloudinary = (
+  fileBuffer,
+  folder,
+  publicId = null,
+  resourceType = "image",
+) => {
   return new Promise((resolve, reject) => {
     const uploadOptions = {
       folder: folder,
-      resource_type: "image",
+      resource_type: resourceType,
     };
 
     if (publicId) {
