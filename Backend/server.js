@@ -37,7 +37,9 @@ const PORT = globalThis.process?.env.PORT || 3000;
 connectDB();
 
 // CORS Config
-const allowedOrigins = [
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean) || [
   "http://localhost:5173",
   "https://taj-hrms-frontend.vercel.app",
 ];
