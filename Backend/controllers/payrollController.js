@@ -940,7 +940,7 @@ export const generatePayrolls = async (req, res, next) => {
               employee,
               parsedYear,
               parsedMonth,
-              "GENERATION_FAILED",
+              error.reasonCode || "GENERATION_FAILED",
               error.message || "Failed to generate payroll",
             ),
           );
@@ -1024,6 +1024,7 @@ export const regenerateEmployeePayroll = async (req, res, next) => {
       payroll: created,
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };

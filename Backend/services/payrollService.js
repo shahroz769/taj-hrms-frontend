@@ -34,6 +34,15 @@ const round2 = (value) =>
 
 const roundMoney = (value) => Math.round(Number(value) || 0);
 
+export class PayrollGenerationError extends Error {
+  constructor(message, reasonCode = "GENERATION_FAILED", statusCode = 400) {
+    super(message);
+    this.name = "PayrollGenerationError";
+    this.reasonCode = reasonCode;
+    this.statusCode = statusCode;
+  }
+}
+
 const keyByPKDate = (date) => formatInTimeZone(date, PAKISTAN_TZ, "yyyy-MM-dd");
 
 const normalizeUtcDate = (value) => {
@@ -362,6 +371,16 @@ export const calculateEmployeePayroll = async ({
   const totalScheduledDays = scheduledDates.filter(
     (date) => !isOutsideEmploymentWindow(date, employmentBounds),
   ).length;
+  const employedDaysInMonth = monthDates.filter(
+    (date) => !isOutsideEmploymentWindow(date, employmentBounds),
+  ).length;
+
+  if (employedDaysInMonth > 0 && totalScheduledDays === 0) {
+    throw new PayrollGenerationError(
+      "No working shift schedule is assigned for this employee in the payroll month.",
+      "NO_SHIFT_SCHEDULE",
+    );
+  }
 
   let present = 0;
   let absences = 0;

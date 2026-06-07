@@ -169,6 +169,23 @@ const normalizeAllowances = async (rawAllowances, effectiveDate) => {
   return allowances;
 };
 
+const getPayrollAllowanceSignature = (allowances = []) =>
+  JSON.stringify(
+    (allowances || [])
+      .filter((item) => Boolean(item.enabled))
+      .map((item) => ({
+        allowanceComponent: item.allowanceComponent?.toString(),
+        amount: Number(item.amount || 0),
+      }))
+      .sort((a, b) => a.allowanceComponent.localeCompare(b.allowanceComponent)),
+  );
+
+const isFutureEffectiveDate = (date) => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return date > today;
+};
+
 const syncLeaveBalancesFromEntitlements = async (employeeId, entitlements, year) => {
   const leaveBalances = [];
 
@@ -540,7 +557,9 @@ export const createEmployee = async (req, res, next) => {
         }
       } catch (uploadError) {
         res.status(500);
-        throw new Error(`Failed to upload employee images: ${uploadError.message}`);
+        throw new Error(`Failed to upload employee images: ${uploadError.message}`, {
+          cause: uploadError,
+        });
       }
     }
 
@@ -881,6 +900,8 @@ export const updateEmployee = async (req, res, next) => {
       leaveEntitlements,
       employmentType,
       compensationEffectiveDate,
+      salaryEffectiveDate,
+      allowanceEffectiveDate,
       compensationChangeReason,
     } = req.body;
 
@@ -921,47 +942,69 @@ export const updateEmployee = async (req, res, next) => {
       basicSalary !== undefined ? Number(basicSalary) || 0 : Number(employee.basicSalary || 0);
     const currentBasicSalary = Number(employee.basicSalary || 0);
 
+    const salaryEffectiveDateInput = salaryEffectiveDate || compensationEffectiveDate;
+    const allowanceEffectiveDateInput = allowanceEffectiveDate || compensationEffectiveDate;
+
     const nextAllowanceCandidate =
       allowances !== undefined
-        ? await normalizeAllowances(allowances, compensationEffectiveDate || new Date())
+        ? await normalizeAllowances(
+            allowances,
+            allowanceEffectiveDateInput || new Date(),
+          )
         : employee.allowances || [];
-    const currentAllowanceSignature = JSON.stringify(
-      (employee.allowances || []).map((item) => ({
-        allowanceComponent: item.allowanceComponent?.toString(),
-        enabled: Boolean(item.enabled),
-        amount: Number(item.amount || 0),
-      })),
+    const currentAllowanceSignature = getPayrollAllowanceSignature(
+      employee.allowances || [],
     );
-    const nextAllowanceSignature = JSON.stringify(
-      nextAllowanceCandidate.map((item) => ({
-        allowanceComponent: item.allowanceComponent?.toString(),
-        enabled: Boolean(item.enabled),
-        amount: Number(item.amount || 0),
-      })),
-    );
+    const nextAllowanceSignature = getPayrollAllowanceSignature(nextAllowanceCandidate);
 
-    const hasCompensationChangeInput =
-      nextBasicSalaryCandidate !== currentBasicSalary ||
-      nextAllowanceSignature !== currentAllowanceSignature;
+    const hasBasicSalaryChangeInput = nextBasicSalaryCandidate !== currentBasicSalary;
+    const hasAllowanceChangeInput = nextAllowanceSignature !== currentAllowanceSignature;
 
-    if (hasCompensationChangeInput && !compensationEffectiveDate) {
+    if (hasBasicSalaryChangeInput && !salaryEffectiveDateInput) {
       res.status(400);
       throw new Error(
-        "Compensation effective date is required when changing basic salary or allowances"
+        "Salary effective date is required when changing basic salary"
       );
     }
 
-    const parsedCompensationEffectiveDate = compensationEffectiveDate
-      ? new Date(compensationEffectiveDate)
+    if (hasAllowanceChangeInput && !allowanceEffectiveDateInput) {
+      res.status(400);
+      throw new Error(
+        "Allowance effective date is required when changing allowances"
+      );
+    }
+
+    const parsedSalaryEffectiveDate = salaryEffectiveDateInput
+      ? new Date(salaryEffectiveDateInput)
+      : new Date();
+    const parsedAllowanceEffectiveDate = allowanceEffectiveDateInput
+      ? new Date(allowanceEffectiveDateInput)
       : new Date();
 
     if (
-      hasCompensationChangeInput &&
-      compensationEffectiveDate &&
-      Number.isNaN(parsedCompensationEffectiveDate.getTime())
+      hasBasicSalaryChangeInput &&
+      Number.isNaN(parsedSalaryEffectiveDate.getTime())
     ) {
       res.status(400);
-      throw new Error("Invalid compensation effective date");
+      throw new Error("Invalid salary effective date");
+    }
+
+    if (hasBasicSalaryChangeInput && isFutureEffectiveDate(parsedSalaryEffectiveDate)) {
+      res.status(400);
+      throw new Error("Salary effective date cannot be in the future");
+    }
+
+    if (
+      hasAllowanceChangeInput &&
+      Number.isNaN(parsedAllowanceEffectiveDate.getTime())
+    ) {
+      res.status(400);
+      throw new Error("Invalid allowance effective date");
+    }
+
+    if (hasAllowanceChangeInput && isFutureEffectiveDate(parsedAllowanceEffectiveDate)) {
+      res.status(400);
+      throw new Error("Allowance effective date cannot be in the future");
     }
 
     res.status(400);
@@ -1050,7 +1093,9 @@ export const updateEmployee = async (req, res, next) => {
         }
       } catch (uploadError) {
         res.status(500);
-        throw new Error(`Failed to upload employee images: ${uploadError.message}`);
+        throw new Error(`Failed to upload employee images: ${uploadError.message}`, {
+          cause: uploadError,
+        });
       }
     }
 
@@ -1138,7 +1183,7 @@ export const updateEmployee = async (req, res, next) => {
       if (nextBasicSalary !== previousBasicSalary) {
         const existingSalaryHistoryOnSameDate = await BasicSalaryHistory.findOne({
           employee: id,
-          effectiveDate: parsedCompensationEffectiveDate,
+          effectiveDate: parsedSalaryEffectiveDate,
           toBasicSalary: { $ne: nextBasicSalary },
         });
 
@@ -1154,7 +1199,7 @@ export const updateEmployee = async (req, res, next) => {
           fromBasicSalary: previousBasicSalary,
           toBasicSalary: nextBasicSalary,
           changedBy: req.user._id,
-          effectiveDate: parsedCompensationEffectiveDate,
+          effectiveDate: parsedSalaryEffectiveDate,
           reason: compensationChangeReason || "Updated via employee edit form",
         });
       }
@@ -1226,7 +1271,7 @@ export const updateEmployee = async (req, res, next) => {
         fromAllowances: employee.allowances || [],
         toAllowances: nextAllowanceCandidate,
         changedBy: req.user._id,
-        effectiveDate: parsedCompensationEffectiveDate,
+        effectiveDate: parsedAllowanceEffectiveDate,
         reason: compensationChangeReason || "Updated via employee edit form",
       });
       employee.allowances = nextAllowanceCandidate;

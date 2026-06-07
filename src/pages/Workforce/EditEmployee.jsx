@@ -97,6 +97,22 @@ const getDocumentFileError = (file, label, maxSize) => {
   return "";
 };
 
+const getAllowanceComponentId = (allowance) => {
+  const component = allowance?.allowanceComponent;
+  return component?._id || component || "";
+};
+
+const getPayrollAllowanceSignature = (allowances = []) =>
+  JSON.stringify(
+    (allowances || [])
+      .filter((allowance) => Boolean(allowance?.enabled))
+      .map((allowance) => ({
+        allowanceComponent: getAllowanceComponentId(allowance).toString(),
+        amount: Number(allowance?.amount || 0),
+      }))
+      .sort((a, b) => a.allowanceComponent.localeCompare(b.allowanceComponent)),
+  );
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -127,7 +143,6 @@ const EditEmployee = () => {
   // Reset state when employee ID changes (for navigation between different employees)
   useEffect(() => {
     // This state mirrors route identity and file inputs, so it must reset when the id changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDataLoaded(false);
     setSelectedDepartment("");
     setEmployeePicturePreview(null);
@@ -161,7 +176,9 @@ const EditEmployee = () => {
       leaveEntitlements: [],
       leaveMethod: "Fixed",
       allowances: [],
-      compensationEffectiveDate: new Date(),
+      compensationEffectiveDate: null,
+      salaryEffectiveDate: null,
+      allowanceEffectiveDate: null,
       compensationChangeReason: "",
       employmentType: "Permanent",
       fatherName: "",
@@ -266,9 +283,13 @@ const EditEmployee = () => {
   const watchDob = useWatch({ control, name: "dob" });
   const watchJoiningDate = useWatch({ control, name: "joiningDate" });
   const watchBasicSalary = useWatch({ control, name: "basicSalary" });
-  const watchCompensationEffectiveDate = useWatch({
+  const watchSalaryEffectiveDate = useWatch({
     control,
-    name: "compensationEffectiveDate",
+    name: "salaryEffectiveDate",
+  });
+  const watchAllowanceEffectiveDate = useWatch({
+    control,
+    name: "allowanceEffectiveDate",
   });
   const watchLeaveMethod = useWatch({ control, name: "leaveMethod" });
   const watchLeaveEntitlements =
@@ -285,6 +306,11 @@ const EditEmployee = () => {
       guarantorDocFiles.some(Boolean),
   );
   const hasUnsavedChanges = isDirty || hasFileChanges;
+  const hasSalaryChange =
+    Number(employeeData?.employee?.basicSalary || 0) !== Number(watchBasicSalary || 0);
+  const hasAllowanceChange =
+    getPayrollAllowanceSignature(employeeData?.employee?.allowances || []) !==
+    getPayrollAllowanceSignature(watchAllowances || []);
 
   const setDirtyValue = (name, value, options = {}) => {
     setValue(name, value, { shouldDirty: true, ...options });
@@ -383,7 +409,9 @@ const EditEmployee = () => {
             amount: existing?.amount ?? "",
           };
         }),
-        compensationEffectiveDate: new Date(),
+        compensationEffectiveDate: null,
+        salaryEffectiveDate: null,
+        allowanceEffectiveDate: null,
         compensationChangeReason: "",
         employmentType: emp.employmentType || "Permanent",
         fatherName: emp.fatherName || "",
@@ -466,7 +494,6 @@ const EditEmployee = () => {
 
       // Set image previews
       // These previews mirror the loaded employee record before any new local file is selected.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmployeePicturePreview(emp.employeePicture || null);
       if (emp.cnicImages?.front) {
         setCnicFrontPreview(emp.cnicImages.front);
@@ -589,12 +616,13 @@ const EditEmployee = () => {
   };
 
   const onSubmit = (data) => {
-    const currentBasicSalary = Number(employeeData?.employee?.basicSalary || 0);
-    const nextBasicSalary = Number(data.basicSalary || 0);
-    const hasCompensationChange = currentBasicSalary !== nextBasicSalary;
+    if (hasSalaryChange && !data.salaryEffectiveDate) {
+      toast.error("Salary effective date is required when changing basic salary");
+      return;
+    }
 
-    if (hasCompensationChange && !data.compensationEffectiveDate) {
-      toast.error("Compensation effective date is required for salary or allowance changes");
+    if (hasAllowanceChange && !data.allowanceEffectiveDate) {
+      toast.error("Allowance effective date is required when changing allowances");
       return;
     }
 
@@ -998,6 +1026,44 @@ const EditEmployee = () => {
                 </span>
               )}
             </div>
+            {hasSalaryChange ? (
+              <div className={styles.formGroup}>
+                {renderLabel("Salary Effective Date", true)}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      data-empty={!watchSalaryEffectiveDate}
+                      className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+                    >
+                      {watchSalaryEffectiveDate ? (
+                        format(watchSalaryEffectiveDate, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                      <ChevronDownIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={watchSalaryEffectiveDate}
+                      onSelect={(date) => setDirtyValue("salaryEffectiveDate", date)}
+                      defaultMonth={watchSalaryEffectiveDate || new Date()}
+                      captionLayout="dropdown"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      disabled={{ after: new Date() }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {errors.salaryEffectiveDate && (
+                  <span className={styles.error}>
+                    {errors.salaryEffectiveDate.message}
+                  </span>
+                )}
+              </div>
+            ) : null}
             <div className={styles.formGroup}>
               {renderLabel("Gross Salary")}
               <Input
@@ -1054,41 +1120,11 @@ const EditEmployee = () => {
                 </span>
               )}
             </div>
-            <div className={styles.formGroup}>
-              {renderLabel("Compensation Effective Date")}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    data-empty={!watchCompensationEffectiveDate}
-                    className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
-                  >
-                    {watchCompensationEffectiveDate ? (
-                      format(watchCompensationEffectiveDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <ChevronDownIcon />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={watchCompensationEffectiveDate}
-                    onSelect={(date) => setDirtyValue("compensationEffectiveDate", date)}
-                    defaultMonth={watchCompensationEffectiveDate}
-                    captionLayout="dropdown"
-                    fromYear={1990}
-                    toYear={new Date().getFullYear() + 1}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
               {renderLabel("Compensation Change Reason")}
               <Textarea
                 {...register("compensationChangeReason")}
-                placeholder="Reason for salary or allowance change (optional)"
+                placeholder="Reason for salary, allowance, or leave entitlement change (optional)"
               />
             </div>
             <div className={`${styles.formGroup} ${styles.formGroupFull}`}>
@@ -1276,6 +1312,46 @@ const EditEmployee = () => {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Allowances</h2>
           </div>
+          {hasAllowanceChange ? (
+            <div className={styles.formGrid}>
+              <div className={styles.formGroup}>
+                {renderLabel("Allowance Effective Date", true)}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      data-empty={!watchAllowanceEffectiveDate}
+                      className="w-full justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+                    >
+                      {watchAllowanceEffectiveDate ? (
+                        format(watchAllowanceEffectiveDate, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                      <ChevronDownIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={watchAllowanceEffectiveDate}
+                      onSelect={(date) => setDirtyValue("allowanceEffectiveDate", date)}
+                      defaultMonth={watchAllowanceEffectiveDate || new Date()}
+                      captionLayout="dropdown"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      disabled={{ after: new Date() }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {errors.allowanceEffectiveDate && (
+                  <span className={styles.error}>
+                    {errors.allowanceEffectiveDate.message}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className={styles.allowanceGrid}>
             {(allowanceComponentsData || []).map((allowance, index) => {
               const enabled = watchAllowances[index]?.enabled;

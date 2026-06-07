@@ -183,6 +183,8 @@ export const employeeSchema = z
       .union([z.string(), z.date()])
       .optional()
       .nullable(),
+    salaryEffectiveDate: z.union([z.string(), z.date()]).optional().nullable(),
+    allowanceEffectiveDate: z.union([z.string(), z.date()]).optional().nullable(),
     compensationChangeReason: z.string().optional(),
     joiningDate: z.union([z.string(), z.date()], {
       required_error: "Joining date is required",
