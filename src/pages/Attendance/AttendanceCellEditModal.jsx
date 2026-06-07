@@ -510,7 +510,7 @@ const AttendanceCellEditModal = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {isNewRecord ? "Mark Attendance" : "Edit Attendance"}
@@ -605,7 +605,7 @@ const AttendanceCellEditModal = ({
                 </div>
               ) : (
                 <Select value={shiftId || "_none_"} onValueChange={(val) => handleShiftChange(val === "_none_" ? "" : val)} disabled={isApprovedLeaveLocked}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full min-w-0 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate">
                     <SelectValue placeholder="Select a shift..." />
                   </SelectTrigger>
                   <SelectContent>
