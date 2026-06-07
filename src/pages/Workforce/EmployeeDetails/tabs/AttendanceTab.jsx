@@ -1,10 +1,14 @@
 // React
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+
+// React Router
+import { useSearchParams } from "react-router";
 
 // External
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ChevronLeftIcon from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRightIcon from "lucide-react/dist/esm/icons/chevron-right";
+import LoaderCircleIcon from "lucide-react/dist/esm/icons/loader-circle";
 
 // Components
 import { Button } from "@/components/ui/button";
@@ -17,8 +21,12 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
+// Pages / Modals
+import AttendanceCellEditModal from "@/pages/Attendance/AttendanceCellEditModal";
+
 // Services
 import { fetchEmployeeMonthlyAttendance } from "@/services/attendancesApi";
+import { fetchEmployeeShiftOnDate } from "@/services/employeeShiftsApi";
 
 // Styles
 import styles from "../EmployeeDetails.module.css";
@@ -41,6 +49,7 @@ const STATUS_CLASS = {
   "Unpaid Leave": styles.stateLeave,
   Late: styles.stateLate,
   "Half Day": styles.stateHalfDay,
+  Off: styles.stateDayOff,
   "Day Off": styles.stateDayOff,
   Holiday: styles.stateHoliday,
 };
@@ -51,9 +60,37 @@ const STATUS_CLASS = {
 
 const today = new Date();
 
-const AttendanceTab = ({ employeeId }) => {
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+const parseMonthParam = (value) => {
+  if (value === null) return today.getMonth();
+  const month = Number(value);
+  return Number.isInteger(month) && month >= 0 && month <= 11
+    ? month
+    : today.getMonth();
+};
+
+const AttendanceTab = ({ employeeId, employeeName }) => {
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [selectedYear, setSelectedYear] = useState(
+    () => Number(searchParams.get("attendanceYear")) || today.getFullYear(),
+  );
+  const [selectedMonth, setSelectedMonth] = useState(
+    () => parseMonthParam(searchParams.get("attendanceMonth")),
+  );
+  const [cellEditOpen, setCellEditOpen] = useState(false);
+  const [cellEditData, setCellEditData] = useState(null);
+  const [loadingDay, setLoadingDay] = useState(null);
+
+  const updateAttendanceUrl = useCallback((year, month) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", "attendance");
+      next.set("attendanceYear", String(year));
+      next.set("attendanceMonth", String(month));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["employee-monthly-attendance", employeeId, selectedYear, selectedMonth],
@@ -64,12 +101,14 @@ const AttendanceTab = ({ employeeId }) => {
       }),
   });
 
-  const records = data?.records || data?.attendances || data || [];
+  const records = useMemo(() => {
+    if (Array.isArray(data)) return data;
+    return data?.records || data?.attendances || [];
+  }, [data]);
 
   const recordsByDay = useMemo(() => {
     const map = new Map();
-    const list = Array.isArray(records) ? records : [];
-    for (const rec of list) {
+    for (const rec of records) {
       const date = rec.date ? new Date(rec.date) : null;
       if (!date) continue;
       map.set(date.getDate(), rec);
@@ -92,23 +131,59 @@ const AttendanceTab = ({ employeeId }) => {
     return Array.from({ length: 6 }, (_, i) => current - 4 + i);
   }, []);
 
+  const setPeriod = useCallback((year, month) => {
+    setSelectedYear(year);
+    setSelectedMonth(month);
+    updateAttendanceUrl(year, month);
+  }, [updateAttendanceUrl]);
+
   const goPrev = () => {
-    if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear((y) => y - 1);
-    } else {
-      setSelectedMonth((m) => m - 1);
-    }
+    const nextYear = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+    const nextMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    setPeriod(nextYear, nextMonth);
   };
 
   const goNext = () => {
-    if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear((y) => y + 1);
-    } else {
-      setSelectedMonth((m) => m + 1);
-    }
+    const nextYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
+    const nextMonth = selectedMonth === 11 ? 0 : selectedMonth + 1;
+    setPeriod(nextYear, nextMonth);
   };
+
+  const handleCellClick = useCallback(async (day, record) => {
+    const date = new Date(Date.UTC(selectedYear, selectedMonth, day));
+    const month = String(selectedMonth + 1).padStart(2, "0");
+    const dateDay = String(day).padStart(2, "0");
+    const dateStr = `${selectedYear}-${month}-${dateDay}`;
+    const recordHasShift = !!(
+      record?.shift?._id || (typeof record?.shift === "string" && record.shift)
+    );
+
+    let preloadedShift = null;
+    if (!recordHasShift) {
+      setLoadingDay(day);
+      try {
+        preloadedShift = await queryClient.fetchQuery({
+          queryKey: ["employee-shift-on-date", employeeId, dateStr],
+          queryFn: () => fetchEmployeeShiftOnDate({ employeeId, date: dateStr }),
+          staleTime: 60_000,
+        });
+      } catch {
+        // Open the modal without a pre-selected shift; the user can pick one.
+      } finally {
+        setLoadingDay(null);
+      }
+    }
+
+    setCellEditData({
+      employeeId,
+      employeeName: employeeName || "Employee",
+      date,
+      dateStr,
+      record: record || null,
+      preloadedShift,
+    });
+    setCellEditOpen(true);
+  }, [employeeId, employeeName, queryClient, selectedMonth, selectedYear]);
 
   return (
     <div>
@@ -119,7 +194,7 @@ const AttendanceTab = ({ employeeId }) => {
           </Button>
           <Select
             value={String(selectedMonth)}
-            onValueChange={(v) => setSelectedMonth(Number(v))}
+            onValueChange={(v) => setPeriod(selectedYear, Number(v))}
           >
             <SelectTrigger className="w-35">
               <SelectValue />
@@ -134,7 +209,7 @@ const AttendanceTab = ({ employeeId }) => {
           </Select>
           <Select
             value={String(selectedYear)}
-            onValueChange={(v) => setSelectedYear(Number(v))}
+            onValueChange={(v) => setPeriod(Number(v), selectedMonth)}
           >
             <SelectTrigger className="w-25">
               <SelectValue />
@@ -178,6 +253,7 @@ const AttendanceTab = ({ employeeId }) => {
             const day = i + 1;
             const rec = recordsByDay.get(day);
             const status = rec?.status;
+            const isCellLoading = loadingDay === day;
             const isToday =
               today.getFullYear() === selectedYear &&
               today.getMonth() === selectedMonth &&
@@ -188,10 +264,26 @@ const AttendanceTab = ({ employeeId }) => {
                 key={day}
                 className={`${styles.calendarCell} ${
                   isToday ? styles.calendarCellToday : ""
-                }`}
+                } ${styles.calendarCellClickable}`}
+                onClick={
+                  isCellLoading ? undefined : () => handleCellClick(day, rec)
+                }
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    if (!isCellLoading) handleCellClick(day, rec);
+                  }
+                }}
               >
                 <div className={styles.calendarDay}>{day}</div>
-                {status ? (
+                {isCellLoading ? (
+                  <LoaderCircleIcon
+                    size={16}
+                    className="mt-1 text-primary animate-spin"
+                  />
+                ) : status ? (
                   <span
                     className={`${styles.calendarStatus} ${
                       STATUS_CLASS[status] || styles.stateNone
@@ -214,6 +306,20 @@ const AttendanceTab = ({ employeeId }) => {
           })}
         </div>
       )}
+
+      {cellEditData ? (
+        <AttendanceCellEditModal
+          key={`${cellEditData.employeeId}-${cellEditData.date?.toISOString()}`}
+          open={cellEditOpen}
+          onOpenChange={setCellEditOpen}
+          employeeId={cellEditData.employeeId}
+          employeeName={cellEditData.employeeName}
+          date={cellEditData.date}
+          dateStr={cellEditData.dateStr}
+          record={cellEditData.record}
+          preloadedShift={cellEditData.preloadedShift}
+        />
+      ) : null}
     </div>
   );
 };

@@ -462,7 +462,21 @@ const AllEmployees = () => {
     setSelectedEmployeeIds(newSelection);
   };
 
+  const handleMarkAttendanceClick = () => {
+    if (selectedEmployeeIds.length === 0) {
+      toast.error("Please select an employee to mark attendance");
+      return;
+    }
+
+    setMarkAttendanceModalOpen(true);
+  };
+
   const handleAssignShiftOpenChange = async (open) => {
+    if (open && selectedEmployeeIds.length === 0) {
+      toast.error("Please select an employee to assign shift");
+      return;
+    }
+
     setAssignShiftModalOpen(open);
     if (open) {
       if (minimumEffectiveDate) {
@@ -598,14 +612,18 @@ const AllEmployees = () => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>All Employees</h1>
+        <div>
+          <h1 className={styles.title}>All Employees</h1>
+          <p className={styles.selectionNote}>
+            Select employee to mark attendance or assign shift.
+          </p>
+        </div>
         <div className="flex items-center gap-3">
           {/* Mark Attendance Button */}
           <Button
             variant="outline"
             className="cursor-pointer relative"
-            disabled={selectedEmployeeIds.length === 0}
-            onClick={() => setMarkAttendanceModalOpen(true)}
+            onClick={handleMarkAttendanceClick}
           >
             <CalendarIcon size={16} />
             Mark Attendance
@@ -624,7 +642,6 @@ const AllEmployees = () => {
               <Button
                 variant="outline"
                 className="cursor-pointer relative"
-                disabled={selectedEmployeeIds.length === 0}
               >
                 <CalendarIcon size={16} />
                 Assign Shift

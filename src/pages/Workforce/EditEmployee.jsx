@@ -149,7 +149,7 @@ const EditEmployee = () => {
     control,
     setValue,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
@@ -278,6 +278,17 @@ const EditEmployee = () => {
   const watchedPreviousExperience =
     useWatch({ control, name: "previousExperience" }) || [];
   const watchedGuarantors = useWatch({ control, name: "guarantor" }) || [];
+  const hasFileChanges = Boolean(
+    employeePictureFile ||
+      cnicFrontFile ||
+      cnicBackFile ||
+      guarantorDocFiles.some(Boolean),
+  );
+  const hasUnsavedChanges = isDirty || hasFileChanges;
+
+  const setDirtyValue = (name, value, options = {}) => {
+    setValue(name, value, { shouldDirty: true, ...options });
+  };
 
   useEffect(() => {
     if (!(watchGender === "Female" && watchMaritalStatus === "Married")) {
@@ -496,8 +507,8 @@ const EditEmployee = () => {
 
   const handleDepartmentChange = (value) => {
     setSelectedDepartment(value);
-    setValue("department", value);
-    setValue("position", ""); // Reset position when department changes
+    setDirtyValue("department", value);
+    setDirtyValue("position", ""); // Reset position when department changes
   };
 
   const handleEmployeePictureUpload = (e) => {
@@ -668,7 +679,7 @@ const EditEmployee = () => {
     <Button
       type="submit"
       variant="green"
-      disabled={mutation.isPending}
+      disabled={mutation.isPending || !hasUnsavedChanges}
       className="cursor-pointer"
       {...extraProps}
     >
@@ -733,7 +744,7 @@ const EditEmployee = () => {
               {renderLabel("Gender", true)}
               <Select
                 value={watchGender}
-                onValueChange={(value) => setValue("gender", value)}
+                onValueChange={(value) => setDirtyValue("gender", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select gender" />
@@ -768,7 +779,7 @@ const EditEmployee = () => {
                   <Calendar
                     mode="single"
                     selected={watchDob}
-                    onSelect={(date) => setValue("dob", date)}
+                    onSelect={(date) => setDirtyValue("dob", date)}
                     defaultMonth={watchDob}
                     captionLayout="dropdown"
                     fromYear={1950}
@@ -848,7 +859,7 @@ const EditEmployee = () => {
               {renderLabel("Province", true)}
               <Select
                 value={watchProvince}
-                onValueChange={(value) => setValue("province", value)}
+                onValueChange={(value) => setDirtyValue("province", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select province" />
@@ -876,7 +887,7 @@ const EditEmployee = () => {
               {renderLabel("Marital Status", true)}
               <Select
                 value={watchMaritalStatus}
-                onValueChange={(value) => setValue("maritalStatus", value)}
+                onValueChange={(value) => setDirtyValue("maritalStatus", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select status" />
@@ -922,7 +933,7 @@ const EditEmployee = () => {
               {renderLabel("Position", true)}
               <Select
                 value={watchPosition}
-                onValueChange={(value) => setValue("position", value)}
+                onValueChange={(value) => setDirtyValue("position", value)}
                 disabled={!departmentIdForPositions || isLoadingPositions}
               >
                 <SelectTrigger className="w-full">
@@ -956,7 +967,7 @@ const EditEmployee = () => {
               {renderLabel("Employment Type", true)}
               <Select
                 value={watchEmploymentType}
-                onValueChange={(value) => setValue("employmentType", value)}
+                onValueChange={(value) => setDirtyValue("employmentType", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select type" />
@@ -1029,7 +1040,7 @@ const EditEmployee = () => {
                   <Calendar
                     mode="single"
                     selected={watchJoiningDate}
-                    onSelect={(date) => setValue("joiningDate", date)}
+                    onSelect={(date) => setDirtyValue("joiningDate", date)}
                     defaultMonth={watchJoiningDate}
                     captionLayout="dropdown"
                     fromYear={1990}
@@ -1064,7 +1075,7 @@ const EditEmployee = () => {
                   <Calendar
                     mode="single"
                     selected={watchCompensationEffectiveDate}
-                    onSelect={(date) => setValue("compensationEffectiveDate", date)}
+                    onSelect={(date) => setDirtyValue("compensationEffectiveDate", date)}
                     defaultMonth={watchCompensationEffectiveDate}
                     captionLayout="dropdown"
                     fromYear={1990}
@@ -1194,7 +1205,7 @@ const EditEmployee = () => {
               {renderLabel("Method (applies to all selected leaves)", true)}
               <Select
                 value={watchLeaveMethod || "Fixed"}
-                onValueChange={(value) => setValue("leaveMethod", value)}
+                onValueChange={(value) => setDirtyValue("leaveMethod", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Method" />
@@ -1219,12 +1230,12 @@ const EditEmployee = () => {
                       <Checkbox
                         checked={Boolean(enabled)}
                         onCheckedChange={(checked) => {
-                          setValue(
+                          setDirtyValue(
                             `leaveEntitlements.${index}.enabled`,
                             Boolean(checked),
                           );
                           if (!checked) {
-                            setValue(
+                            setDirtyValue(
                               `leaveEntitlements.${index}.annualDays`,
                               "",
                             );
@@ -1274,7 +1285,7 @@ const EditEmployee = () => {
                     <Checkbox
                       checked={Boolean(enabled)}
                       onCheckedChange={(checked) =>
-                        setValue(`allowances.${index}.enabled`, Boolean(checked))
+                        setDirtyValue(`allowances.${index}.enabled`, Boolean(checked))
                       }
                     />
                     <Label className={styles.label}>{allowance.name}</Label>
@@ -1387,7 +1398,7 @@ const EditEmployee = () => {
               <Label className={styles.label}>Blood Group</Label>
               <Select
                 value={watchMedical?.bloodGroup}
-                onValueChange={(value) => setValue("medical.bloodGroup", value)}
+                onValueChange={(value) => setDirtyValue("medical.bloodGroup", value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select blood group" />
@@ -1415,7 +1426,7 @@ const EditEmployee = () => {
                   id="hasHealthIssues"
                   checked={watchMedical?.hasHealthIssues}
                   onCheckedChange={(checked) =>
-                    setValue("medical.hasHealthIssues", checked)
+                    setDirtyValue("medical.hasHealthIssues", checked)
                   }
                 />
                 <Label htmlFor="hasHealthIssues">Has Health Issues</Label>
@@ -1434,7 +1445,7 @@ const EditEmployee = () => {
                   id="disability"
                   checked={watchMedical?.disability}
                   onCheckedChange={(checked) =>
-                    setValue("medical.disability", checked)
+                    setDirtyValue("medical.disability", checked)
                   }
                 />
                 <Label htmlFor="disability">Has Disability</Label>
@@ -1501,7 +1512,7 @@ const EditEmployee = () => {
                   <Select
                     value={watchedEducation[index]?.status || ""}
                     onValueChange={(value) =>
-                      setValue(`education.${index}.status`, value)
+                      setDirtyValue(`education.${index}.status`, value)
                     }
                   >
                     <SelectTrigger className="w-full">
@@ -1592,7 +1603,7 @@ const EditEmployee = () => {
                         mode="single"
                         selected={experience.from}
                         onSelect={(date) =>
-                          setValue(`previousExperience.${index}.from`, date)
+                          setDirtyValue(`previousExperience.${index}.from`, date)
                         }
                         defaultMonth={experience.from}
                         captionLayout="dropdown"
@@ -1624,7 +1635,7 @@ const EditEmployee = () => {
                         mode="single"
                         selected={experience.to}
                         onSelect={(date) =>
-                          setValue(`previousExperience.${index}.to`, date)
+                          setDirtyValue(`previousExperience.${index}.to`, date)
                         }
                         defaultMonth={experience.to}
                         captionLayout="dropdown"
@@ -1911,7 +1922,7 @@ const EditEmployee = () => {
                   id="convictedCriminalCorruptionCase"
                   checked={watchLegal?.convictedCriminalCorruptionCase}
                   onCheckedChange={(checked) =>
-                    setValue("legal.convictedCriminalCorruptionCase", checked)
+                    setDirtyValue("legal.convictedCriminalCorruptionCase", checked)
                   }
                 />
                 <Label htmlFor="convictedCriminalCorruptionCase">
@@ -1925,7 +1936,7 @@ const EditEmployee = () => {
                   id="rusticatedDismissedTerminated"
                   checked={watchLegal?.rusticatedDismissedTerminated}
                   onCheckedChange={(checked) =>
-                    setValue("legal.rusticatedDismissedTerminated", checked)
+                    setDirtyValue("legal.rusticatedDismissedTerminated", checked)
                   }
                 />
                 <Label htmlFor="rusticatedDismissedTerminated">
@@ -1939,7 +1950,7 @@ const EditEmployee = () => {
                   id="pendingLitigationCourtCase"
                   checked={watchLegal?.pendingLitigationCourtCase}
                   onCheckedChange={(checked) =>
-                    setValue("legal.pendingLitigationCourtCase", checked)
+                    setDirtyValue("legal.pendingLitigationCourtCase", checked)
                   }
                 />
                 <Label htmlFor="pendingLitigationCourtCase">
@@ -1953,7 +1964,7 @@ const EditEmployee = () => {
                   id="availableAnywhereInPakistan"
                   checked={watchLegal?.availableAnywhereInPakistan}
                   onCheckedChange={(checked) =>
-                    setValue("legal.availableAnywhereInPakistan", checked)
+                    setDirtyValue("legal.availableAnywhereInPakistan", checked)
                   }
                 />
                 <Label htmlFor="availableAnywhereInPakistan">

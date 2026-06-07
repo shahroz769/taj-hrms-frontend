@@ -254,6 +254,18 @@
   outline-offset: -2px;
 }
 
+.calendarCellClickable {
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.calendarCellClickable:hover,
+.calendarCellClickable:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 36%, transparent);
+  outline: none;
+}
+
 .calendarDay {
   font-size: 12px;
   font-weight: 600;

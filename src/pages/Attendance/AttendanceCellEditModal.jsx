@@ -196,6 +196,7 @@ const AttendanceCellEditModal = ({
     mutationFn: ({ id, payload }) => updateAttendance(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance-monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-monthly-attendance"] });
       toast.success("Attendance updated");
       onOpenChange(false);
     },
@@ -210,6 +211,7 @@ const AttendanceCellEditModal = ({
     mutationFn: markSingleAttendance,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance-monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-monthly-attendance"] });
       toast.success("Attendance record created");
       onOpenChange(false);
     },
@@ -224,6 +226,7 @@ const AttendanceCellEditModal = ({
     mutationFn: deleteAttendance,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance-monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-monthly-attendance"] });
       toast.success("Attendance record deleted");
       setDeleteDialogOpen(false);
       onOpenChange(false);
@@ -272,14 +275,27 @@ const AttendanceCellEditModal = ({
     const isSplit = !!selShift && Array.isArray(selShift.segments) && selShift.segments.length === 2;
     let segmentsPayload;
     if (isSplit && !isTimeless) {
+      const selectedSegments = selShift.segments || [];
       segmentsPayload = [
         {
-          checkIn: combineDateAndTime(dateStr, seg1In),
-          checkOut: combineDateAndTime(dateStr, seg1Out),
+          checkIn: combineDateAndTime(
+            dateStr,
+            seg1In || selectedSegments[0]?.startTime?.slice(0, 5),
+          ),
+          checkOut: combineDateAndTime(
+            dateStr,
+            seg1Out || selectedSegments[0]?.endTime?.slice(0, 5),
+          ),
         },
         {
-          checkIn: combineDateAndTime(dateStr, seg2In),
-          checkOut: combineDateAndTime(dateStr, seg2Out),
+          checkIn: combineDateAndTime(
+            dateStr,
+            seg2In || selectedSegments[1]?.startTime?.slice(0, 5),
+          ),
+          checkOut: combineDateAndTime(
+            dateStr,
+            seg2Out || selectedSegments[1]?.endTime?.slice(0, 5),
+          ),
         },
       ];
     }
@@ -341,20 +357,14 @@ const AttendanceCellEditModal = ({
       ? !(selectedShiftObj.workingDays || []).includes(dayNameForOff)
       : false;
 
-  // Auto-fill segment times when shift becomes split or check-in/out changes
   const segShift1Start = selectedShiftObj?.segments?.[0]?.startTime;
   const segShift1End = selectedShiftObj?.segments?.[0]?.endTime;
   const segShift2Start = selectedShiftObj?.segments?.[1]?.startTime;
   const segShift2End = selectedShiftObj?.segments?.[1]?.endTime;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const _ = useMemo(() => {
-    if (!isSplitShiftSelected) return null;
-    if (!seg1In && segShift1Start) setSeg1In(segShift1Start.slice(0, 5));
-    if (!seg1Out && segShift1End) setSeg1Out(segShift1End.slice(0, 5));
-    if (!seg2In && segShift2Start) setSeg2In(segShift2Start.slice(0, 5));
-    if (!seg2Out && segShift2End) setSeg2Out(segShift2End.slice(0, 5));
-    return null;
-  }, [isSplitShiftSelected, segShift1Start, segShift1End, segShift2Start, segShift2End]);
+  const resolvedSeg1In = seg1In || segShift1Start?.slice(0, 5) || "";
+  const resolvedSeg1Out = seg1Out || segShift1End?.slice(0, 5) || "";
+  const resolvedSeg2In = seg2In || segShift2Start?.slice(0, 5) || "";
+  const resolvedSeg2Out = seg2Out || segShift2End?.slice(0, 5) || "";
 
   // Off-day rule: if off-day, force status to Present and lock to Present-only
   if (isOffDayForSelectedShift && mainStatus !== "Present" && mainStatus !== "Leave") {
@@ -646,14 +656,14 @@ const AttendanceCellEditModal = ({
                     <div className="grid grid-cols-2 gap-3">
                       <input
                         type="time"
-                        value={seg1In}
+                        value={resolvedSeg1In}
                         onChange={(e) => setSeg1In(e.target.value)}
                         disabled={isApprovedLeaveLocked}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       />
                       <input
                         type="time"
-                        value={seg1Out}
+                        value={resolvedSeg1Out}
                         onChange={(e) => setSeg1Out(e.target.value)}
                         disabled={isApprovedLeaveLocked}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -667,14 +677,14 @@ const AttendanceCellEditModal = ({
                     <div className="grid grid-cols-2 gap-3">
                       <input
                         type="time"
-                        value={seg2In}
+                        value={resolvedSeg2In}
                         onChange={(e) => setSeg2In(e.target.value)}
                         disabled={isApprovedLeaveLocked}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       />
                       <input
                         type="time"
-                        value={seg2Out}
+                        value={resolvedSeg2Out}
                         onChange={(e) => setSeg2Out(e.target.value)}
                         disabled={isApprovedLeaveLocked}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

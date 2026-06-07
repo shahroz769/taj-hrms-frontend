@@ -12,6 +12,12 @@
   color: var(--primary);
 }
 
+.selectionNote {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
 .header {
   display: flex;
   justify-content: space-between;

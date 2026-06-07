@@ -1,6 +1,9 @@
 // React
 import { useState } from "react";
 
+// React Router
+import { useSearchParams } from "react-router";
+
 // External
 import {
   useMutation,
@@ -205,9 +208,34 @@ const STATUS_VARIANT = {
 };
 
 const LeavesTab = ({ employee, canApply }) => {
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => Number(searchParams.get("leavePage")) || 1);
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const urlStatus = searchParams.get("leaveStatus");
+    return urlStatus && urlStatus !== "all" ? urlStatus : "";
+  });
   const [applyOpen, setApplyOpen] = useState(false);
+
+  const updateLeavesUrl = (nextPage, nextStatus) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", "leaves");
+      next.set("leavePage", String(nextPage));
+      next.set("leaveStatus", nextStatus || "all");
+      return next;
+    }, { replace: true });
+  };
+
+  const setLeavesPage = (nextPage) => {
+    setPage(nextPage);
+    updateLeavesUrl(nextPage, statusFilter);
+  };
+
+  const setLeavesStatusFilter = (nextStatus) => {
+    setStatusFilter(nextStatus);
+    setPage(1);
+    updateLeavesUrl(1, nextStatus);
+  };
 
   const { data: balancesData, isLoading: balancesLoading } = useQuery({
     queryKey: ["employee-leave-balances", employee._id],
@@ -281,8 +309,7 @@ const LeavesTab = ({ employee, canApply }) => {
             <Select
               value={statusFilter || "all"}
               onValueChange={(v) => {
-                setStatusFilter(v === "all" ? "" : v);
-                setPage(1);
+                setLeavesStatusFilter(v === "all" ? "" : v);
               }}
             >
               <SelectTrigger className="w-35">
@@ -354,7 +381,7 @@ const LeavesTab = ({ employee, canApply }) => {
                     <PaginationPrevious
                       onClick={(e) => {
                         e.preventDefault();
-                        setPage((p) => Math.max(1, p - 1));
+                        setLeavesPage(Math.max(1, page - 1));
                       }}
                     />
                   </PaginationItem>
@@ -365,7 +392,7 @@ const LeavesTab = ({ employee, canApply }) => {
                           isActive={n === page}
                           onClick={(e) => {
                             e.preventDefault();
-                            setPage(n);
+                            setLeavesPage(n);
                           }}
                         >
                           {n}
@@ -377,7 +404,7 @@ const LeavesTab = ({ employee, canApply }) => {
                     <PaginationNext
                       onClick={(e) => {
                         e.preventDefault();
-                        setPage((p) => Math.min(totalPages, p + 1));
+                        setLeavesPage(Math.min(totalPages, page + 1));
                       }}
                     />
                   </PaginationItem>

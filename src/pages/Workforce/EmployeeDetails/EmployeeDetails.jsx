@@ -1,8 +1,8 @@
 // React
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // React Router
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 // External
 import { useQuery } from "@tanstack/react-query";
@@ -56,6 +56,16 @@ const STATUS_BADGE_VARIANT = {
   Terminated: "destructive",
 };
 
+const DETAILS_TABS = new Set([
+  "details",
+  "position",
+  "shift",
+  "attendance",
+  "leaves",
+  "salary",
+  "payroll",
+]);
+
 const getInitials = (name = "") =>
   name
     .split(" ")
@@ -72,13 +82,32 @@ const getInitials = (name = "") =>
 const EmployeeDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const role = useSelector((state) => state.auth.user?.role);
   const isAdmin = role === ROLES.admin;
 
-  const [activeTab, setActiveTab] = useState("details");
+  const urlTab = searchParams.get("tab");
+  const activeTab = DETAILS_TABS.has(urlTab) ? urlTab : "details";
   const [endDialogOpen, setEndDialogOpen] = useState(false);
   const [endDialogMode, setEndDialogMode] = useState("Terminated");
   const [rejoinDialogOpen, setRejoinDialogOpen] = useState(false);
+
+  const handleTabChange = (tab) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      return next;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    if (urlTab && DETAILS_TABS.has(urlTab)) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", "details");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams, urlTab]);
 
   const {
     data: employeeResponse,
@@ -238,7 +267,7 @@ const EmployeeDetails = () => {
         </Alert>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className={styles.tabsList}>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="position">Position History</TabsTrigger>
@@ -262,7 +291,7 @@ const EmployeeDetails = () => {
         </TabsContent>
 
         <TabsContent value="attendance" className={styles.tabContent}>
-          <AttendanceTab employeeId={employee._id} />
+          <AttendanceTab employeeId={employee._id} employeeName={employee.fullName} />
         </TabsContent>
 
         <TabsContent value="leaves" className={styles.tabContent}>

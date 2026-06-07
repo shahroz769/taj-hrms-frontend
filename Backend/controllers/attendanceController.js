@@ -375,7 +375,7 @@ const ensureEarnedLeaveType = async () => {
         createdBy: "system",
       },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 };
 
@@ -387,7 +387,7 @@ const adjustEarnedLeaveBalance = async (employeeId, delta) => {
     {
       $setOnInsert: { totalDays: 0, usedDays: 0, remainingDays: 0 },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 
   const usedDays = Math.max(0, Number(balance.usedDays || 0));

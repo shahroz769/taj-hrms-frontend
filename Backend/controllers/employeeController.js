@@ -82,7 +82,7 @@ const ensureEarnedLeaveType = async () => {
         createdBy: "system",
       },
     },
-    { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
   );
 };
 

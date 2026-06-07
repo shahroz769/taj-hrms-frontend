@@ -1,11 +1,19 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import chalk from "chalk";
+import dns from "node:dns";
 dotenv.config();
 
 // Cache the connection promise so warm Vercel invocations reuse the existing connection
 let connectionPromise = null;
 const databaseName = process.env.MONGO_DB_NAME || "tajHRMS";
+const dnsServers = process.env.MONGO_DNS_SERVERS?.split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+
+if (dnsServers?.length) {
+  dns.setServers(dnsServers);
+}
 
 const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) return;
